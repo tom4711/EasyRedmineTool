@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EasyRedmineTool.Core/EasyRedmineTool.Core.csproj" />
+    <Project Path="src/EasyRedmineTool.Desktop/EasyRedmineTool.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EasyRedmineTool.Tests/EasyRedmineTool.Tests.csproj" />
+  </Folder>
+</Solution>
