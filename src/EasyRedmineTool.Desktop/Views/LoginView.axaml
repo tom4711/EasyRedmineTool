@@ -1,0 +1,21 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="EasyRedmineTool.Desktop.Views.LoginView">
+
+  <StackPanel Margin="24" Spacing="12">
+    <TextBlock Text="EasyRedmine Login" FontSize="22" FontWeight="Bold" />
+
+    <TextBlock Text="Base URL" />
+    <TextBox Text="{Binding BaseUrl}" Watermark="https://redmine.example.com" />
+
+    <TextBlock Text="API Key" />
+    <TextBox Text="{Binding ApiKey}" PasswordChar="*" />
+
+    <Button
+      Content="Verbindung testen"
+      Command="{Binding TestConnectionCommand}" />
+
+    <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>
