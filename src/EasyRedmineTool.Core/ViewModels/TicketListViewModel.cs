@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.Input;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
-using System.Buffers.Text;
 using System.Collections.ObjectModel;
 
 namespace EasyRedmineTool.Core.ViewModels;
@@ -12,12 +11,13 @@ namespace EasyRedmineTool.Core.ViewModels;
 public partial class TicketListViewModel : ViewModelBase
 {
     private readonly ITicketService _ticketService;
+    private readonly IAppSettingsService _appSettingsService;
 
     [ObservableProperty]
     private string baseUrl = "https://projects.hawe.com/";
 
     [ObservableProperty]
-    private string apiKey = "REDACTED";
+    private string apiKey = string.Empty;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -27,9 +27,19 @@ public partial class TicketListViewModel : ViewModelBase
 
     public ObservableCollection<IssueDto> Tickets { get; } = new();
 
-    public TicketListViewModel(ITicketService ticketService)
+    public TicketListViewModel(ITicketService ticketService, IAppSettingsService appSettingsService)
     {
         _ticketService = ticketService;
+        _appSettingsService = appSettingsService;
+
+        ReloadSettings();
+    }
+
+    public void ReloadSettings()
+    {
+        var settings = _appSettingsService.Load();
+        BaseUrl = settings.BaseUrl;
+        ApiKey = settings.ApiKey;
     }
 
     [RelayCommand]

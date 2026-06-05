@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace EasyRedmineTool.Desktop.Views;
 
-public partial class LoginView : UserControl
+public partial class SettingsView : UserControl
 {
-    public LoginView()
+    public SettingsView()
     {
         InitializeComponent();
     }

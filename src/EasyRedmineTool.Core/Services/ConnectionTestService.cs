@@ -4,25 +4,25 @@ using EasyRedmineTool.Core.Services.Interfaces;
 
 namespace EasyRedmineTool.Core.Services;
 
-public class AuthService : IAuthService
+public class ConnectionTestService : IConnectionTestService
 {
     private readonly EasyRedmineApiClient _apiClient;
 
-    public AuthService(EasyRedmineApiClient apiClient)
+    public ConnectionTestService(EasyRedmineApiClient apiClient)
     {
         _apiClient = apiClient;
     }
 
-    public async Task<LoginResult> TestConnectionAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    public async Task<ConnectionTestResult> TestConnectionAsync(ConnectionTestRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.BaseUrl))
         {
-            return new LoginResult { Success = false, Message = "BaseUrl fehlt." };
+            return new ConnectionTestResult { Success = false, Message = "BaseUrl fehlt." };
         }
 
         if (string.IsNullOrWhiteSpace(request.ApiKey))
         {
-            return new LoginResult { Success = false, Message = "API-Key fehlt." };
+            return new ConnectionTestResult { Success = false, Message = "API-Key fehlt." };
         }
 
         try
@@ -31,14 +31,14 @@ public class AuthService : IAuthService
 
             if (!response.IsSuccessStatusCode)
             {
-                return new LoginResult
+                return new ConnectionTestResult
                 {
                     Success = false,
                     Message = $"Verbindung fehlgeschlagen: {(int)response.StatusCode} {response.ReasonPhrase}"
                 };
             }
 
-            return new LoginResult
+            return new ConnectionTestResult
             {
                 Success = true,
                 Message = "Verbindung erfolgreich."
@@ -46,7 +46,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            return new LoginResult
+            return new ConnectionTestResult
             {
                 Success = false,
                 Message = $"Fehler: {ex.Message}"

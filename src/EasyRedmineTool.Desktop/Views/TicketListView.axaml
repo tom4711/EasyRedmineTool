@@ -8,12 +8,6 @@
   <StackPanel Margin="24" Spacing="12">
     <TextBlock Text="Meine offenen Tickets" FontSize="22" FontWeight="Bold" />
 
-    <TextBlock Text="Base URL" />
-    <TextBox Text="{Binding BaseUrl}" Watermark="https://redmine.example.com" />
-
-    <TextBlock Text="API Key" />
-    <TextBox Text="{Binding ApiKey}" PasswordChar="*" />
-
     <Button
       Content="Tickets laden"
       Command="{Binding LoadTicketsCommand}" />

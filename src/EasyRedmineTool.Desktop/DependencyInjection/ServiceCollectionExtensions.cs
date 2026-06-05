@@ -15,10 +15,11 @@ public static class ServiceCollectionExtensions
     {
         services.AddHttpClient<EasyRedmineApiClient>();
 
-        services.AddSingleton<IAuthService, AuthService>();
+        services.AddSingleton<IConnectionTestService, ConnectionTestService>();
         services.AddSingleton<ITicketService, TicketService>();
+        services.AddSingleton<IAppSettingsService, AppSettingsService>();
 
-        services.AddTransient<LoginViewModel>();
+        services.AddTransient<SettingsViewModel>();
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<TicketListViewModel>();
 
