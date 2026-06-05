@@ -1,0 +1,41 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:EasyRedmineTool.Core.ViewModels"
+    x:Class="EasyRedmineTool.Desktop.Views.TimeEntriesView"
+    x:DataType="vm:TimeEntriesViewModel">
+
+  <StackPanel Margin="24" Spacing="12">
+    <TextBlock Text="Time Entries" FontSize="22" FontWeight="Bold" />
+
+    <Button Content="Favoriten neu laden" Command="{Binding ReloadFavoritesCommand}" />
+
+    <TextBlock Text="Favoriten-Tickets" />
+    <ListBox ItemsSource="{Binding FavoriteTickets}" SelectedItem="{Binding SelectedFavoriteTicket}" Height="180">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="{Binding Id, StringFormat=#\{0\}}" FontWeight="Bold" />
+            <TextBlock Text="{Binding Subject}" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+    <TextBlock Text="Stunden (z. B. 1.5)" />
+    <TextBox Text="{Binding Hours}" />
+
+    <TextBlock Text="Datum (yyyy-MM-dd)" />
+    <TextBox Text="{Binding SpentOn}" />
+
+    <TextBlock Text="Activity ID" />
+    <TextBox Text="{Binding ActivityId}" />
+
+    <TextBlock Text="Kommentar" />
+    <TextBox Text="{Binding Comments}" />
+
+    <Button Content="Zeiteintrag erstellen" Command="{Binding CreateTimeEntryCommand}" />
+
+    <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>

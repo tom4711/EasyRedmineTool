@@ -8,5 +8,11 @@ public interface ITicketService
         string baseUrl,
         string apiKey,
         CancellationToken cancellationToken = default);
+
+    Task<IssueDto?> GetIssueByIdAsync(
+        string baseUrl,
+        string apiKey,
+        int issueId,
+        CancellationToken cancellationToken = default);
 }
 

@@ -1,5 +1,6 @@
 namespace EasyRedmineTool.Core.Api;
 
+using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 
 using System.Net.Http.Headers;
@@ -42,5 +43,41 @@ public class EasyRedmineApiClient
         return await _httpClient.GetFromJsonAsync<IssueListResponse>(
             "issues.json?assigned_to_id=me&status_id=open&limit=100",
             cancellationToken);
+    }
+
+    public async Task<IssueResponse?> GetIssueByIdAsync(
+        string baseUrl,
+        string apiKey,
+        int issueId,
+        CancellationToken cancellationToken = default)
+    {
+        Configure(baseUrl, apiKey);
+
+        return await _httpClient.GetFromJsonAsync<IssueResponse>(
+            $"issues/{issueId}.json",
+            cancellationToken);
+    }
+
+    public async Task<HttpResponseMessage> CreateTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        TimeEntryCreateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        Configure(baseUrl, apiKey);
+
+        var payload = new
+        {
+            time_entry = new
+            {
+                issue_id = request.IssueId,
+                hours = request.Hours,
+                spent_on = request.SpentOn,
+                activity_id = request.ActivityId,
+                comments = request.Comments
+            }
+        };
+
+        return await _httpClient.PostAsJsonAsync("time_entries.json", payload, cancellationToken);
     }
 }

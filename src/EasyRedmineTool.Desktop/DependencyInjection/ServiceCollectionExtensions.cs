@@ -16,11 +16,13 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IConnectionTestService, ConnectionTestService>();
         services.AddSingleton<ITicketService, TicketService>();
+        services.AddSingleton<ITimeEntryService, TimeEntryService>();
         services.AddSingleton<IAppSettingsService, AppSettingsService>();
 
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<TicketListViewModel>();
+        services.AddTransient<TimeEntriesViewModel>();
 
 
         return services;

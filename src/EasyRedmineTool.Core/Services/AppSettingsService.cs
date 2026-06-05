@@ -34,10 +34,10 @@ public sealed class AppSettingsService : IAppSettingsService
                 return CreateDefault();
             }
 
-            if (string.IsNullOrWhiteSpace(settings.BaseUrl))
-            {
-                settings.BaseUrl = DefaultBaseUrl;
-            }
+            settings.BaseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? DefaultBaseUrl : settings.BaseUrl;
+            settings.ApiKey ??= string.Empty;
+            settings.CachedTickets ??= [];
+            settings.FavoriteTicketIds ??= [];
 
             return settings;
         }
@@ -52,7 +52,9 @@ public sealed class AppSettingsService : IAppSettingsService
         var normalized = new AppSettings
         {
             BaseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? DefaultBaseUrl : settings.BaseUrl,
-            ApiKey = settings.ApiKey ?? string.Empty
+            ApiKey = settings.ApiKey ?? string.Empty,
+            CachedTickets = settings.CachedTickets ?? [],
+            FavoriteTicketIds = settings.FavoriteTicketIds ?? []
         };
 
         var wrapper = new AppSettingsWrapper
@@ -67,7 +69,9 @@ public sealed class AppSettingsService : IAppSettingsService
     private static AppSettings CreateDefault() => new()
     {
         BaseUrl = DefaultBaseUrl,
-        ApiKey = string.Empty
+        ApiKey = string.Empty,
+        CachedTickets = [],
+        FavoriteTicketIds = []
     };
 
     private sealed class AppSettingsWrapper

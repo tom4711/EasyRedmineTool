@@ -16,13 +16,18 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool isTicketListVisible;
 
+    [ObservableProperty]
+    private bool isTimeEntriesVisible;
+
     public MainWindowViewModel(
         SettingsViewModel settingsViewModel,
         TicketListViewModel ticketListViewModel,
+        TimeEntriesViewModel timeEntriesViewModel,
         IAppSettingsService appSettingsService)
     {
         SettingsViewModel = settingsViewModel;
         TicketListViewModel = ticketListViewModel;
+        TimeEntriesViewModel = timeEntriesViewModel;
 
         SettingsViewModel.SettingsSaved += OnSettingsSaved;
 
@@ -39,6 +44,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public SettingsViewModel SettingsViewModel { get; }
     public TicketListViewModel TicketListViewModel { get; }
+    public TimeEntriesViewModel TimeEntriesViewModel { get; }
 
     [RelayCommand]
     private void OpenSettings()
@@ -46,9 +52,24 @@ public partial class MainWindowViewModel : ViewModelBase
         ShowSettings();
     }
 
+    [RelayCommand]
+    private void OpenTicketList()
+    {
+        TicketListViewModel.ReloadSettings();
+        ShowTicketList();
+    }
+
+    [RelayCommand]
+    private void OpenTimeEntries()
+    {
+        TimeEntriesViewModel.ReloadFavorites();
+        ShowTimeEntries();
+    }
+
     private void OnSettingsSaved(object? sender, EventArgs e)
     {
         TicketListViewModel.ReloadSettings();
+        TimeEntriesViewModel.ReloadFavorites();
         ShowTicketList();
     }
 
@@ -56,11 +77,20 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         IsSettingsVisible = true;
         IsTicketListVisible = false;
+        IsTimeEntriesVisible = false;
     }
 
     private void ShowTicketList()
     {
         IsSettingsVisible = false;
         IsTicketListVisible = true;
+        IsTimeEntriesVisible = false;
+    }
+
+    private void ShowTimeEntries()
+    {
+        IsSettingsVisible = false;
+        IsTicketListVisible = false;
+        IsTimeEntriesVisible = true;
     }
 }
