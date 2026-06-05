@@ -5,74 +5,77 @@
     xmlns:models="using:EasyRedmineTool.Core.Models.TimeEntries"
     x:Class="EasyRedmineTool.Desktop.Views.TimeEntriesView"
     x:DataType="vm:TimeEntriesViewModel">
+  <Grid>
+    <ScrollViewer>
+      <StackPanel Margin="24" Spacing="12">
+        <TextBlock Text="Time Entries" FontSize="22" FontWeight="Bold" />
 
-  <StackPanel Margin="24" Spacing="12">
-    <TextBlock Text="Time Entries" FontSize="22" FontWeight="Bold" />
+        <Border Padding="12" BorderThickness="1" CornerRadius="6">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Wochenübersicht:" FontWeight="Bold" />
+              <TextBlock Text="{Binding CurrentQuarterLabel}" />
+              <Button Content="Aktualisieren" Command="{Binding ReloadWeeklySummaryCommand}" />
+            </StackPanel>
+            <TextBlock Text="{Binding WeeklyTotalHours, StringFormat=Gesamtstunden im Zeitraum: {0}}" />
+            <ListBox ItemsSource="{Binding WeeklyHours}" Height="200">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="models:WeeklyHoursDto">
+                  <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Text="{Binding Label}" />
+                      <TextBlock Grid.Column="1" Text="{Binding Hours, StringFormat={}{0} h}" FontWeight="Bold" />
+                    </Grid>
+                    <ProgressBar Minimum="0"
+                                 Maximum="{Binding $parent[UserControl].DataContext.MaxWeeklyHours}"
+                                 Value="{Binding Hours}"
+                                 Height="10" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </Border>
 
-    <Border Padding="12" BorderThickness="1" CornerRadius="6">
-      <StackPanel Spacing="8">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Text="Wochenübersicht:" FontWeight="Bold" />
-          <TextBlock Text="{Binding CurrentQuarterLabel}" />
-          <Button Content="Aktualisieren" Command="{Binding ReloadWeeklySummaryCommand}" />
+          <Button Content="Favoriten neu laden" Command="{Binding ReloadFavoritesCommand}" />
+          <Button Content="Aktivitäten neu laden" Command="{Binding ReloadActivitiesCommand}" />
         </StackPanel>
-        <TextBlock Text="{Binding WeeklyTotalHours, StringFormat=Gesamtstunden im Zeitraum: {0}}" />
-        <ListBox ItemsSource="{Binding WeeklyHours}" Height="200">
+
+        <TextBlock Text="Favoriten-Tickets" />
+        <ListBox ItemsSource="{Binding FavoriteTickets}" SelectedItem="{Binding SelectedFavoriteTicket}" Height="180">
           <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="models:WeeklyHoursDto">
-              <StackPanel Spacing="4">
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Grid.Column="0" Text="{Binding Label}" />
-                  <TextBlock Grid.Column="1" Text="{Binding Hours, StringFormat={}{0} h}" FontWeight="Bold" />
-                </Grid>
-                <ProgressBar Minimum="0"
-                             Maximum="{Binding $parent[UserControl].DataContext.MaxWeeklyHours}"
-                             Value="{Binding Hours}"
-                             Height="10" />
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding Id, StringFormat=#\{0\}}" FontWeight="Bold" />
+                <TextBlock Text="{Binding Subject}" />
               </StackPanel>
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
+
+        <TextBlock Text="Stunden (z. B. 1.5)" />
+        <TextBox Text="{Binding Hours}" />
+
+        <TextBlock Text="Datum (yyyy-MM-dd)" />
+        <TextBox Text="{Binding SpentOn}" />
+
+        <TextBlock Text="Aktivität" />
+        <ComboBox ItemsSource="{Binding Activities}" SelectedItem="{Binding SelectedActivity}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding Name}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <TextBlock Text="Kommentar" />
+        <TextBox Text="{Binding Comments}" />
+
+        <Button Content="Zeiteintrag erstellen" Command="{Binding CreateTimeEntryCommand}" />
+
+        <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
       </StackPanel>
-    </Border>
-
-    <StackPanel Orientation="Horizontal" Spacing="8">
-      <Button Content="Favoriten neu laden" Command="{Binding ReloadFavoritesCommand}" />
-      <Button Content="Aktivitäten neu laden" Command="{Binding ReloadActivitiesCommand}" />
-    </StackPanel>
-
-    <TextBlock Text="Favoriten-Tickets" />
-    <ListBox ItemsSource="{Binding FavoriteTickets}" SelectedItem="{Binding SelectedFavoriteTicket}" Height="180">
-      <ListBox.ItemTemplate>
-        <DataTemplate>
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="{Binding Id, StringFormat=#\{0\}}" FontWeight="Bold" />
-            <TextBlock Text="{Binding Subject}" />
-          </StackPanel>
-        </DataTemplate>
-      </ListBox.ItemTemplate>
-    </ListBox>
-
-    <TextBlock Text="Stunden (z. B. 1.5)" />
-    <TextBox Text="{Binding Hours}" />
-
-    <TextBlock Text="Datum (yyyy-MM-dd)" />
-    <TextBox Text="{Binding SpentOn}" />
-
-    <TextBlock Text="Aktivität" />
-    <ComboBox ItemsSource="{Binding Activities}" SelectedItem="{Binding SelectedActivity}">
-      <ComboBox.ItemTemplate>
-        <DataTemplate>
-          <TextBlock Text="{Binding Name}" />
-        </DataTemplate>
-      </ComboBox.ItemTemplate>
-    </ComboBox>
-
-    <TextBlock Text="Kommentar" />
-    <TextBox Text="{Binding Comments}" />
-
-    <Button Content="Zeiteintrag erstellen" Command="{Binding CreateTimeEntryCommand}" />
-
-    <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
-  </StackPanel>
+    </ScrollViewer>
+  </Grid>
 </UserControl>
