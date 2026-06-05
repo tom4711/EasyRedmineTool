@@ -8,7 +8,10 @@
   <StackPanel Margin="24" Spacing="12">
     <TextBlock Text="Time Entries" FontSize="22" FontWeight="Bold" />
 
-    <Button Content="Favoriten neu laden" Command="{Binding ReloadFavoritesCommand}" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Content="Favoriten neu laden" Command="{Binding ReloadFavoritesCommand}" />
+      <Button Content="Aktivitäten neu laden" Command="{Binding ReloadActivitiesCommand}" />
+    </StackPanel>
 
     <TextBlock Text="Favoriten-Tickets" />
     <ListBox ItemsSource="{Binding FavoriteTickets}" SelectedItem="{Binding SelectedFavoriteTicket}" Height="180">
@@ -28,8 +31,14 @@
     <TextBlock Text="Datum (yyyy-MM-dd)" />
     <TextBox Text="{Binding SpentOn}" />
 
-    <TextBlock Text="Activity ID" />
-    <TextBox Text="{Binding ActivityId}" />
+    <TextBlock Text="Aktivität" />
+    <ComboBox ItemsSource="{Binding Activities}" SelectedItem="{Binding SelectedActivity}">
+      <ComboBox.ItemTemplate>
+        <DataTemplate>
+          <TextBlock Text="{Binding Name}" />
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
 
     <TextBlock Text="Kommentar" />
     <TextBox Text="{Binding Comments}" />

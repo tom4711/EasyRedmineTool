@@ -4,6 +4,13 @@ using EasyRedmineTool.Core.Models.TimeEntries;
 
 public interface ITimeEntryService
 {
+    Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
+        string baseUrl,
+        string apiKey,
+        int? issueId = null,
+        int? projectId = null,
+        CancellationToken cancellationToken = default);
+
     Task<TimeEntryOperationResult> CreateTimeEntryAsync(
         string baseUrl,
         string apiKey,

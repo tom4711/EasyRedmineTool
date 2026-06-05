@@ -13,6 +13,23 @@ public class TimeEntryService : ITimeEntryService
         _apiClient = apiClient;
     }
 
+    public async Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
+        string baseUrl,
+        string apiKey,
+        int? issueId = null,
+        int? projectId = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await _apiClient.GetTimeEntryActivitiesAsync(baseUrl, apiKey, issueId, projectId, cancellationToken);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     public async Task<TimeEntryOperationResult> CreateTimeEntryAsync(
         string baseUrl,
         string apiKey,

@@ -26,7 +26,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
     private string spentOn = DateTime.Today.ToString("yyyy-MM-dd");
 
     [ObservableProperty]
-    private string activityId = "9";
+    private TimeEntryActivityDto? selectedActivity;
 
     [ObservableProperty]
     private string comments = string.Empty;
@@ -38,6 +38,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
     private bool isBusy;
 
     public ObservableCollection<IssueDto> FavoriteTickets { get; } = [];
+    public ObservableCollection<TimeEntryActivityDto> Activities { get; } = [];
 
     public TimeEntriesViewModel(IAppSettingsService appSettingsService, ITimeEntryService timeEntryService)
     {
@@ -45,6 +46,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
         _timeEntryService = timeEntryService;
 
         ReloadFavorites();
+        _ = ReloadActivitiesAsync();
     }
 
     [RelayCommand]
@@ -74,6 +76,46 @@ public partial class TimeEntriesViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    public async Task ReloadActivitiesAsync()
+    {
+        var settings = _appSettingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            return;
+        }
+
+        var issueId = SelectedFavoriteTicket?.Id;
+        var projectId = SelectedFavoriteTicket?.Project?.Id;
+
+        var loadedActivities = await _timeEntryService.GetActivitiesAsync(
+            settings.BaseUrl,
+            settings.ApiKey,
+            issueId,
+            projectId);
+
+        Activities.Clear();
+        foreach (var activity in loadedActivities.OrderBy(a => a.Name))
+        {
+            Activities.Add(activity);
+        }
+
+        if (SelectedActivity is null || Activities.All(a => a.Id != SelectedActivity.Id))
+        {
+            SelectedActivity = Activities.FirstOrDefault();
+        }
+
+        if (Activities.Count == 0)
+        {
+            StatusMessage = "Keine Aktivitäten gefunden. Bitte API-Berechtigung/Projekt prüfen.";
+        }
+    }
+
+    partial void OnSelectedFavoriteTicketChanged(IssueDto? value)
+    {
+        _ = ReloadActivitiesAsync();
+    }
+
+    [RelayCommand]
     private async Task CreateTimeEntryAsync()
     {
         if (IsBusy)
@@ -91,9 +133,9 @@ public partial class TimeEntriesViewModel : ViewModelBase
             return;
         }
 
-        if (!int.TryParse(ActivityId, out var parsedActivityId) || parsedActivityId <= 0)
+        if (SelectedActivity is null)
         {
-            StatusMessage = "Bitte eine gültige Activity-ID eingeben.";
+            StatusMessage = "Bitte eine Aktivität auswählen.";
             return;
         }
 
@@ -123,7 +165,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
                     IssueId = SelectedFavoriteTicket.Id,
                     Hours = parsedHours,
                     SpentOn = SpentOn,
-                    ActivityId = parsedActivityId,
+                    ActivityId = SelectedActivity.Id,
                     Comments = Comments
                 });
 

@@ -153,15 +153,31 @@ public partial class TicketListViewModel : ViewModelBase
             return;
         }
 
-        if (_favoriteTicketIds.Contains(SelectedTicket.Id))
+        ToggleFavorite(SelectedTicket);
+    }
+
+    [RelayCommand]
+    private void ToggleFavoriteForTicket(IssueDto? ticket)
+    {
+        if (ticket is null)
         {
-            _favoriteTicketIds.Remove(SelectedTicket.Id);
-            StatusMessage = $"Ticket #{SelectedTicket.Id} aus Favoriten entfernt.";
+            return;
+        }
+
+        ToggleFavorite(ticket);
+    }
+
+    private void ToggleFavorite(IssueDto ticket)
+    {
+        if (_favoriteTicketIds.Contains(ticket.Id))
+        {
+            _favoriteTicketIds.Remove(ticket.Id);
+            StatusMessage = $"Ticket #{ticket.Id} aus Favoriten entfernt.";
         }
         else
         {
-            _favoriteTicketIds.Add(SelectedTicket.Id);
-            StatusMessage = $"Ticket #{SelectedTicket.Id} als Favorit markiert.";
+            _favoriteTicketIds.Add(ticket.Id);
+            StatusMessage = $"Ticket #{ticket.Id} als Favorit markiert.";
         }
 
         PersistCurrentState();

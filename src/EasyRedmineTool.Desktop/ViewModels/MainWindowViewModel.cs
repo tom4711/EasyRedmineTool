@@ -63,6 +63,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OpenTimeEntries()
     {
         TimeEntriesViewModel.ReloadFavorites();
+        _ = TimeEntriesViewModel.ReloadActivitiesAsync();
         ShowTimeEntries();
     }
 
@@ -70,6 +71,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         TicketListViewModel.ReloadSettings();
         TimeEntriesViewModel.ReloadFavorites();
+        _ = TimeEntriesViewModel.ReloadActivitiesAsync();
         ShowTicketList();
     }
 

@@ -15,6 +15,7 @@
       <Button Content="Ticket per ID hinzufügen" Command="{Binding AddTicketByIdCommand}" />
     </StackPanel>
 
+    <TextBlock Text="Favorit direkt je Ticket über ⭐ in der Liste setzen/entfernen." />
     <Button Content="Favorit für ausgewähltes Ticket umschalten" Command="{Binding ToggleSelectedFavoriteCommand}" />
     <TextBlock Text="{Binding IsSelectedFavorite, StringFormat=Ausgewähltes Ticket Favorit: {0}}" />
 
@@ -24,12 +25,18 @@
       <ListBox.ItemTemplate>
         <DataTemplate>
           <Border Padding="8" Margin="0,0,0,8">
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding Id, StringFormat=#\{0\}}" FontWeight="Bold" />
-              <TextBlock Text="{Binding Subject}" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding Project.Name, StringFormat=Projekt: {0}}" />
-              <TextBlock Text="{Binding Status.Name, StringFormat=Status: {0}}" />
-            </StackPanel>
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Id, StringFormat=#\{0\}}" FontWeight="Bold" />
+              <Button Grid.Row="0"
+                      Grid.Column="1"
+                      Content="⭐"
+                      ToolTip.Tip="Favorit setzen/entfernen"
+                      Command="{Binding $parent[UserControl].DataContext.ToggleFavoriteForTicketCommand}"
+                      CommandParameter="{Binding .}" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Text="{Binding Subject}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Text="{Binding Project.Name, StringFormat=Projekt: {0}}" />
+              <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Text="{Binding Status.Name, StringFormat=Status: {0}}" />
+            </Grid>
           </Border>
         </DataTemplate>
       </ListBox.ItemTemplate>
