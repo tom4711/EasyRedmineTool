@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia">
   <Styles.Resources>
     <ResourceDictionary>
       <ResourceDictionary.ThemeDictionaries>
@@ -126,5 +127,45 @@
 
   <Style Selector="Button.ghost:pressed">
     <Setter Property="Background" Value="{DynamicResource AppGhostPressedBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="mi|MaterialIcon.app-icon">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource AppIconForegroundBrush}" />
+  </Style>
+
+  <Style Selector="Button.primary mi|MaterialIcon">
+    <Setter Property="Foreground" Value="{DynamicResource AppIconOnAccentForegroundBrush}" />
+  </Style>
+
+  <Style Selector="ToggleButton.theme-toggle mi|MaterialIcon">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="Foreground" Value="{DynamicResource AppIconForegroundBrush}" />
+  </Style>
+
+  <Style Selector="ToggleButton.theme-toggle">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="10" />
+    <Setter Property="MinWidth" Value="40" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="ToggleButton.theme-toggle:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppNavHoverBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="ToggleButton.theme-toggle:pressed">
+    <Setter Property="Background" Value="{DynamicResource AppNavPressedBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="ToggleButton.theme-toggle:checked">
+    <Setter Property="Background" Value="{DynamicResource AppSecondaryHoverBackgroundBrush}" />
   </Style>
 </Styles>

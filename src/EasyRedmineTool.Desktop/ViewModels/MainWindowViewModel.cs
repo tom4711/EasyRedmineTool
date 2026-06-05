@@ -6,6 +6,7 @@ using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Services.Interfaces;
 using EasyRedmineTool.Core.ViewModels;
 
@@ -22,17 +23,29 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool isTimeEntriesVisible;
 
+    [ObservableProperty]
+    private bool isAboutVisible;
+
+    public string WindowTitle => AppInfo.WindowTitle;
+
     public MainWindowViewModel(
         SettingsViewModel settingsViewModel,
         TicketListViewModel ticketListViewModel,
         TimeEntriesViewModel timeEntriesViewModel,
+        AboutViewModel aboutViewModel,
         IAppSettingsService appSettingsService)
     {
         SettingsViewModel = settingsViewModel;
         TicketListViewModel = ticketListViewModel;
         TimeEntriesViewModel = timeEntriesViewModel;
+        AboutViewModel = aboutViewModel;
 
         SettingsViewModel.SettingsSaved += OnSettingsSaved;
+
+        if (Application.Current is { } app)
+        {
+            IsDarkMode = app.RequestedThemeVariant == ThemeVariant.Dark;
+        }
 
         var settings = appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -48,6 +61,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public SettingsViewModel SettingsViewModel { get; }
     public TicketListViewModel TicketListViewModel { get; }
     public TimeEntriesViewModel TimeEntriesViewModel { get; }
+    public AboutViewModel AboutViewModel { get; }
 
     [ObservableProperty]
     private bool _isDarkMode;
@@ -81,6 +95,12 @@ public partial class MainWindowViewModel : ViewModelBase
         ShowTimeEntries();
     }
 
+    [RelayCommand]
+    private void OpenAbout()
+    {
+        ShowAbout();
+    }
+
     private void OnSettingsSaved(object? sender, EventArgs e)
     {
         TicketListViewModel.ReloadSettings();
@@ -94,6 +114,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IsSettingsVisible = true;
         IsTicketListVisible = false;
         IsTimeEntriesVisible = false;
+        IsAboutVisible = false;
     }
 
     private void ShowTicketList()
@@ -101,6 +122,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IsSettingsVisible = false;
         IsTicketListVisible = true;
         IsTimeEntriesVisible = false;
+        IsAboutVisible = false;
     }
 
     private void ShowTimeEntries()
@@ -108,5 +130,14 @@ public partial class MainWindowViewModel : ViewModelBase
         IsSettingsVisible = false;
         IsTicketListVisible = false;
         IsTimeEntriesVisible = true;
+        IsAboutVisible = false;
+    }
+
+    private void ShowAbout()
+    {
+        IsSettingsVisible = false;
+        IsTicketListVisible = false;
+        IsTimeEntriesVisible = false;
+        IsAboutVisible = true;
     }
 }

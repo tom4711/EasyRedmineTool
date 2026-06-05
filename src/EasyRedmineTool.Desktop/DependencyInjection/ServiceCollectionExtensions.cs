@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAppSettingsService, AppSettingsService>();
 
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<AboutViewModel>();
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<TicketListViewModel>();
         services.AddTransient<TimeEntriesViewModel>();

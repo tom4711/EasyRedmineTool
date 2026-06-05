@@ -2,6 +2,8 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:vm="using:EasyRedmineTool.Core.ViewModels"
+    xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+    xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
     x:Class="EasyRedmineTool.Desktop.Views.TicketListView"
     x:DataType="vm:TicketListViewModel">
   <UserControl.Resources>
@@ -39,15 +41,16 @@
       <Setter Property="Background" Value="{DynamicResource TicketFavoriteBackgroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource TicketFavoriteBorderBrush}" />
     </Style>
-    <Style Selector="TextBlock.favorite-star">
-      <Setter Property="FontSize" Value="18" />
-      <Setter Property="VerticalAlignment" Value="Center" />
+    <Style Selector="mi|MaterialIcon.favorite-star">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
     </Style>
-    <Style Selector="TextBlock.favorite-star.active">
+    <Style Selector="mi|MaterialIcon.favorite-star.active">
       <Setter Property="Foreground" Value="{DynamicResource TicketFavoriteStarActiveBrush}" />
     </Style>
-    <Style Selector="TextBlock.favorite-star.inactive">
+    <Style Selector="mi|MaterialIcon.favorite-star.inactive">
       <Setter Property="Foreground" Value="{DynamicResource TicketFavoriteStarInactiveBrush}" />
+      <Setter Property="Opacity" Value="0.55" />
     </Style>
     <Style Selector="Border.favorite-badge">
       <Setter Property="Background" Value="{DynamicResource TicketFavoriteBadgeBackgroundBrush}" />
@@ -66,14 +69,14 @@
       <TextBlock Text="Meine Tickets" FontSize="22" FontWeight="Bold" />
 
       <Button Classes="primary"
-              Content="Tickets laden"
-              Command="{Binding LoadTicketsCommand}" />
+              Command="{Binding LoadTicketsCommand}"
+              Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Tickets laden}" />
 
       <StackPanel Orientation="Horizontal" Spacing="8">
         <TextBox Width="180" PlaceholderText="Ticket-ID" Text="{Binding TicketIdToAdd}" />
         <Button Classes="secondary"
-                Content="Ticket per ID hinzufügen"
-                Command="{Binding AddTicketByIdCommand}" />
+                Command="{Binding AddTicketByIdCommand}"
+                Content="{materialIcons:MaterialIconTextExt Kind=Plus, Text=Ticket per ID hinzufügen}" />
       </StackPanel>
 
       <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
@@ -106,14 +109,14 @@
                       ToolTip.Tip="Favorit setzen/entfernen"
                       Command="{Binding $parent[UserControl].DataContext.ToggleFavoriteForTicketCommand}"
                       CommandParameter="{Binding .}">
-                <Panel>
-                  <TextBlock Classes="favorite-star active"
-                             Text="★"
-                             IsVisible="{Binding IsFavorite}" />
-                  <TextBlock Classes="favorite-star inactive"
-                             Text="☆"
-                             IsVisible="{Binding !IsFavorite}" />
-                </Panel>
+                    <Panel>
+                      <materialIcons:MaterialIcon Classes="favorite-star active"
+                                                    Kind="Star"
+                                                    IsVisible="{Binding IsFavorite}" />
+                      <materialIcons:MaterialIcon Classes="favorite-star inactive"
+                                                    Kind="StarOutline"
+                                                    IsVisible="{Binding !IsFavorite}" />
+                    </Panel>
               </Button>
 
               <TextBlock Grid.Row="1"

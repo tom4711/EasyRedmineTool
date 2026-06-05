@@ -3,6 +3,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:vm="using:EasyRedmineTool.Core.ViewModels"
     xmlns:models="using:EasyRedmineTool.Core.Models.TimeEntries"
+    xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
     x:Class="EasyRedmineTool.Desktop.Views.TimeEntriesView"
     x:DataType="vm:TimeEntriesViewModel">
   <UserControl.Resources>
@@ -61,11 +62,11 @@
                           Orientation="Horizontal"
                           Spacing="6">
                 <Button Classes="secondary compact"
-                        Content="Favoriten"
-                        Command="{Binding ReloadFavoritesCommand}" />
+                        Command="{Binding ReloadFavoritesCommand}"
+                        Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Favoriten}" />
                 <Button Classes="secondary compact"
-                        Content="Aktivitäten"
-                        Command="{Binding ReloadActivitiesCommand}" />
+                        Command="{Binding ReloadActivitiesCommand}"
+                        Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Aktivitäten}" />
               </StackPanel>
             </Grid>
 
@@ -159,8 +160,8 @@
             </StackPanel>
 
             <Button Classes="primary stretch"
-                    Content="Zeiteintrag erstellen"
-                    Command="{Binding CreateTimeEntryCommand}" />
+                    Command="{Binding CreateTimeEntryCommand}"
+                    Content="{materialIcons:MaterialIconTextExt Kind=Plus, Text=Zeiteintrag erstellen}" />
           </StackPanel>
         </Border>
 
@@ -173,8 +174,8 @@
                          VerticalAlignment="Center" />
               <Button Grid.Column="1"
                       Classes="secondary compact"
-                      Content="Aktualisieren"
-                      Command="{Binding ReloadWeeklySummaryCommand}" />
+                      Command="{Binding ReloadWeeklySummaryCommand}"
+                      Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Aktualisieren}" />
             </Grid>
 
             <TextBlock Text="{Binding CurrentQuarterLabel}" Opacity="0.85" TextWrapping="Wrap" />

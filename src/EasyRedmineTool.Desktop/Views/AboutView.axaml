@@ -1,0 +1,48 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:EasyRedmineTool.Core.ViewModels"
+    xmlns:core="using:EasyRedmineTool.Core"
+    xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+    x:Class="EasyRedmineTool.Desktop.Views.AboutView"
+    x:DataType="vm:AboutViewModel">
+
+  <ScrollViewer>
+    <StackPanel Margin="24" Spacing="16" MaxWidth="560">
+      <TextBlock Text="Über EasyRedmineTool" FontSize="22" FontWeight="Bold" />
+
+      <StackPanel Spacing="4">
+        <TextBlock Text="Version" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Version}" Opacity="0.85" />
+      </StackPanel>
+
+      <StackPanel Spacing="8">
+        <TextBlock Text="Quellcode" FontWeight="SemiBold" />
+        <Button Classes="secondary"
+                Command="{Binding OpenGitHubCommand}"
+                Content="{materialIcons:MaterialIconTextExt Kind=Github, Text=GitHub öffnen}" />
+        <TextBlock Text="{Binding GitHubUrl}"
+                   Opacity="0.7"
+                   FontSize="12"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+
+      <StackPanel Spacing="8">
+        <TextBlock Text="Verwendete Bibliotheken" FontSize="16" FontWeight="SemiBold" />
+        <ItemsControl ItemsSource="{Binding Libraries}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="core:LibraryInfo">
+              <Grid ColumnDefinitions="*,Auto" Margin="0,4">
+                <TextBlock Grid.Column="0" Text="{Binding Name}" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding Version}"
+                           Opacity="0.7"
+                           Margin="16,0,0,0" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -2,32 +2,49 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:EasyRedmineTool.Desktop.ViewModels"
         xmlns:views="using:EasyRedmineTool.Desktop.Views"
+        xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="EasyRedmineTool.Desktop.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="EasyRedmineTool.Desktop">
+        Title="{Binding WindowTitle}">
 
   <Grid RowDefinitions="Auto,Auto,*">
     <Border Grid.Row="0"
             Background="{DynamicResource CardBackgroundBrush}"
             Padding="24,16,24,12">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button Classes="nav"
-                Content="Tickets"
-                Command="{Binding OpenTicketListCommand}" />
-        <Button Classes="nav"
-                Content="Time Entries"
-                Command="{Binding OpenTimeEntriesCommand}" />
-        <Button Classes="nav"
-                Content="Einstellungen"
-                Command="{Binding OpenSettingsCommand}" />
-        <ToggleSwitch IsChecked="{Binding IsDarkMode}"
-                      OnContent="Dark"
-                      OffContent="Light" />
-      </StackPanel>
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Grid.Column="0"
+                    Orientation="Horizontal"
+                    Spacing="8">
+          <Button Classes="nav"
+                  Command="{Binding OpenTicketListCommand}"
+                  Content="{materialIcons:MaterialIconTextExt Kind=ClipboardListOutline, Text=Tickets}" />
+          <Button Classes="nav"
+                  Command="{Binding OpenTimeEntriesCommand}"
+                  Content="{materialIcons:MaterialIconTextExt Kind=ClockOutline, Text=Time Entries}" />
+          <Button Classes="nav"
+                  Command="{Binding OpenSettingsCommand}"
+                  Content="{materialIcons:MaterialIconTextExt Kind=CogOutline, Text=Einstellungen}" />
+          <Button Classes="nav"
+                  Command="{Binding OpenAboutCommand}"
+                  Content="{materialIcons:MaterialIconTextExt Kind=InformationOutline, Text=Info}" />
+        </StackPanel>
+
+        <ToggleButton Grid.Column="1"
+                      Classes="theme-toggle"
+                      IsChecked="{Binding IsDarkMode}"
+                      ToolTip.Tip="Design-Modus wechseln">
+          <Panel>
+            <materialIcons:MaterialIcon Kind="WeatherNight"
+                                        IsVisible="{Binding !IsDarkMode}" />
+            <materialIcons:MaterialIcon Kind="WhiteBalanceSunny"
+                                        IsVisible="{Binding IsDarkMode}" />
+          </Panel>
+        </ToggleButton>
+      </Grid>
     </Border>
 
     <Separator Grid.Row="1" />
@@ -43,6 +60,10 @@
 
       <Grid IsVisible="{Binding IsTimeEntriesVisible}">
         <views:TimeEntriesView DataContext="{Binding TimeEntriesViewModel}" />
+      </Grid>
+
+      <Grid IsVisible="{Binding IsAboutVisible}">
+        <views:AboutView DataContext="{Binding AboutViewModel}" />
       </Grid>
     </Panel>
   </Grid>
