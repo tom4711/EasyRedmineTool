@@ -1,7 +1,8 @@
-﻿using Avalonia;
-using System;
+﻿namespace EasyRedmineTool.Desktop;
 
-namespace EasyRedmineTool.Desktop;
+using Avalonia;
+
+using System;
 
 sealed class Program
 {

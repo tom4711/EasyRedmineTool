@@ -1,12 +1,12 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿namespace EasyRedmineTool.Core.ViewModels;
+
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
-
-namespace EasyRedmineTool.Core.ViewModels;
 
 public partial class TicketListViewModel : ViewModelBase
 {
@@ -25,7 +25,7 @@ public partial class TicketListViewModel : ViewModelBase
     [ObservableProperty]
     private bool isBusy;
 
-    public ObservableCollection<IssueDto> Tickets { get; } = new();
+    public ObservableCollection<IssueDto> Tickets { get; } = [];
 
     public TicketListViewModel(ITicketService ticketService, IAppSettingsService appSettingsService)
     {

@@ -1,13 +1,12 @@
-﻿using EasyRedmineTool.Core.Api;
+﻿namespace EasyRedmineTool.Desktop.DependencyInjection;
+
+using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Services;
 using EasyRedmineTool.Core.Services.Interfaces;
 using EasyRedmineTool.Core.ViewModels;
 using EasyRedmineTool.Desktop.ViewModels;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Http;
-
-namespace EasyRedmineTool.Desktop.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {

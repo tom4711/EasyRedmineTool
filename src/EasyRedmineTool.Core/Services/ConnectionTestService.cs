@@ -1,17 +1,12 @@
+namespace EasyRedmineTool.Core.Services;
+
 using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Models;
 using EasyRedmineTool.Core.Services.Interfaces;
 
-namespace EasyRedmineTool.Core.Services;
-
-public class ConnectionTestService : IConnectionTestService
+public class ConnectionTestService(EasyRedmineApiClient apiClient) : IConnectionTestService
 {
-    private readonly EasyRedmineApiClient _apiClient;
-
-    public ConnectionTestService(EasyRedmineApiClient apiClient)
-    {
-        _apiClient = apiClient;
-    }
+    private readonly EasyRedmineApiClient _apiClient = apiClient;
 
     public async Task<ConnectionTestResult> TestConnectionAsync(ConnectionTestRequest request, CancellationToken cancellationToken = default)
     {
@@ -29,16 +24,13 @@ public class ConnectionTestService : IConnectionTestService
         {
             using var response = await _apiClient.GetCurrentUserAsync(request.BaseUrl, request.ApiKey, cancellationToken);
 
-            if (!response.IsSuccessStatusCode)
-            {
-                return new ConnectionTestResult
+            return !response.IsSuccessStatusCode
+                ? new ConnectionTestResult
                 {
                     Success = false,
                     Message = $"Verbindung fehlgeschlagen: {(int)response.StatusCode} {response.ReasonPhrase}"
-                };
-            }
-
-            return new ConnectionTestResult
+                }
+                : new ConnectionTestResult
             {
                 Success = true,
                 Message = "Verbindung erfolgreich."

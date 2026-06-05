@@ -1,11 +1,11 @@
+namespace EasyRedmineTool.Core.ViewModels;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models;
 using EasyRedmineTool.Core.Services.Interfaces;
-
-namespace EasyRedmineTool.Core.ViewModels;
 
 public partial class SettingsViewModel : ViewModelBase
 {

@@ -1,9 +1,9 @@
+namespace EasyRedmineTool.Core.Services;
+
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Text.Json;
-
-namespace EasyRedmineTool.Core.Services;
 
 public sealed class AppSettingsService : IAppSettingsService
 {

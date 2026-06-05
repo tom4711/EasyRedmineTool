@@ -1,3 +1,5 @@
+namespace EasyRedmineTool.Desktop;
+
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
@@ -12,8 +14,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 using System;
 using System.Linq;
-
-namespace EasyRedmineTool.Desktop;
 
 public partial class App : Application
 {

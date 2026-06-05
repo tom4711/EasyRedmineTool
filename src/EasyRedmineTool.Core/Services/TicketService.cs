@@ -1,8 +1,8 @@
-﻿using EasyRedmineTool.Core.Api;
+﻿namespace EasyRedmineTool.Core.Services;
+
+using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
-
-namespace EasyRedmineTool.Core.Services;
 
 public class TicketService : ITicketService
 {

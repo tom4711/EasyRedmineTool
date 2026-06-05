@@ -1,6 +1,6 @@
-﻿using Avalonia.Controls;
+﻿namespace EasyRedmineTool.Desktop.Views;
 
-namespace EasyRedmineTool.Desktop.Views;
+using Avalonia.Controls;
 
 public partial class TicketListView : UserControl
 {

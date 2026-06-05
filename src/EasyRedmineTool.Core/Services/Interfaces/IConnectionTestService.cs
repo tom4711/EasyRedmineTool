@@ -1,6 +1,6 @@
-using EasyRedmineTool.Core.Models;
-
 namespace EasyRedmineTool.Core.Services.Interfaces;
+
+using EasyRedmineTool.Core.Models;
 
 public interface IConnectionTestService
 {

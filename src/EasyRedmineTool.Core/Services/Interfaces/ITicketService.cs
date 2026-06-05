@@ -1,6 +1,6 @@
-﻿using EasyRedmineTool.Core.Models.Tickets;
+﻿namespace EasyRedmineTool.Core.Services.Interfaces;
 
-namespace EasyRedmineTool.Core.Services.Interfaces;
+using EasyRedmineTool.Core.Models.Tickets;
 
 public interface ITicketService
 {

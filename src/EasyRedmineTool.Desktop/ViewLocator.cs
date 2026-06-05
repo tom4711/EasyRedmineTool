@@ -1,10 +1,12 @@
+namespace EasyRedmineTool.Desktop;
+
 using System;
 using System.Diagnostics.CodeAnalysis;
+
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using EasyRedmineTool.Desktop.ViewModels;
 
-namespace EasyRedmineTool.Desktop;
+using EasyRedmineTool.Desktop.ViewModels;
 
 /// <summary>
 /// Given a view model, returns the corresponding view if possible.

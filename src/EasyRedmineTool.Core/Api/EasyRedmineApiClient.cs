@@ -1,9 +1,9 @@
+namespace EasyRedmineTool.Core.Api;
+
 using EasyRedmineTool.Core.Models.Tickets;
 
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-
-namespace EasyRedmineTool.Core.Api;
 
 public class EasyRedmineApiClient
 {

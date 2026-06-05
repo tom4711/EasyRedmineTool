@@ -1,6 +1,6 @@
-using EasyRedmineTool.Core.Configuration;
-
 namespace EasyRedmineTool.Core.Services.Interfaces;
+
+using EasyRedmineTool.Core.Configuration;
 
 public interface IAppSettingsService
 {

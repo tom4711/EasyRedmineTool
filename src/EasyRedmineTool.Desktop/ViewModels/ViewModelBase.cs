@@ -1,6 +1,6 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿namespace EasyRedmineTool.Desktop.ViewModels;
 
-namespace EasyRedmineTool.Desktop.ViewModels;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 public abstract class ViewModelBase : ObservableObject
 {
