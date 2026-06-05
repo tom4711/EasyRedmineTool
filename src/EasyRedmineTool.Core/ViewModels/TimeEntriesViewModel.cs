@@ -23,7 +23,10 @@ public partial class TimeEntriesViewModel : ViewModelBase
     private string hours = "1";
 
     [ObservableProperty]
-    private DateTimeOffset? spentOn = DateTimeOffset.Now;
+    private DateTime? spentOn = DateTime.Today;
+
+    [ObservableProperty]
+    private DateTime calendarDisplayDate = DateTime.Today;
 
     [ObservableProperty]
     private TimeEntryActivityDto? selectedActivity;
@@ -181,6 +184,37 @@ public partial class TimeEntriesViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void SetSpentOnToday()
+    {
+        SetSpentOnDate(DateTime.Today);
+    }
+
+    [RelayCommand]
+    private void SetSpentOnYesterday()
+    {
+        SetSpentOnDate(DateTime.Today.AddDays(-1));
+    }
+
+    private void SetSpentOnDate(DateTime date)
+    {
+        SpentOn = date;
+        CalendarDisplayDate = date;
+    }
+
+    partial void OnSpentOnChanged(DateTime? value)
+    {
+        if (value.HasValue)
+        {
+            CalendarDisplayDate = value.Value;
+        }
+
+        OnPropertyChanged(nameof(SelectedDateLabel));
+    }
+
+    public string SelectedDateLabel =>
+        SpentOn?.ToString("dddd, dd.MM.yyyy", CultureInfo.GetCultureInfo("de-DE")) ?? "Kein Datum ausgewählt";
+
+    [RelayCommand]
     private async Task CreateTimeEntryAsync()
     {
         if (IsBusy)
@@ -204,11 +238,11 @@ public partial class TimeEntriesViewModel : ViewModelBase
             return;
         }
 
-        //if (!DateOnly.TryParse(SpentOn, out _))
-        //{
-        //    StatusMessage = "Datum muss im Format yyyy-MM-dd angegeben werden.";
-        //    return;
-        //}
+        if (SpentOn is null)
+        {
+            StatusMessage = "Bitte ein Datum auswählen.";
+            return;
+        }
 
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
