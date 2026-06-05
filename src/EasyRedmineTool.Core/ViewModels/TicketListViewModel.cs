@@ -197,6 +197,7 @@ public partial class TicketListViewModel : ViewModelBase
             LastTimeEntryIssueId = current.LastTimeEntryIssueId,
             LastTimeEntryActivityId = current.LastTimeEntryActivityId,
             LastTimeEntryHours = current.LastTimeEntryHours,
+            LastTimeEntryActivityName = current.LastTimeEntryActivityName,
         });
     }
 }

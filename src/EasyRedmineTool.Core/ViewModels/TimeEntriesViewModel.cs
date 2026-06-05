@@ -3,7 +3,6 @@ namespace EasyRedmineTool.Core.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
@@ -16,24 +15,6 @@ public partial class TimeEntriesViewModel : ViewModelBase
 {
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
-
-    [ObservableProperty]
-    private IssueDto? selectedFavoriteTicket;
-
-    [ObservableProperty]
-    private string hours = "1";
-
-    [ObservableProperty]
-    private DateTime? spentOn = DateTime.Today;
-
-    [ObservableProperty]
-    private DateTime calendarDisplayDate = DateTime.Today;
-
-    [ObservableProperty]
-    private TimeEntryActivityDto? selectedActivity;
-
-    [ObservableProperty]
-    private string comments = string.Empty;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -50,9 +31,11 @@ public partial class TimeEntriesViewModel : ViewModelBase
     [ObservableProperty]
     private bool canRepeatLastEntry;
 
-    public ObservableCollection<IssueDto> FavoriteTickets { get; } = [];
-    public ObservableCollection<IssueDto> FilteredFavoriteTickets { get; } = [];
-    public ObservableCollection<TimeEntryActivityDto> Activities { get; } = [];
+    [ObservableProperty]
+    private string lastEntrySummaryLabel = string.Empty;
+
+    public ObservableCollection<FavoriteTimeEntryRowViewModel> FavoriteRows { get; } = [];
+    public ObservableCollection<FavoriteTimeEntryRowViewModel> FilteredFavoriteRows { get; } = [];
 
     public TimeEntriesViewModel(IAppSettingsService appSettingsService, ITimeEntryService timeEntryService)
     {
@@ -60,19 +43,40 @@ public partial class TimeEntriesViewModel : ViewModelBase
         _timeEntryService = timeEntryService;
 
         ReloadFavorites();
-        _ = ReloadActivitiesAsync();
         _ = ReloadTodayBookedHoursAsync();
     }
 
-    public string TodayBookedHoursLabel =>
-        $"Heute gebucht: {TodayBookedHours.ToString("0.##", CultureInfo.GetCultureInfo("de-DE"))} h";
+    public string TodayBookedHoursDisplay =>
+        $"{TodayBookedHours.ToString("0.##", CultureInfo.GetCultureInfo("de-DE"))} h";
 
-    public bool HasSelectedFavoriteTicket => SelectedFavoriteTicket is not null;
+    partial void OnTodayBookedHoursChanged(double value)
+    {
+        OnPropertyChanged(nameof(TodayBookedHoursDisplay));
+    }
+
+    internal void SetStatusMessage(string message)
+    {
+        StatusMessage = message;
+    }
+
+    internal async Task HandleEntryCreatedAsync(
+        FavoriteTimeEntryRowViewModel row,
+        DateTime spentOn,
+        TimeEntryActivityDto activity)
+    {
+        SaveLastTimeEntryTemplate(row, activity);
+        UpdateCachedTicketLastTimeEntry(row.Ticket.Id, spentOn);
+        ReloadFavorites();
+        await ReloadTodayBookedHoursAsync();
+    }
 
     [RelayCommand]
     public void ReloadFavorites()
     {
         var settings = _appSettingsService.Load();
+        var previousState = FavoriteRows.ToDictionary(
+            row => row.Ticket.Id,
+            row => (row.Hours, row.Comments, row.SpentOn, SelectedActivityId: row.SelectedActivity?.Id));
 
         var favorites = settings.CachedTickets
             .Where(t => settings.FavoriteTicketIds.Contains(t.Id))
@@ -81,23 +85,40 @@ public partial class TimeEntriesViewModel : ViewModelBase
             .ThenBy(t => t.Id)
             .ToList();
 
-        FavoriteTickets.Clear();
+        FavoriteRows.Clear();
         foreach (var ticket in favorites)
         {
-            FavoriteTickets.Add(ticket);
-        }
+            var row = new FavoriteTimeEntryRowViewModel(this, ticket, _appSettingsService, _timeEntryService);
+            int? selectedActivityId = null;
+            if (previousState.TryGetValue(ticket.Id, out var state))
+            {
+                row.Hours = state.Hours;
+                row.Comments = state.Comments;
+                row.SpentOn = state.SpentOn ?? DateTime.Today;
+                selectedActivityId = state.SelectedActivityId;
+            }
 
-        if (SelectedFavoriteTicket is null || !FavoriteTickets.Any(t => t.Id == SelectedFavoriteTicket.Id))
-        {
-            SelectedFavoriteTicket = FavoriteTickets.FirstOrDefault();
+            FavoriteRows.Add(row);
+            _ = RestoreAndLoadRowAsync(row, selectedActivityId);
         }
 
         ApplyFavoriteFilter();
         UpdateCanRepeatLastEntry();
 
-        StatusMessage = FavoriteTickets.Count == 0
+        StatusMessage = FavoriteRows.Count == 0
             ? "Keine Favoriten vorhanden. Bitte in der Ticketliste Favoriten markieren."
             : string.Empty;
+    }
+
+    private async Task RestoreAndLoadRowAsync(FavoriteTimeEntryRowViewModel row, int? selectedActivityId)
+    {
+        await row.LoadActivitiesAsync();
+
+        if (selectedActivityId.HasValue)
+        {
+            row.SelectedActivity = row.Activities.FirstOrDefault(a => a.Id == selectedActivityId.Value)
+                ?? row.SelectedActivity;
+        }
     }
 
     [RelayCommand]
@@ -126,25 +147,12 @@ public partial class TimeEntriesViewModel : ViewModelBase
         ApplyFavoriteFilter();
     }
 
-    partial void OnSelectedFavoriteTicketChanged(IssueDto? value)
-    {
-        OnPropertyChanged(nameof(HasSelectedFavoriteTicket));
-        OpenSelectedTicketInBrowserCommand.NotifyCanExecuteChanged();
-        _ = ReloadActivitiesAsync();
-    }
-
     private void ApplyFavoriteFilter()
     {
-        FilteredFavoriteTickets.Clear();
-        foreach (var ticket in FavoriteTickets.Where(MatchesFavoriteFilter))
+        FilteredFavoriteRows.Clear();
+        foreach (var row in FavoriteRows.Where(row => MatchesFavoriteFilter(row.Ticket)))
         {
-            FilteredFavoriteTickets.Add(ticket);
-        }
-
-        if (SelectedFavoriteTicket is not null &&
-            !FilteredFavoriteTickets.Any(t => t.Id == SelectedFavoriteTicket.Id))
-        {
-            SelectedFavoriteTicket = FilteredFavoriteTickets.FirstOrDefault();
+            FilteredFavoriteRows.Add(row);
         }
     }
 
@@ -161,41 +169,6 @@ public partial class TimeEntriesViewModel : ViewModelBase
             || (ticket.Project?.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
     }
 
-    [RelayCommand]
-    public async Task ReloadActivitiesAsync()
-    {
-        var settings = _appSettingsService.Load();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
-        {
-            return;
-        }
-
-        var issueId = SelectedFavoriteTicket?.Id;
-        var projectId = SelectedFavoriteTicket?.Project?.Id;
-
-        var loadedActivities = await _timeEntryService.GetActivitiesAsync(
-            settings.BaseUrl,
-            settings.ApiKey,
-            issueId,
-            projectId);
-
-        Activities.Clear();
-        foreach (var activity in loadedActivities.OrderBy(a => a.Name))
-        {
-            Activities.Add(activity);
-        }
-
-        if (SelectedActivity is null || Activities.All(a => a.Id != SelectedActivity.Id))
-        {
-            SelectedActivity = Activities.FirstOrDefault();
-        }
-
-        if (Activities.Count == 0 && SelectedFavoriteTicket is not null)
-        {
-            StatusMessage = "Keine Aktivitäten gefunden. Bitte API-Berechtigung/Projekt prüfen.";
-        }
-    }
-
     [RelayCommand(CanExecute = nameof(CanRepeatLastEntry))]
     private async Task RepeatLastEntryAsync()
     {
@@ -205,145 +178,33 @@ public partial class TimeEntriesViewModel : ViewModelBase
             return;
         }
 
-        var ticket = FavoriteTickets.FirstOrDefault(t => t.Id == settings.LastTimeEntryIssueId.Value);
-        if (ticket is null)
+        var row = FavoriteRows.FirstOrDefault(r => r.Ticket.Id == settings.LastTimeEntryIssueId.Value);
+        if (row is null)
         {
             StatusMessage = "Letztes Ticket ist kein Favorit mehr.";
             UpdateCanRepeatLastEntry();
             return;
         }
 
-        SelectedFavoriteTicket = ticket;
-        Hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? "1" : settings.LastTimeEntryHours;
-        SetSpentOnDate(DateTime.Today);
+        await row.LoadActivitiesAsync();
 
-        await ReloadActivitiesAsync();
+        var hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? "1" : settings.LastTimeEntryHours;
+        row.ApplyTemplate(
+            settings.LastTimeEntryActivityId.Value,
+            hours,
+            DateTime.Today,
+            settings.LastTimeEntryActivityName);
 
-        SelectedActivity = Activities.FirstOrDefault(a => a.Id == settings.LastTimeEntryActivityId.Value)
-            ?? SelectedActivity;
-
-        StatusMessage = $"Letzter Eintrag übernommen (#{ticket.Id}, {Hours} h).";
+        await row.CreateTimeEntryCommand.ExecuteAsync(null);
     }
 
-    [RelayCommand(CanExecute = nameof(HasSelectedFavoriteTicket))]
-    private void OpenSelectedTicketInBrowser()
-    {
-        if (SelectedFavoriteTicket is null)
-        {
-            return;
-        }
-
-        var settings = _appSettingsService.Load();
-        RedmineLinks.OpenIssueInBrowser(settings.BaseUrl, SelectedFavoriteTicket.Id);
-    }
-
-    [RelayCommand]
-    private void SetSpentOnToday()
-    {
-        SetSpentOnDate(DateTime.Today);
-    }
-
-    [RelayCommand]
-    private void SetSpentOnYesterday()
-    {
-        SetSpentOnDate(DateTime.Today.AddDays(-1));
-    }
-
-    private void SetSpentOnDate(DateTime date)
-    {
-        SpentOn = date;
-        CalendarDisplayDate = date;
-    }
-
-    partial void OnSpentOnChanged(DateTime? value)
-    {
-        if (value.HasValue)
-        {
-            CalendarDisplayDate = value.Value;
-        }
-
-        OnPropertyChanged(nameof(SelectedDateLabel));
-    }
-
-    public string SelectedDateLabel =>
-        SpentOn?.ToString("dddd, dd.MM.yyyy", CultureInfo.GetCultureInfo("de-DE")) ?? "Kein Datum ausgewählt";
-
-    [RelayCommand]
-    private async Task CreateTimeEntryAsync()
-    {
-        if (IsBusy)
-            return;
-
-        if (SelectedFavoriteTicket is null)
-        {
-            StatusMessage = "Bitte ein Favoriten-Ticket auswählen.";
-            return;
-        }
-
-        if (!double.TryParse(Hours, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedHours) || parsedHours <= 0)
-        {
-            StatusMessage = "Bitte gültige Stunden eingeben (z. B. 1.5).";
-            return;
-        }
-
-        if (SelectedActivity is null)
-        {
-            StatusMessage = "Bitte eine Aktivität auswählen.";
-            return;
-        }
-
-        if (SpentOn is null)
-        {
-            StatusMessage = "Bitte ein Datum auswählen.";
-            return;
-        }
-
-        var settings = _appSettingsService.Load();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
-        {
-            StatusMessage = "API-Key fehlt. Bitte zuerst Einstellungen speichern.";
-            return;
-        }
-
-        try
-        {
-            IsBusy = true;
-            StatusMessage = "Zeiteintrag wird erstellt …";
-
-            var result = await _timeEntryService.CreateTimeEntryAsync(
-                settings.BaseUrl,
-                settings.ApiKey,
-                new TimeEntryCreateRequest
-                {
-                    IssueId = SelectedFavoriteTicket.Id,
-                    Hours = parsedHours,
-                    SpentOn = SpentOn.Value.ToString("yyyy-MM-dd"),
-                    ActivityId = SelectedActivity.Id,
-                    Comments = Comments
-                });
-
-            StatusMessage = result.Message;
-            if (result.Success)
-            {
-                Comments = string.Empty;
-                SaveLastTimeEntryTemplate();
-                UpdateCachedTicketLastTimeEntry(SelectedFavoriteTicket.Id, SpentOn.Value);
-                ReloadFavorites();
-                await ReloadTodayBookedHoursAsync();
-            }
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    private void SaveLastTimeEntryTemplate()
+    private void SaveLastTimeEntryTemplate(FavoriteTimeEntryRowViewModel row, TimeEntryActivityDto activity)
     {
         var settings = _appSettingsService.Load();
-        settings.LastTimeEntryIssueId = SelectedFavoriteTicket?.Id;
-        settings.LastTimeEntryActivityId = SelectedActivity?.Id;
-        settings.LastTimeEntryHours = Hours;
+        settings.LastTimeEntryIssueId = row.Ticket.Id;
+        settings.LastTimeEntryActivityId = activity.Id;
+        settings.LastTimeEntryHours = row.Hours;
+        settings.LastTimeEntryActivityName = activity.Name;
         _appSettingsService.Save(settings);
         UpdateCanRepeatLastEntry();
     }
@@ -369,9 +230,39 @@ public partial class TimeEntriesViewModel : ViewModelBase
         var settings = _appSettingsService.Load();
         CanRepeatLastEntry = settings.LastTimeEntryIssueId.HasValue
             && settings.LastTimeEntryActivityId.HasValue
-            && FavoriteTickets.Any(t => t.Id == settings.LastTimeEntryIssueId.Value);
+            && FavoriteRows.Any(r => r.Ticket.Id == settings.LastTimeEntryIssueId.Value);
+
+        LastEntrySummaryLabel = CanRepeatLastEntry
+            ? BuildLastEntrySummary(settings)
+            : string.Empty;
 
         RepeatLastEntryCommand.NotifyCanExecuteChanged();
-        OpenSelectedTicketInBrowserCommand.NotifyCanExecuteChanged();
+    }
+
+    private string BuildLastEntrySummary(AppSettings settings)
+    {
+        var ticket = FavoriteRows.FirstOrDefault(r => r.Ticket.Id == settings.LastTimeEntryIssueId)?.Ticket
+            ?? _appSettingsService.Load().CachedTickets.FirstOrDefault(t => t.Id == settings.LastTimeEntryIssueId);
+
+        var ticketPart = ticket is not null
+            ? $"#{ticket.Id} {Truncate(ticket.Subject, 48)}"
+            : $"#{settings.LastTimeEntryIssueId}";
+
+        var hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? "1" : settings.LastTimeEntryHours;
+        var activity = string.IsNullOrWhiteSpace(settings.LastTimeEntryActivityName)
+            ? "Aktivität"
+            : settings.LastTimeEntryActivityName;
+
+        return $"{ticketPart} · {hours} h · {activity}";
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return value[..(maxLength - 1)] + "…";
     }
 }

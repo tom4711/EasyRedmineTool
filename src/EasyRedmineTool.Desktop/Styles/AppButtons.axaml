@@ -79,6 +79,12 @@
     <Setter Property="MinHeight" Value="40" />
   </Style>
 
+  <Style Selector="Button.secondary.stretch">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="MinHeight" Value="40" />
+  </Style>
+
   <Style Selector="Button.secondary">
     <Setter Property="Background" Value="{DynamicResource AppSecondaryBackgroundBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource AppSecondaryForegroundBrush}" />

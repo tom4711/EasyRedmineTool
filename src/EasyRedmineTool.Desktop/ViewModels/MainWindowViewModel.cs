@@ -94,7 +94,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OpenTimeEntries()
     {
         TimeEntriesViewModel.ReloadFavorites();
-        _ = TimeEntriesViewModel.ReloadActivitiesAsync();
         _ = TimeEntriesViewModel.ReloadTodayBookedHoursAsync();
         ShowTimeEntries();
     }
@@ -116,7 +115,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         TicketListViewModel.ReloadSettings();
         TimeEntriesViewModel.ReloadFavorites();
-        _ = TimeEntriesViewModel.ReloadActivitiesAsync();
+        _ = TimeEntriesViewModel.ReloadTodayBookedHoursAsync();
         ShowInitialView();
     }
 
@@ -132,7 +131,6 @@ public partial class MainWindowViewModel : ViewModelBase
         if (HasUsableFavorites(settings))
         {
             TimeEntriesViewModel.ReloadFavorites();
-            _ = TimeEntriesViewModel.ReloadActivitiesAsync();
             _ = TimeEntriesViewModel.ReloadTodayBookedHoursAsync();
             ShowTimeEntries();
             return;

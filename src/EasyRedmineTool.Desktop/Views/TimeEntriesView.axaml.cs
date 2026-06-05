@@ -3,6 +3,9 @@ namespace EasyRedmineTool.Desktop.Views;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
+
+using System.Linq;
 
 public partial class TimeEntriesView : UserControl
 {
@@ -11,11 +14,14 @@ public partial class TimeEntriesView : UserControl
         InitializeComponent();
     }
 
-    private void OnCalendarSelectedDatesChanged(object? sender, SelectionChangedEventArgs e)
+    private void OnRowCalendarSelectedDatesChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (DatePickerButton.Flyout is Flyout flyout)
+        if (sender is not Calendar calendar)
         {
-            flyout.Hide();
+            return;
         }
+
+        var popup = calendar.GetVisualAncestors().OfType<Popup>().FirstOrDefault();
+        popup?.Close();
     }
 }

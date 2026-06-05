@@ -51,6 +51,7 @@ public partial class SettingsViewModel : ViewModelBase
             LastTimeEntryIssueId = current.LastTimeEntryIssueId,
             LastTimeEntryActivityId = current.LastTimeEntryActivityId,
             LastTimeEntryHours = current.LastTimeEntryHours,
+            LastTimeEntryActivityName = current.LastTimeEntryActivityName,
         });
 
         StatusMessage = "Einstellungen gespeichert.";
