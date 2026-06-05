@@ -4,14 +4,9 @@ using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Services.Interfaces;
 
-public class TimeEntryService : ITimeEntryService
+public class TimeEntryService(EasyRedmineApiClient apiClient) : ITimeEntryService
 {
-    private readonly EasyRedmineApiClient _apiClient;
-
-    public TimeEntryService(EasyRedmineApiClient apiClient)
-    {
-        _apiClient = apiClient;
-    }
+    private readonly EasyRedmineApiClient _apiClient = apiClient;
 
     public async Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
         string baseUrl,

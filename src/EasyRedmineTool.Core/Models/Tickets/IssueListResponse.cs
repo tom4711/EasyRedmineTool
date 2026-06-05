@@ -1,8 +1,6 @@
 ﻿namespace EasyRedmineTool.Core.Models.Tickets
 {
-    using System;
     using System.Collections.Generic;
-    using System.Text;
 
     public class IssueListResponse
     {

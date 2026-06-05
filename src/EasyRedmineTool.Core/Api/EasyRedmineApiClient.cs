@@ -7,28 +7,17 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 
-public class EasyRedmineApiClient
+public class EasyRedmineApiClient(HttpClient httpClient)
 {
-    private readonly HttpClient _httpClient;
+    private readonly HttpClient _httpClient = httpClient;
 
-    public EasyRedmineApiClient(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
-    }
-
-    public async Task<HttpResponseMessage> GetCurrentUserAsync(
-        string baseUrl,
-        string apiKey,
-        CancellationToken cancellationToken = default)
+    public async Task<HttpResponseMessage> GetCurrentUserAsync( string baseUrl, string apiKey, CancellationToken cancellationToken = default)
     {
         var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "users/current.json");
         return await _httpClient.SendAsync(request, cancellationToken);
     }
 
-    public async Task<IssueListResponse?> GetMyOpenIssuesAsync(
-        string baseUrl,
-        string apiKey,
-        CancellationToken cancellationToken = default)
+    public async Task<IssueListResponse?> GetMyOpenIssuesAsync( string baseUrl, string apiKey, CancellationToken cancellationToken = default)
     {
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "issues.json?assigned_to_id=me&status_id=open&limit=100");
         using var response = await _httpClient.SendAsync(request, cancellationToken);
@@ -41,11 +30,7 @@ public class EasyRedmineApiClient
         return await response.Content.ReadFromJsonAsync<IssueListResponse>(cancellationToken);
     }
 
-    public async Task<IssueResponse?> GetIssueByIdAsync(
-        string baseUrl,
-        string apiKey,
-        int issueId,
-        CancellationToken cancellationToken = default)
+    public async Task<IssueResponse?> GetIssueByIdAsync( string baseUrl, string apiKey, int issueId, CancellationToken cancellationToken = default)
     {
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, $"issues/{issueId}.json");
         using var response = await _httpClient.SendAsync(request, cancellationToken);
@@ -58,12 +43,7 @@ public class EasyRedmineApiClient
         return await response.Content.ReadFromJsonAsync<IssueResponse>(cancellationToken);
     }
 
-    public async Task<TimeEntriesListResponse?> GetMyTimeEntriesAsync(
-        string baseUrl,
-        string apiKey,
-        DateTime from,
-        DateTime to,
-        CancellationToken cancellationToken = default)
+    public async Task<TimeEntriesListResponse?> GetMyTimeEntriesAsync( string baseUrl, string apiKey, DateTime from, DateTime to, CancellationToken cancellationToken = default)
     {
         var endpoint = $"time_entries.json?user_id=me&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&limit=500";
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
@@ -77,12 +57,7 @@ public class EasyRedmineApiClient
         return await response.Content.ReadFromJsonAsync<TimeEntriesListResponse>(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<TimeEntryActivityDto>> GetTimeEntryActivitiesAsync(
-        string baseUrl,
-        string apiKey,
-        int? issueId = null,
-        int? projectId = null,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TimeEntryActivityDto>> GetTimeEntryActivitiesAsync( string baseUrl, string apiKey, int? issueId = null, int? projectId = null, CancellationToken cancellationToken = default)
     {
         var endpoints = new List<string>();
 
@@ -120,11 +95,7 @@ public class EasyRedmineApiClient
         return [];
     }
 
-    public async Task<HttpResponseMessage> CreateTimeEntryAsync(
-        string baseUrl,
-        string apiKey,
-        TimeEntryCreateRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<HttpResponseMessage> CreateTimeEntryAsync( string baseUrl, string apiKey, TimeEntryCreateRequest request, CancellationToken cancellationToken = default)
     {
         var payload = new
         {
@@ -213,14 +184,6 @@ public class EasyRedmineApiClient
         return true;
     }
 
-    private static bool TryGetArray(JsonElement source, string propertyName, out JsonElement value)
-    {
-        if (source.TryGetProperty(propertyName, out value)
-            && value.ValueKind == JsonValueKind.Array)
-        {
-            return true;
-        }
-
-        return false;
-    }
+    private static bool TryGetArray(JsonElement source, string propertyName, out JsonElement value) 
+        => source.TryGetProperty(propertyName, out value) && value.ValueKind == JsonValueKind.Array;
 }
