@@ -39,7 +39,11 @@ public partial class TimeEntriesViewModel : ViewModelBase
     [ObservableProperty]
     private bool isBusy;
 
+    [ObservableProperty]
+    private string favoriteFilterText = string.Empty;
+
     public ObservableCollection<IssueDto> FavoriteTickets { get; } = [];
+    public ObservableCollection<IssueDto> FilteredFavoriteTickets { get; } = [];
     public ObservableCollection<TimeEntryActivityDto> Activities { get; } = [];
 
     public TimeEntriesViewModel(IAppSettingsService appSettingsService, ITimeEntryService timeEntryService)
@@ -72,9 +76,46 @@ public partial class TimeEntriesViewModel : ViewModelBase
             SelectedFavoriteTicket = FavoriteTickets.FirstOrDefault();
         }
 
+        ApplyFavoriteFilter();
+
         StatusMessage = FavoriteTickets.Count == 0
             ? "Keine Favoriten vorhanden. Bitte in der Ticketliste Favoriten markieren."
             : string.Empty;
+    }
+
+    partial void OnFavoriteFilterTextChanged(string value)
+    {
+        ApplyFavoriteFilter();
+    }
+
+    private void ApplyFavoriteFilter()
+    {
+        var query = FavoriteFilterText.Trim();
+
+        FilteredFavoriteTickets.Clear();
+        foreach (var ticket in FavoriteTickets.Where(MatchesFavoriteFilter))
+        {
+            FilteredFavoriteTickets.Add(ticket);
+        }
+
+        if (SelectedFavoriteTicket is not null &&
+            !FilteredFavoriteTickets.Any(t => t.Id == SelectedFavoriteTicket.Id))
+        {
+            SelectedFavoriteTicket = FilteredFavoriteTickets.FirstOrDefault();
+        }
+    }
+
+    private bool MatchesFavoriteFilter(IssueDto ticket)
+    {
+        if (string.IsNullOrWhiteSpace(FavoriteFilterText))
+        {
+            return true;
+        }
+
+        var query = FavoriteFilterText.Trim();
+        return ticket.Id.ToString(CultureInfo.InvariantCulture).Contains(query, StringComparison.OrdinalIgnoreCase)
+            || ticket.Subject.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || (ticket.Project?.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
     }
 
     [RelayCommand]
