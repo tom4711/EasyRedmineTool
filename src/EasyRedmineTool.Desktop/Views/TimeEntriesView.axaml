@@ -2,7 +2,7 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:vm="using:EasyRedmineTool.Core.ViewModels"
-    xmlns:models="using:EasyRedmineTool.Core.Models.TimeEntries"
+    xmlns:models="using:EasyRedmineTool.Core.Models.Tickets"
     xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
     x:Class="EasyRedmineTool.Desktop.Views.TimeEntriesView"
     x:DataType="vm:TimeEntriesViewModel">
@@ -12,10 +12,20 @@
         <ResourceDictionary x:Key="Light">
           <SolidColorBrush x:Key="TimeEntryCardBorderBrush" Color="#E0E0E0" />
           <SolidColorBrush x:Key="TimeEntryCardBackgroundBrush" Color="#FAFAFA" />
+          <SolidColorBrush x:Key="FavoriteChipBackgroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="FavoriteChipBorderBrush" Color="#D1D5DB" />
+          <SolidColorBrush x:Key="FavoriteChipHoverBackgroundBrush" Color="#F3F4F6" />
+          <SolidColorBrush x:Key="FavoriteChipSelectedBackgroundBrush" Color="#EFF6FF" />
+          <SolidColorBrush x:Key="FavoriteChipSelectedBorderBrush" Color="#2563EB" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="TimeEntryCardBorderBrush" Color="#525252" />
           <SolidColorBrush x:Key="TimeEntryCardBackgroundBrush" Color="#2A2A2A" />
+          <SolidColorBrush x:Key="FavoriteChipBackgroundBrush" Color="#1F1F1F" />
+          <SolidColorBrush x:Key="FavoriteChipBorderBrush" Color="#525252" />
+          <SolidColorBrush x:Key="FavoriteChipHoverBackgroundBrush" Color="#333333" />
+          <SolidColorBrush x:Key="FavoriteChipSelectedBackgroundBrush" Color="#1E3A5F" />
+          <SolidColorBrush x:Key="FavoriteChipSelectedBorderBrush" Color="#3B82F6" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
     </ResourceDictionary>
@@ -27,7 +37,7 @@
       <Setter Property="BorderBrush" Value="{DynamicResource TimeEntryCardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Padding" Value="16" />
+      <Setter Property="Padding" Value="20" />
     </Style>
     <Style Selector="TextBlock.section-title">
       <Setter Property="FontSize" Value="16" />
@@ -36,6 +46,35 @@
     <Style Selector="TextBlock.field-label">
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Opacity" Value="0.85" />
+    </Style>
+    <Style Selector="ListBox.favorite-picker">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ListBox.favorite-picker ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,0,8,8" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ListBox.favorite-picker ListBoxItem:pointerover Border.favorite-chip">
+      <Setter Property="Background" Value="{DynamicResource FavoriteChipHoverBackgroundBrush}" />
+    </Style>
+    <Style Selector="ListBox.favorite-picker ListBoxItem:selected Border.favorite-chip">
+      <Setter Property="Background" Value="{DynamicResource FavoriteChipSelectedBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FavoriteChipSelectedBorderBrush}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="Border.favorite-chip">
+      <Setter Property="Background" Value="{DynamicResource FavoriteChipBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FavoriteChipBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="MinWidth" Value="140" />
+      <Setter Property="MaxWidth" Value="280" />
     </Style>
   </UserControl.Styles>
 
@@ -46,63 +85,83 @@
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-      <Grid Margin="24,0,24,24"
-            ColumnDefinitions="*,16,*"
-            RowDefinitions="Auto">
-        <Border Grid.Column="0" Classes="time-entry-card">
-          <StackPanel Spacing="14">
+      <Border Margin="24,0,24,24"
+              Classes="time-entry-card"
+              HorizontalAlignment="Stretch">
+        <Grid ColumnDefinitions="*,24,*">
+          <StackPanel Grid.Column="0" Spacing="16">
             <TextBlock Classes="section-title" Text="Neuer Zeiteintrag" />
 
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-              <TextBlock Grid.Column="0"
-                         Classes="field-label"
-                         Text="Favoriten-Ticket"
-                         FontWeight="SemiBold" />
-              <StackPanel Grid.Column="1"
-                          Orientation="Horizontal"
-                          Spacing="6">
-                <Button Classes="secondary compact"
-                        Command="{Binding ReloadFavoritesCommand}"
-                        Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Favoriten}" />
-                <Button Classes="secondary compact"
-                        Command="{Binding ReloadActivitiesCommand}"
-                        Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Aktivitäten}" />
-              </StackPanel>
-            </Grid>
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBlock Grid.Column="0"
+                           Classes="field-label"
+                           Text="Favoriten-Ticket"
+                           FontWeight="SemiBold" />
+                <Button Grid.Column="1"
+                        Classes="ghost compact"
+                        ToolTip.Tip="Favoriten neu laden"
+                        Command="{Binding ReloadFavoritesCommand}">
+                  <materialIcons:MaterialIcon Kind="Refresh" Width="18" Height="18" />
+                </Button>
+              </Grid>
 
-            <ListBox ItemsSource="{Binding FavoriteTickets}"
-                     SelectedItem="{Binding SelectedFavoriteTicket}"
-                     MinHeight="100"
-                     MaxHeight="140">
-              <ListBox.ItemTemplate>
-                <DataTemplate>
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="{Binding Id, StringFormat=#\{0\}}" FontWeight="Bold" />
-                    <TextBlock Text="{Binding Subject}" TextTrimming="CharacterEllipsis" />
-                  </StackPanel>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
+              <ListBox Classes="favorite-picker"
+                       ItemsSource="{Binding FavoriteTickets}"
+                       SelectedItem="{Binding SelectedFavoriteTicket}">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                  </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="models:IssueDto">
+                    <Border Classes="favorite-chip">
+                      <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <materialIcons:MaterialIcon Kind="Star"
+                                                        Width="14"
+                                                        Height="14"
+                                                        Foreground="{DynamicResource FavoriteChipSelectedBorderBrush}" />
+                          <TextBlock Text="{Binding Id, StringFormat=#\{0\}}"
+                                     FontWeight="Bold"
+                                     FontSize="12" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Subject}"
+                                   FontSize="11"
+                                   Opacity="0.9"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxLines="2"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Project.Name}"
+                                   FontSize="10"
+                                   Opacity="0.65"
+                                   TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </StackPanel>
 
-            <Grid ColumnDefinitions="110,*"
-                  RowDefinitions="Auto,Auto,Auto"
-                  RowSpacing="10"
-                  ColumnSpacing="12">
+            <Grid ColumnDefinitions="*,12,*"
+                  RowDefinitions="Auto,Auto,Auto,Auto"
+                  RowSpacing="8">
               <TextBlock Grid.Row="0"
                          Grid.Column="0"
                          Classes="field-label"
                          Text="Stunden" />
-              <TextBox Grid.Row="0"
-                       Grid.Column="1"
+              <TextBox Grid.Row="1"
+                       Grid.Column="0"
                        Text="{Binding Hours}"
                        PlaceholderText="z. B. 1.5" />
 
-              <TextBlock Grid.Row="1"
-                         Grid.Column="0"
+              <TextBlock Grid.Row="0"
+                         Grid.Column="2"
                          Classes="field-label"
                          Text="Aktivität" />
               <ComboBox Grid.Row="1"
-                        Grid.Column="1"
+                        Grid.Column="2"
                         HorizontalAlignment="Stretch"
                         ItemsSource="{Binding Activities}"
                         SelectedItem="{Binding SelectedActivity}">
@@ -115,93 +174,52 @@
 
               <TextBlock Grid.Row="2"
                          Grid.Column="0"
+                         Grid.ColumnSpan="3"
                          Classes="field-label"
                          Text="Kommentar"
-                         VerticalAlignment="Top"
                          Margin="0,4,0,0" />
-              <TextBox Grid.Row="2"
-                       Grid.Column="1"
+              <TextBox Grid.Row="3"
+                       Grid.Column="0"
+                       Grid.ColumnSpan="3"
                        Text="{Binding Comments}"
-                       MinHeight="64"
+                       MinHeight="96"
                        AcceptsReturn="True"
                        TextWrapping="Wrap"
                        PlaceholderText="Optional" />
             </Grid>
 
-            <StackPanel Spacing="8">
-              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                <TextBlock Grid.Column="0"
-                           Classes="field-label"
-                           Text="Datum"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center" />
-                <Button Grid.Column="1"
-                        Classes="secondary compact"
-                        Content="Heute"
-                        Command="{Binding SetSpentOnTodayCommand}" />
-                <Button Grid.Column="2"
-                        Classes="secondary compact"
-                        Content="Gestern"
-                        Command="{Binding SetSpentOnYesterdayCommand}" />
-              </Grid>
-
-              <TextBlock Text="{Binding SelectedDateLabel}" Opacity="0.85" />
-
-              <Border HorizontalAlignment="Center"
-                      Padding="4"
-                      BorderThickness="1"
-                      BorderBrush="{DynamicResource TimeEntryCardBorderBrush}"
-                      CornerRadius="6">
-                <Calendar SelectedDate="{Binding SpentOn}"
-                          DisplayDate="{Binding CalendarDisplayDate, Mode=TwoWay}"
-                          IsTodayHighlighted="True"
-                          FirstDayOfWeek="Monday" />
-              </Border>
-            </StackPanel>
-
             <Button Classes="primary stretch"
                     Command="{Binding CreateTimeEntryCommand}"
                     Content="{materialIcons:MaterialIconTextExt Kind=Plus, Text=Zeiteintrag erstellen}" />
           </StackPanel>
-        </Border>
 
-        <Border Grid.Column="2" Classes="time-entry-card">
-          <StackPanel Spacing="12">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-              <TextBlock Grid.Column="0"
-                         Classes="section-title"
-                         Text="Wochenübersicht"
-                         VerticalAlignment="Center" />
-              <Button Grid.Column="1"
-                      Classes="secondary compact"
-                      Command="{Binding ReloadWeeklySummaryCommand}"
-                      Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Aktualisieren}" />
-            </Grid>
+          <StackPanel Grid.Column="2" Spacing="12">
+            <TextBlock Classes="section-title" Text="Datum" />
 
-            <TextBlock Text="{Binding CurrentQuarterLabel}" Opacity="0.85" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding WeeklyTotalHours, StringFormat=Gesamtstunden im Zeitraum: {0}}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="secondary compact"
+                      Content="Heute"
+                      Command="{Binding SetSpentOnTodayCommand}" />
+              <Button Classes="secondary compact"
+                      Content="Gestern"
+                      Command="{Binding SetSpentOnYesterdayCommand}" />
+            </StackPanel>
 
-            <ListBox ItemsSource="{Binding WeeklyHours}" MinHeight="220">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="models:WeeklyHoursDto">
-                  <StackPanel Spacing="4" Margin="0,0,0,8">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Grid.Column="0" Text="{Binding Label}" />
-                      <TextBlock Grid.Column="1"
-                                 Text="{Binding Hours, StringFormat={}{0} h}"
-                                 FontWeight="Bold" />
-                    </Grid>
-                    <ProgressBar Minimum="0"
-                                 Maximum="{Binding $parent[UserControl].DataContext.MaxWeeklyHours}"
-                                 Value="{Binding Hours}"
-                                 Height="10" />
-                  </StackPanel>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
+            <TextBlock Text="{Binding SelectedDateLabel}" Opacity="0.85" />
+
+            <Border Padding="4"
+                    HorizontalAlignment="Left"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource TimeEntryCardBorderBrush}"
+                    CornerRadius="6">
+              <Calendar SelectedDate="{Binding SpentOn}"
+                        DisplayDate="{Binding CalendarDisplayDate, Mode=TwoWay}"
+                        IsTodayHighlighted="True"
+                        FirstDayOfWeek="Monday" />
+            </Border>
           </StackPanel>
-        </Border>
-      </Grid>
+        </Grid>
+      </Border>
     </ScrollViewer>
   </Grid>
 </UserControl>

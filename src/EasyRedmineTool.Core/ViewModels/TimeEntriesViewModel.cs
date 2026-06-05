@@ -9,7 +9,6 @@ using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Linq;
 
 public partial class TimeEntriesViewModel : ViewModelBase
 {
@@ -40,18 +39,8 @@ public partial class TimeEntriesViewModel : ViewModelBase
     [ObservableProperty]
     private bool isBusy;
 
-    [ObservableProperty]
-    private string currentQuarterLabel = string.Empty;
-
-    [ObservableProperty]
-    private double weeklyTotalHours;
-
-    [ObservableProperty]
-    private double maxWeeklyHours = 1;
-
     public ObservableCollection<IssueDto> FavoriteTickets { get; } = [];
     public ObservableCollection<TimeEntryActivityDto> Activities { get; } = [];
-    public ObservableCollection<WeeklyHoursDto> WeeklyHours { get; } = [];
 
     public TimeEntriesViewModel(IAppSettingsService appSettingsService, ITimeEntryService timeEntryService)
     {
@@ -60,7 +49,6 @@ public partial class TimeEntriesViewModel : ViewModelBase
 
         ReloadFavorites();
         _ = ReloadActivitiesAsync();
-        _ = ReloadWeeklySummaryAsync();
     }
 
     [RelayCommand]
@@ -86,7 +74,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
 
         StatusMessage = FavoriteTickets.Count == 0
             ? "Keine Favoriten vorhanden. Bitte in der Ticketliste Favoriten markieren."
-            : $"{FavoriteTickets.Count} Favorit(en) geladen.";
+            : string.Empty;
     }
 
     [RelayCommand]
@@ -118,64 +106,10 @@ public partial class TimeEntriesViewModel : ViewModelBase
             SelectedActivity = Activities.FirstOrDefault();
         }
 
-        if (Activities.Count == 0)
+        if (Activities.Count == 0 && SelectedFavoriteTicket is not null)
         {
             StatusMessage = "Keine Aktivitäten gefunden. Bitte API-Berechtigung/Projekt prüfen.";
         }
-    }
-
-    [RelayCommand]
-    public async Task ReloadWeeklySummaryAsync()
-    {
-        var settings = _appSettingsService.Load();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
-        {
-            return;
-        }
-
-        var (from, to, label) = GetCurrentQuarterRange();
-        CurrentQuarterLabel = label;
-
-        var entries = await _timeEntryService.GetMyTimeEntriesAsync(settings.BaseUrl, settings.ApiKey, from, to);
-
-        var grouped = entries
-            .Where(e => DateTime.TryParseExact(e.Spent_On, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-            .Select(e => new
-            {
-                Entry = e,
-                Date = DateTime.ParseExact(e.Spent_On, "yyyy-MM-dd", CultureInfo.InvariantCulture)
-            })
-            .GroupBy(x => new { Year = ISOWeek.GetYear(x.Date), Week = ISOWeek.GetWeekOfYear(x.Date) })
-            .Select(g => new WeeklyHoursDto
-            {
-                Year = g.Key.Year,
-                Week = g.Key.Week,
-                Hours = Math.Round(g.Sum(x => x.Entry.Hours), 2)
-            })
-            .OrderBy(x => x.Year)
-            .ThenBy(x => x.Week)
-            .ToList();
-
-        WeeklyHours.Clear();
-        foreach (var item in grouped)
-        {
-            WeeklyHours.Add(item);
-        }
-
-        WeeklyTotalHours = grouped.Sum(x => x.Hours);
-        MaxWeeklyHours = grouped.Count == 0 ? 1 : Math.Max(1, grouped.Max(x => x.Hours));
-    }
-
-    private static (DateTime From, DateTime To, string Label) GetCurrentQuarterRange()
-    {
-        var today = DateTime.Today;
-        var quarter = ((today.Month - 1) / 3) + 1;
-        var fromMonth = (quarter - 1) * 3 + 1;
-
-        var from = new DateTime(today.Year, fromMonth, 1);
-        var to = from.AddMonths(3).AddDays(-1);
-
-        return (from, to, $"Q{quarter} {today.Year} ({from:yyyy-MM-dd} - {to:yyyy-MM-dd})");
     }
 
     partial void OnSelectedFavoriteTicketChanged(IssueDto? value)
@@ -254,7 +188,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
         try
         {
             IsBusy = true;
-            StatusMessage = "Zeiteintrag wird erstellt ...";
+            StatusMessage = "Zeiteintrag wird erstellt …";
 
             var result = await _timeEntryService.CreateTimeEntryAsync(
                 settings.BaseUrl,
@@ -272,7 +206,6 @@ public partial class TimeEntriesViewModel : ViewModelBase
             if (result.Success)
             {
                 Comments = string.Empty;
-                await ReloadWeeklySummaryAsync();
             }
         }
         finally

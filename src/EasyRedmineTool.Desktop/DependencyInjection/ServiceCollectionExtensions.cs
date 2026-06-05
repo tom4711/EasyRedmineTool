@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<TicketListViewModel>();
         services.AddTransient<TimeEntriesViewModel>();
+        services.AddTransient<WeeklySummaryViewModel>();
 
 
         return services;

@@ -1,0 +1,76 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:EasyRedmineTool.Core.ViewModels"
+    xmlns:models="using:EasyRedmineTool.Core.Models.TimeEntries"
+    xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+    x:Class="EasyRedmineTool.Desktop.Views.WeeklySummaryView"
+    x:DataType="vm:WeeklySummaryViewModel">
+  <UserControl.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="SummaryCardBorderBrush" Color="#E0E0E0" />
+          <SolidColorBrush x:Key="SummaryCardBackgroundBrush" Color="#FAFAFA" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="SummaryCardBorderBrush" Color="#525252" />
+          <SolidColorBrush x:Key="SummaryCardBackgroundBrush" Color="#2A2A2A" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </UserControl.Resources>
+
+  <UserControl.Styles>
+    <Style Selector="Border.summary-card">
+      <Setter Property="Background" Value="{DynamicResource SummaryCardBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SummaryCardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="20" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,*">
+    <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="8">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <StackPanel Grid.Column="0" Spacing="4">
+          <TextBlock Text="Auswertung" FontSize="22" FontWeight="Bold" />
+          <TextBlock Text="{Binding CurrentQuarterLabel}" Opacity="0.85" TextWrapping="Wrap" />
+        </StackPanel>
+        <Button Grid.Column="1"
+                Classes="secondary"
+                VerticalAlignment="Top"
+                Command="{Binding ReloadWeeklySummaryCommand}"
+                Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Aktualisieren}" />
+      </Grid>
+
+      <TextBlock Text="{Binding WeeklyTotalHours, StringFormat=Gesamtstunden im Zeitraum: {0}}" FontWeight="SemiBold" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" Margin="24,0,24,24">
+      <Border Classes="summary-card" HorizontalAlignment="Stretch">
+        <ListBox ItemsSource="{Binding WeeklyHours}"
+                 Background="Transparent"
+                 BorderThickness="0">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="models:WeeklyHoursDto">
+              <StackPanel Spacing="4" Margin="0,0,0,12">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Text="{Binding Label}" />
+                  <TextBlock Grid.Column="1"
+                             Text="{Binding Hours, StringFormat={}{0} h}"
+                             FontWeight="Bold" />
+                </Grid>
+                <ProgressBar Minimum="0"
+                             Maximum="{Binding $parent[UserControl].DataContext.MaxWeeklyHours}"
+                             Value="{Binding Hours}"
+                             Height="10" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

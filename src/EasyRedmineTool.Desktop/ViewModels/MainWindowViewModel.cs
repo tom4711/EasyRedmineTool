@@ -26,18 +26,23 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool isAboutVisible;
 
+    [ObservableProperty]
+    private bool isWeeklySummaryVisible;
+
     public string WindowTitle => AppInfo.WindowTitle;
 
     public MainWindowViewModel(
         SettingsViewModel settingsViewModel,
         TicketListViewModel ticketListViewModel,
         TimeEntriesViewModel timeEntriesViewModel,
+        WeeklySummaryViewModel weeklySummaryViewModel,
         AboutViewModel aboutViewModel,
         IAppSettingsService appSettingsService)
     {
         SettingsViewModel = settingsViewModel;
         TicketListViewModel = ticketListViewModel;
         TimeEntriesViewModel = timeEntriesViewModel;
+        WeeklySummaryViewModel = weeklySummaryViewModel;
         AboutViewModel = aboutViewModel;
 
         SettingsViewModel.SettingsSaved += OnSettingsSaved;
@@ -61,6 +66,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public SettingsViewModel SettingsViewModel { get; }
     public TicketListViewModel TicketListViewModel { get; }
     public TimeEntriesViewModel TimeEntriesViewModel { get; }
+    public WeeklySummaryViewModel WeeklySummaryViewModel { get; }
     public AboutViewModel AboutViewModel { get; }
 
     [ObservableProperty]
@@ -96,6 +102,13 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void OpenWeeklySummary()
+    {
+        _ = WeeklySummaryViewModel.ReloadWeeklySummaryAsync();
+        ShowWeeklySummary();
+    }
+
+    [RelayCommand]
     private void OpenAbout()
     {
         ShowAbout();
@@ -109,35 +122,42 @@ public partial class MainWindowViewModel : ViewModelBase
         ShowTicketList();
     }
 
-    private void ShowSettings()
+    private void HideAllViews()
     {
-        IsSettingsVisible = true;
+        IsSettingsVisible = false;
         IsTicketListVisible = false;
         IsTimeEntriesVisible = false;
+        IsWeeklySummaryVisible = false;
         IsAboutVisible = false;
+    }
+
+    private void ShowSettings()
+    {
+        HideAllViews();
+        IsSettingsVisible = true;
     }
 
     private void ShowTicketList()
     {
-        IsSettingsVisible = false;
+        HideAllViews();
         IsTicketListVisible = true;
-        IsTimeEntriesVisible = false;
-        IsAboutVisible = false;
     }
 
     private void ShowTimeEntries()
     {
-        IsSettingsVisible = false;
-        IsTicketListVisible = false;
+        HideAllViews();
         IsTimeEntriesVisible = true;
-        IsAboutVisible = false;
+    }
+
+    private void ShowWeeklySummary()
+    {
+        HideAllViews();
+        IsWeeklySummaryVisible = true;
     }
 
     private void ShowAbout()
     {
-        IsSettingsVisible = false;
-        IsTicketListVisible = false;
-        IsTimeEntriesVisible = false;
+        HideAllViews();
         IsAboutVisible = true;
     }
 }
