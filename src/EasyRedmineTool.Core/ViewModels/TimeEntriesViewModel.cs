@@ -23,7 +23,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
     private string hours = "1";
 
     [ObservableProperty]
-    private string spentOn = DateTime.Today.ToString("yyyy-MM-dd");
+    private DateTimeOffset? spentOn = DateTimeOffset.Now;
 
     [ObservableProperty]
     private TimeEntryActivityDto? selectedActivity;
@@ -204,11 +204,11 @@ public partial class TimeEntriesViewModel : ViewModelBase
             return;
         }
 
-        if (!DateTime.TryParseExact(SpentOn, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-        {
-            StatusMessage = "Datum muss im Format yyyy-MM-dd angegeben werden.";
-            return;
-        }
+        //if (!DateOnly.TryParse(SpentOn, out _))
+        //{
+        //    StatusMessage = "Datum muss im Format yyyy-MM-dd angegeben werden.";
+        //    return;
+        //}
 
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -229,7 +229,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
                 {
                     IssueId = SelectedFavoriteTicket.Id,
                     Hours = parsedHours,
-                    SpentOn = SpentOn,
+                    SpentOn = SpentOn.Value.ToString("yyyy-MM-dd"),
                     ActivityId = SelectedActivity.Id,
                     Comments = Comments
                 });

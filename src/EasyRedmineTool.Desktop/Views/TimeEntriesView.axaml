@@ -59,6 +59,7 @@
 
         <TextBlock Text="Datum (yyyy-MM-dd)" />
         <TextBox Text="{Binding SpentOn}" />
+        <DatePicker SelectedDate="{Binding SpentOn}" />
 
         <TextBlock Text="Aktivität" />
         <ComboBox ItemsSource="{Binding Activities}" SelectedItem="{Binding SelectedActivity}">
