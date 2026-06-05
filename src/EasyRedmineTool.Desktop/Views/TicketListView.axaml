@@ -61,75 +61,76 @@
     </Style>
   </UserControl.Styles>
 
-  <Grid>
-    <ScrollViewer>
-      <StackPanel Margin="24" Spacing="12">
-        <TextBlock Text="Meine Tickets" FontSize="22" FontWeight="Bold" />
+  <Grid RowDefinitions="Auto,*">
+    <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="12">
+      <TextBlock Text="Meine Tickets" FontSize="22" FontWeight="Bold" />
 
-        <Button Content="Tickets laden" Command="{Binding LoadTicketsCommand}" />
+      <Button Content="Tickets laden" Command="{Binding LoadTicketsCommand}" />
 
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBox Width="180" PlaceholderText="Ticket-ID" Text="{Binding TicketIdToAdd}" />
-          <Button Content="Ticket per ID hinzufügen" Command="{Binding AddTicketByIdCommand}" />
-        </StackPanel>
-
-        <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
-
-        <ListBox ItemsSource="{Binding Tickets}" SelectedItem="{Binding SelectedTicket}">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:TicketListItemViewModel">
-              <Border Classes="ticket-item"
-                      Classes.favorite="{Binding IsFavorite}"
-                      Padding="8"
-                      Margin="0,0,0,8">
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
-                  <StackPanel Grid.Row="0"
-                              Grid.Column="0"
-                              Orientation="Horizontal"
-                              Spacing="8">
-                    <TextBlock Text="{Binding Ticket.Id, StringFormat=#\{0\}}" FontWeight="Bold" />
-                    <Border Classes="favorite-badge" IsVisible="{Binding IsFavorite}">
-                      <TextBlock Classes="favorite-badge-text" Text="Favorit" />
-                    </Border>
-                  </StackPanel>
-
-                  <Button Grid.Row="0"
-                          Grid.Column="1"
-                          Background="Transparent"
-                          BorderThickness="0"
-                          Padding="4"
-                          ToolTip.Tip="Favorit setzen/entfernen"
-                          Command="{Binding $parent[UserControl].DataContext.ToggleFavoriteForTicketCommand}"
-                          CommandParameter="{Binding .}">
-                    <Panel>
-                      <TextBlock Classes="favorite-star active"
-                                 Text="★"
-                                 IsVisible="{Binding IsFavorite}" />
-                      <TextBlock Classes="favorite-star inactive"
-                                 Text="☆"
-                                 IsVisible="{Binding !IsFavorite}" />
-                    </Panel>
-                  </Button>
-
-                  <TextBlock Grid.Row="1"
-                             Grid.Column="0"
-                             Grid.ColumnSpan="2"
-                             Text="{Binding Ticket.Subject}"
-                             TextWrapping="Wrap" />
-                  <TextBlock Grid.Row="2"
-                             Grid.Column="0"
-                             Grid.ColumnSpan="2"
-                             Text="{Binding Ticket.Project.Name, StringFormat=Projekt: {0}}" />
-                  <TextBlock Grid.Row="3"
-                             Grid.Column="0"
-                             Grid.ColumnSpan="2"
-                             Text="{Binding Ticket.Status.Name, StringFormat=Status: {0}}" />
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBox Width="180" PlaceholderText="Ticket-ID" Text="{Binding TicketIdToAdd}" />
+        <Button Content="Ticket per ID hinzufügen" Command="{Binding AddTicketByIdCommand}" />
       </StackPanel>
-    </ScrollViewer>
+
+      <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <ListBox Grid.Row="1"
+             Margin="24,0,24,24"
+             ItemsSource="{Binding Tickets}"
+             SelectedItem="{Binding SelectedTicket}">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:TicketListItemViewModel">
+          <Border Classes="ticket-item"
+                  Classes.favorite="{Binding IsFavorite}"
+                  Padding="8"
+                  Margin="0,0,0,8">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+              <StackPanel Grid.Row="0"
+                          Grid.Column="0"
+                          Orientation="Horizontal"
+                          Spacing="8">
+                <TextBlock Text="{Binding Ticket.Id, StringFormat=#\{0\}}" FontWeight="Bold" />
+                <Border Classes="favorite-badge" IsVisible="{Binding IsFavorite}">
+                  <TextBlock Classes="favorite-badge-text" Text="Favorit" />
+                </Border>
+              </StackPanel>
+
+              <Button Grid.Row="0"
+                      Grid.Column="1"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Padding="4"
+                      ToolTip.Tip="Favorit setzen/entfernen"
+                      Command="{Binding $parent[UserControl].DataContext.ToggleFavoriteForTicketCommand}"
+                      CommandParameter="{Binding .}">
+                <Panel>
+                  <TextBlock Classes="favorite-star active"
+                             Text="★"
+                             IsVisible="{Binding IsFavorite}" />
+                  <TextBlock Classes="favorite-star inactive"
+                             Text="☆"
+                             IsVisible="{Binding !IsFavorite}" />
+                </Panel>
+              </Button>
+
+              <TextBlock Grid.Row="1"
+                         Grid.Column="0"
+                         Grid.ColumnSpan="2"
+                         Text="{Binding Ticket.Subject}"
+                         TextWrapping="Wrap" />
+              <TextBlock Grid.Row="2"
+                         Grid.Column="0"
+                         Grid.ColumnSpan="2"
+                         Text="{Binding Ticket.Project.Name, StringFormat=Projekt: {0}}" />
+              <TextBlock Grid.Row="3"
+                         Grid.Column="0"
+                         Grid.ColumnSpan="2"
+                         Text="{Binding Ticket.Status.Name, StringFormat=Status: {0}}" />
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
   </Grid>
 </UserControl>
