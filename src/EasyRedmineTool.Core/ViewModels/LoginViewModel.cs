@@ -10,10 +10,10 @@ public partial class LoginViewModel : ViewModelBase
     private readonly IAuthService _authService;
 
     [ObservableProperty]
-    private string baseUrl = string.Empty;
+    private string baseUrl = "https://projects.hawe.com/";
 
     [ObservableProperty]
-    private string apiKey = string.Empty;
+    private string apiKey = "REDACTED";
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -29,25 +29,25 @@ public partial class LoginViewModel : ViewModelBase
     [RelayCommand]
     private async Task TestConnectionAsync()
     {
-        if (isBusy)
+        if (IsBusy)
             return;
 
         try
         {
-            isBusy = true;
-            statusMessage = "Verbindung wird geprüft ...";
+            IsBusy = true;
+            StatusMessage = "Verbindung wird geprüft ...";
 
             var result = await _authService.TestConnectionAsync(new LoginRequest
             {
-                BaseUrl = baseUrl,
-                ApiKey = apiKey
+                BaseUrl = BaseUrl,
+                ApiKey = ApiKey
             });
 
-            statusMessage = result.Message;
+            StatusMessage = result.Message;
         }
         finally
         {
-            isBusy = false;
+            IsBusy = false;
         }
     }
 }

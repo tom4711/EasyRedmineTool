@@ -16,9 +16,12 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<EasyRedmineApiClient>();
 
         services.AddSingleton<IAuthService, AuthService>();
+        services.AddSingleton<ITicketService, TicketService>();
 
         services.AddTransient<LoginViewModel>();
         services.AddTransient<MainWindowViewModel>();
+        services.AddTransient<TicketListViewModel>();
+
 
         return services;
     }

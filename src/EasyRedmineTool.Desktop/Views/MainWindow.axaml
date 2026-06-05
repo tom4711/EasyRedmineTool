@@ -16,7 +16,7 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
     <Grid RowDefinitions="Auto,*">
-        <views:LoginView Grid.Row="0" DataContext="{Binding LoginViewModel}" />
+        <views:TicketListView Grid.Row="0" DataContext="{Binding TicketListViewModel}" />
     </Grid>
 
 </Window>

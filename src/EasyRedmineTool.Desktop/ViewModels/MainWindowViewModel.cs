@@ -4,10 +4,10 @@ using EasyRedmineTool.Core.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
-    public MainWindowViewModel(LoginViewModel loginViewModel)
+    public MainWindowViewModel(TicketListViewModel ticketListViewModel)
     {
-        LoginViewModel = loginViewModel;
+        TicketListViewModel = ticketListViewModel;
     }
 
-    public LoginViewModel LoginViewModel { get; }
+    public TicketListViewModel TicketListViewModel { get; }
 }
