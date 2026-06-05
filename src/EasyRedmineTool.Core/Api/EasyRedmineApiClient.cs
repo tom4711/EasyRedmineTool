@@ -58,6 +58,25 @@ public class EasyRedmineApiClient
         return await response.Content.ReadFromJsonAsync<IssueResponse>(cancellationToken);
     }
 
+    public async Task<TimeEntriesListResponse?> GetMyTimeEntriesAsync(
+        string baseUrl,
+        string apiKey,
+        DateTime from,
+        DateTime to,
+        CancellationToken cancellationToken = default)
+    {
+        var endpoint = $"time_entries.json?user_id=me&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&limit=500";
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<TimeEntriesListResponse>(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<TimeEntryActivityDto>> GetTimeEntryActivitiesAsync(
         string baseUrl,
         string apiKey,

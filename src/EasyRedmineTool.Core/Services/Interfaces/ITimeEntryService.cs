@@ -11,6 +11,13 @@ public interface ITimeEntryService
         int? projectId = null,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<TimeEntryDto>> GetMyTimeEntriesAsync(
+        string baseUrl,
+        string apiKey,
+        DateTime from,
+        DateTime to,
+        CancellationToken cancellationToken = default);
+
     Task<TimeEntryOperationResult> CreateTimeEntryAsync(
         string baseUrl,
         string apiKey,
