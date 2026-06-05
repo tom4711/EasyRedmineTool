@@ -27,7 +27,7 @@ public class EasyRedmineApiClient(HttpClient httpClient)
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync<IssueListResponse>(cancellationToken);
+        return await response.Content.ReadFromJsonAsync<IssueListResponse>(RedmineJson.Options, cancellationToken);
     }
 
     public async Task<IssueResponse?> GetIssueByIdAsync( string baseUrl, string apiKey, int issueId, CancellationToken cancellationToken = default)
@@ -40,12 +40,117 @@ public class EasyRedmineApiClient(HttpClient httpClient)
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync<IssueResponse>(cancellationToken);
+        return await response.Content.ReadFromJsonAsync<IssueResponse>(RedmineJson.Options, cancellationToken);
     }
 
     public async Task<TimeEntriesListResponse?> GetMyTimeEntriesAsync( string baseUrl, string apiKey, DateTime from, DateTime to, CancellationToken cancellationToken = default)
     {
-        var endpoint = $"time_entries.json?user_id=me&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&limit=500";
+        return await GetMyTimeEntriesPageAsync(baseUrl, apiKey, from, to, limit: 500, offset: 0, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TimeEntryDto>> GetAllMyTimeEntriesAsync(
+        string baseUrl,
+        string apiKey,
+        DateTime from,
+        DateTime to,
+        CancellationToken cancellationToken = default)
+    {
+        const int limit = 100;
+        var offset = 0;
+        var all = new List<TimeEntryDto>();
+        int? totalCount = null;
+
+        while (true)
+        {
+            var page = await GetMyTimeEntriesPageAsync(baseUrl, apiKey, from, to, limit, offset, cancellationToken);
+            if (page?.Time_Entries is null || page.Time_Entries.Count == 0)
+            {
+                break;
+            }
+
+            all.AddRange(page.Time_Entries);
+            totalCount ??= page.Total_Count;
+
+            if (all.Count >= totalCount || page.Time_Entries.Count < limit)
+            {
+                break;
+            }
+
+            offset += limit;
+        }
+
+        return all;
+    }
+
+    public async Task<IReadOnlyList<IssueDto>> GetIssuesByIdsAsync(
+        string baseUrl,
+        string apiKey,
+        IReadOnlyList<int> issueIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (issueIds.Count == 0)
+        {
+            return [];
+        }
+
+        var issuesById = new Dictionary<int, IssueDto>();
+        const int batchSize = 100;
+
+        for (var offset = 0; offset < issueIds.Count; offset += batchSize)
+        {
+            var batch = issueIds.Skip(offset).Take(batchSize).ToList();
+            var idsParam = string.Join(',', batch);
+            var endpoint = $"issues.json?issue_id={idsParam}&status_id=*&limit={batchSize}";
+            using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                continue;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<IssueListResponse>(RedmineJson.Options, cancellationToken);
+            if (result?.Issues is null)
+            {
+                continue;
+            }
+
+            foreach (var issue in result.Issues)
+            {
+                issuesById[issue.Id] = issue;
+            }
+        }
+
+        foreach (var issueId in issueIds)
+        {
+            if (issuesById.ContainsKey(issueId))
+            {
+                continue;
+            }
+
+            var issueResponse = await GetIssueByIdAsync(baseUrl, apiKey, issueId, cancellationToken);
+            if (issueResponse?.Issue is not null)
+            {
+                issuesById[issueId] = issueResponse.Issue;
+            }
+        }
+
+        return issueIds
+            .Where(issuesById.ContainsKey)
+            .Select(id => issuesById[id])
+            .ToList();
+    }
+
+    private async Task<TimeEntriesListResponse?> GetMyTimeEntriesPageAsync(
+        string baseUrl,
+        string apiKey,
+        DateTime from,
+        DateTime to,
+        int limit,
+        int offset,
+        CancellationToken cancellationToken = default)
+    {
+        var endpoint = $"time_entries.json?user_id=me&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&limit={limit}&offset={offset}";
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
 
@@ -54,7 +159,7 @@ public class EasyRedmineApiClient(HttpClient httpClient)
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync<TimeEntriesListResponse>(cancellationToken);
+        return await response.Content.ReadFromJsonAsync<TimeEntriesListResponse>(RedmineJson.Options, cancellationToken);
     }
 
     public async Task<IReadOnlyList<TimeEntryActivityDto>> GetTimeEntryActivitiesAsync( string baseUrl, string apiKey, int? issueId = null, int? projectId = null, CancellationToken cancellationToken = default)

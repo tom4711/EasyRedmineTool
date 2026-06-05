@@ -9,6 +9,11 @@ public interface ITicketService
         string apiKey,
         CancellationToken cancellationToken = default);
 
+    Task<TicketListLoadResult> GetTicketsForListAsync(
+        string baseUrl,
+        string apiKey,
+        CancellationToken cancellationToken = default);
+
     Task<IssueDto?> GetIssueByIdAsync(
         string baseUrl,
         string apiKey,

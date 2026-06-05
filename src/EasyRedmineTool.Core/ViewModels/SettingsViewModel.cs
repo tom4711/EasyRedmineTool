@@ -39,10 +39,14 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void SaveSettings()
     {
+        var current = _appSettingsService.Load();
+
         _appSettingsService.Save(new AppSettings
         {
             BaseUrl = BaseUrl,
-            ApiKey = ApiKey
+            ApiKey = ApiKey,
+            CachedTickets = current.CachedTickets,
+            FavoriteTicketIds = current.FavoriteTicketIds
         });
 
         StatusMessage = "Einstellungen gespeichert.";

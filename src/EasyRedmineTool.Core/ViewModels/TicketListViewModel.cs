@@ -75,15 +75,17 @@ public partial class TicketListViewModel : ViewModelBase
             StatusMessage = "Tickets werden geladen ...";
             Tickets.Clear();
 
-            var tickets = await _ticketService.GetMyOpenIssuesAsync(BaseUrl, ApiKey);
+            var result = await _ticketService.GetTicketsForListAsync(BaseUrl, ApiKey);
 
-            foreach (var ticket in tickets)
+            foreach (var ticket in result.Tickets)
             {
                 Tickets.Add(CreateTicketItem(ticket));
             }
 
             PersistCurrentState();
-            StatusMessage = $"{Tickets.Count} Ticket(s) geladen und gecacht.";
+            StatusMessage = result.TimeEntryTicketCount == 0
+                ? $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} offen zugewiesen)."
+                : $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} offen zugewiesen, {result.TimeEntryTicketCount} mit Zeiteinträgen im letzten Jahr).";
         }
         catch (Exception ex)
         {

@@ -64,7 +64,7 @@
   <Grid>
     <ScrollViewer>
       <StackPanel Margin="24" Spacing="12">
-        <TextBlock Text="Meine offenen Tickets" FontSize="22" FontWeight="Bold" />
+        <TextBlock Text="Meine Tickets" FontSize="22" FontWeight="Bold" />
 
         <Button Content="Tickets laden" Command="{Binding LoadTicketsCommand}" />
 
