@@ -3,6 +3,8 @@ namespace EasyRedmineTool.Core.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using EasyRedmineTool.Core;
+using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
@@ -42,6 +44,12 @@ public partial class TimeEntriesViewModel : ViewModelBase
     [ObservableProperty]
     private string favoriteFilterText = string.Empty;
 
+    [ObservableProperty]
+    private double todayBookedHours;
+
+    [ObservableProperty]
+    private bool canRepeatLastEntry;
+
     public ObservableCollection<IssueDto> FavoriteTickets { get; } = [];
     public ObservableCollection<IssueDto> FilteredFavoriteTickets { get; } = [];
     public ObservableCollection<TimeEntryActivityDto> Activities { get; } = [];
@@ -53,7 +61,13 @@ public partial class TimeEntriesViewModel : ViewModelBase
 
         ReloadFavorites();
         _ = ReloadActivitiesAsync();
+        _ = ReloadTodayBookedHoursAsync();
     }
+
+    public string TodayBookedHoursLabel =>
+        $"Heute gebucht: {TodayBookedHours.ToString("0.##", CultureInfo.GetCultureInfo("de-DE"))} h";
+
+    public bool HasSelectedFavoriteTicket => SelectedFavoriteTicket is not null;
 
     [RelayCommand]
     public void ReloadFavorites()
@@ -62,7 +76,9 @@ public partial class TimeEntriesViewModel : ViewModelBase
 
         var favorites = settings.CachedTickets
             .Where(t => settings.FavoriteTicketIds.Contains(t.Id))
-            .OrderBy(t => t.Id)
+            .OrderByDescending(t => t.LastTimeEntryOn.HasValue)
+            .ThenByDescending(t => t.LastTimeEntryOn)
+            .ThenBy(t => t.Id)
             .ToList();
 
         FavoriteTickets.Clear();
@@ -77,10 +93,32 @@ public partial class TimeEntriesViewModel : ViewModelBase
         }
 
         ApplyFavoriteFilter();
+        UpdateCanRepeatLastEntry();
 
         StatusMessage = FavoriteTickets.Count == 0
             ? "Keine Favoriten vorhanden. Bitte in der Ticketliste Favoriten markieren."
             : string.Empty;
+    }
+
+    [RelayCommand]
+    public async Task ReloadTodayBookedHoursAsync()
+    {
+        var settings = _appSettingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            TodayBookedHours = 0;
+            return;
+        }
+
+        var today = DateTime.Today;
+        var entries = await _timeEntryService.GetMyTimeEntriesAsync(settings.BaseUrl, settings.ApiKey, today, today);
+        var todayKey = today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        TodayBookedHours = Math.Round(
+            entries
+                .Where(entry => string.Equals(entry.Spent_On, todayKey, StringComparison.Ordinal))
+                .Sum(entry => entry.Hours),
+            2);
     }
 
     partial void OnFavoriteFilterTextChanged(string value)
@@ -88,10 +126,15 @@ public partial class TimeEntriesViewModel : ViewModelBase
         ApplyFavoriteFilter();
     }
 
+    partial void OnSelectedFavoriteTicketChanged(IssueDto? value)
+    {
+        OnPropertyChanged(nameof(HasSelectedFavoriteTicket));
+        OpenSelectedTicketInBrowserCommand.NotifyCanExecuteChanged();
+        _ = ReloadActivitiesAsync();
+    }
+
     private void ApplyFavoriteFilter()
     {
-        var query = FavoriteFilterText.Trim();
-
         FilteredFavoriteTickets.Clear();
         foreach (var ticket in FavoriteTickets.Where(MatchesFavoriteFilter))
         {
@@ -153,9 +196,45 @@ public partial class TimeEntriesViewModel : ViewModelBase
         }
     }
 
-    partial void OnSelectedFavoriteTicketChanged(IssueDto? value)
+    [RelayCommand(CanExecute = nameof(CanRepeatLastEntry))]
+    private async Task RepeatLastEntryAsync()
     {
-        _ = ReloadActivitiesAsync();
+        var settings = _appSettingsService.Load();
+        if (!settings.LastTimeEntryIssueId.HasValue || !settings.LastTimeEntryActivityId.HasValue)
+        {
+            return;
+        }
+
+        var ticket = FavoriteTickets.FirstOrDefault(t => t.Id == settings.LastTimeEntryIssueId.Value);
+        if (ticket is null)
+        {
+            StatusMessage = "Letztes Ticket ist kein Favorit mehr.";
+            UpdateCanRepeatLastEntry();
+            return;
+        }
+
+        SelectedFavoriteTicket = ticket;
+        Hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? "1" : settings.LastTimeEntryHours;
+        SetSpentOnDate(DateTime.Today);
+
+        await ReloadActivitiesAsync();
+
+        SelectedActivity = Activities.FirstOrDefault(a => a.Id == settings.LastTimeEntryActivityId.Value)
+            ?? SelectedActivity;
+
+        StatusMessage = $"Letzter Eintrag übernommen (#{ticket.Id}, {Hours} h).";
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelectedFavoriteTicket))]
+    private void OpenSelectedTicketInBrowser()
+    {
+        if (SelectedFavoriteTicket is null)
+        {
+            return;
+        }
+
+        var settings = _appSettingsService.Load();
+        RedmineLinks.OpenIssueInBrowser(settings.BaseUrl, SelectedFavoriteTicket.Id);
     }
 
     [RelayCommand]
@@ -247,11 +326,52 @@ public partial class TimeEntriesViewModel : ViewModelBase
             if (result.Success)
             {
                 Comments = string.Empty;
+                SaveLastTimeEntryTemplate();
+                UpdateCachedTicketLastTimeEntry(SelectedFavoriteTicket.Id, SpentOn.Value);
+                ReloadFavorites();
+                await ReloadTodayBookedHoursAsync();
             }
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    private void SaveLastTimeEntryTemplate()
+    {
+        var settings = _appSettingsService.Load();
+        settings.LastTimeEntryIssueId = SelectedFavoriteTicket?.Id;
+        settings.LastTimeEntryActivityId = SelectedActivity?.Id;
+        settings.LastTimeEntryHours = Hours;
+        _appSettingsService.Save(settings);
+        UpdateCanRepeatLastEntry();
+    }
+
+    private void UpdateCachedTicketLastTimeEntry(int issueId, DateTime spentOn)
+    {
+        var settings = _appSettingsService.Load();
+        var ticket = settings.CachedTickets.FirstOrDefault(t => t.Id == issueId);
+        if (ticket is null)
+        {
+            return;
+        }
+
+        if (ticket.LastTimeEntryOn is null || spentOn >= ticket.LastTimeEntryOn)
+        {
+            ticket.LastTimeEntryOn = spentOn;
+            _appSettingsService.Save(settings);
+        }
+    }
+
+    private void UpdateCanRepeatLastEntry()
+    {
+        var settings = _appSettingsService.Load();
+        CanRepeatLastEntry = settings.LastTimeEntryIssueId.HasValue
+            && settings.LastTimeEntryActivityId.HasValue
+            && FavoriteTickets.Any(t => t.Id == settings.LastTimeEntryIssueId.Value);
+
+        RepeatLastEntryCommand.NotifyCanExecuteChanged();
+        OpenSelectedTicketInBrowserCommand.NotifyCanExecuteChanged();
     }
 }

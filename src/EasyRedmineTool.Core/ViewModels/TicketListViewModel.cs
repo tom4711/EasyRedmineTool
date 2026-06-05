@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core.Configuration;
+using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
@@ -152,6 +153,17 @@ public partial class TicketListViewModel : ViewModelBase
         ToggleFavorite(ticketItem);
     }
 
+    [RelayCommand]
+    private void OpenTicketInBrowser(TicketListItemViewModel? ticketItem)
+    {
+        if (ticketItem is null)
+        {
+            return;
+        }
+
+        RedmineLinks.OpenIssueInBrowser(BaseUrl, ticketItem.Ticket.Id);
+    }
+
     private void ToggleFavorite(TicketListItemViewModel ticketItem)
     {
         if (ticketItem.IsFavorite)
@@ -181,7 +193,10 @@ public partial class TicketListViewModel : ViewModelBase
             BaseUrl = BaseUrl,
             ApiKey = ApiKey,
             CachedTickets = Tickets.Select(t => t.Ticket).ToList(),
-            FavoriteTicketIds = _favoriteTicketIds.ToList()
+            FavoriteTicketIds = _favoriteTicketIds.ToList(),
+            LastTimeEntryIssueId = current.LastTimeEntryIssueId,
+            LastTimeEntryActivityId = current.LastTimeEntryActivityId,
+            LastTimeEntryHours = current.LastTimeEntryHours,
         });
     }
 }

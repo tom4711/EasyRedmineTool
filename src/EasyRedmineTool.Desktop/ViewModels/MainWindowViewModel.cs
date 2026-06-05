@@ -95,6 +95,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         TimeEntriesViewModel.ReloadFavorites();
         _ = TimeEntriesViewModel.ReloadActivitiesAsync();
+        _ = TimeEntriesViewModel.ReloadTodayBookedHoursAsync();
         ShowTimeEntries();
     }
 
@@ -132,6 +133,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             TimeEntriesViewModel.ReloadFavorites();
             _ = TimeEntriesViewModel.ReloadActivitiesAsync();
+            _ = TimeEntriesViewModel.ReloadTodayBookedHoursAsync();
             ShowTimeEntries();
             return;
         }

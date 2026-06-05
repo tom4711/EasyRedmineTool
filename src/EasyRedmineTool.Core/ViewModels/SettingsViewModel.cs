@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core.Configuration;
+using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Models;
 using EasyRedmineTool.Core.Services.Interfaces;
 
@@ -46,7 +47,10 @@ public partial class SettingsViewModel : ViewModelBase
             BaseUrl = BaseUrl,
             ApiKey = ApiKey,
             CachedTickets = current.CachedTickets,
-            FavoriteTicketIds = current.FavoriteTicketIds
+            FavoriteTicketIds = current.FavoriteTicketIds,
+            LastTimeEntryIssueId = current.LastTimeEntryIssueId,
+            LastTimeEntryActivityId = current.LastTimeEntryActivityId,
+            LastTimeEntryHours = current.LastTimeEntryHours,
         });
 
         StatusMessage = "Einstellungen gespeichert.";

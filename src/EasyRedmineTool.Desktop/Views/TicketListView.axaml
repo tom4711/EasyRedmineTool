@@ -112,23 +112,31 @@
                 </Border>
               </StackPanel>
 
-              <Button Grid.Row="0"
-                      Grid.Column="1"
-                      Grid.RowSpan="4"
-                      VerticalAlignment="Top"
-                      Classes="ghost"
-                      ToolTip.Tip="Favorit setzen/entfernen"
-                      Command="{Binding $parent[UserControl].DataContext.ToggleFavoriteForTicketCommand}"
-                      CommandParameter="{Binding .}">
-                    <Panel>
-                      <materialIcons:MaterialIcon Classes="favorite-star active"
-                                                    Kind="Star"
-                                                    IsVisible="{Binding IsFavorite}" />
-                      <materialIcons:MaterialIcon Classes="favorite-star inactive"
-                                                    Kind="StarOutline"
-                                                    IsVisible="{Binding !IsFavorite}" />
-                    </Panel>
-              </Button>
+              <StackPanel Grid.Row="0"
+                          Grid.Column="1"
+                          Grid.RowSpan="4"
+                          VerticalAlignment="Top"
+                          Spacing="4">
+                <Button Classes="ghost"
+                        ToolTip.Tip="In Redmine öffnen"
+                        Command="{Binding $parent[UserControl].DataContext.OpenTicketInBrowserCommand}"
+                        CommandParameter="{Binding .}">
+                  <materialIcons:MaterialIcon Kind="OpenInNew" Width="18" Height="18" />
+                </Button>
+                <Button Classes="ghost"
+                        ToolTip.Tip="Favorit setzen/entfernen"
+                        Command="{Binding $parent[UserControl].DataContext.ToggleFavoriteForTicketCommand}"
+                        CommandParameter="{Binding .}">
+                  <Panel>
+                    <materialIcons:MaterialIcon Classes="favorite-star active"
+                                                  Kind="Star"
+                                                  IsVisible="{Binding IsFavorite}" />
+                    <materialIcons:MaterialIcon Classes="favorite-star inactive"
+                                                  Kind="StarOutline"
+                                                  IsVisible="{Binding !IsFavorite}" />
+                  </Panel>
+                </Button>
+              </StackPanel>
 
               <TextBlock Grid.Row="1"
                          Grid.Column="0"
