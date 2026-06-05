@@ -65,11 +65,15 @@
     <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="12">
       <TextBlock Text="Meine Tickets" FontSize="22" FontWeight="Bold" />
 
-      <Button Content="Tickets laden" Command="{Binding LoadTicketsCommand}" />
+      <Button Classes="primary"
+              Content="Tickets laden"
+              Command="{Binding LoadTicketsCommand}" />
 
       <StackPanel Orientation="Horizontal" Spacing="8">
         <TextBox Width="180" PlaceholderText="Ticket-ID" Text="{Binding TicketIdToAdd}" />
-        <Button Content="Ticket per ID hinzufügen" Command="{Binding AddTicketByIdCommand}" />
+        <Button Classes="secondary"
+                Content="Ticket per ID hinzufügen"
+                Command="{Binding AddTicketByIdCommand}" />
       </StackPanel>
 
       <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
@@ -98,9 +102,7 @@
 
               <Button Grid.Row="0"
                       Grid.Column="1"
-                      Background="Transparent"
-                      BorderThickness="0"
-                      Padding="4"
+                      Classes="ghost"
                       ToolTip.Tip="Favorit setzen/entfernen"
                       Command="{Binding $parent[UserControl].DataContext.ToggleFavoriteForTicketCommand}"
                       CommandParameter="{Binding .}">

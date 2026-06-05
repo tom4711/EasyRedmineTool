@@ -1,0 +1,130 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="AppAccentBrush" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#1D4ED8" />
+          <SolidColorBrush x:Key="AppAccentPressedBrush" Color="#1E40AF" />
+          <SolidColorBrush x:Key="AppAccentForegroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppSecondaryBackgroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppSecondaryBorderBrush" Color="#D1D5DB" />
+          <SolidColorBrush x:Key="AppSecondaryForegroundBrush" Color="#374151" />
+          <SolidColorBrush x:Key="AppSecondaryHoverBackgroundBrush" Color="#F3F4F6" />
+          <SolidColorBrush x:Key="AppSecondaryPressedBackgroundBrush" Color="#E5E7EB" />
+          <SolidColorBrush x:Key="AppNavHoverBackgroundBrush" Color="#E5E7EB" />
+          <SolidColorBrush x:Key="AppNavPressedBackgroundBrush" Color="#D1D5DB" />
+          <SolidColorBrush x:Key="AppGhostHoverBackgroundBrush" Color="#F3F4F6" />
+          <SolidColorBrush x:Key="AppGhostPressedBackgroundBrush" Color="#E5E7EB" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="AppAccentBrush" Color="#3B82F6" />
+          <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#60A5FA" />
+          <SolidColorBrush x:Key="AppAccentPressedBrush" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppAccentForegroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppSecondaryBackgroundBrush" Color="#2A2A2A" />
+          <SolidColorBrush x:Key="AppSecondaryBorderBrush" Color="#525252" />
+          <SolidColorBrush x:Key="AppSecondaryForegroundBrush" Color="#F3F4F6" />
+          <SolidColorBrush x:Key="AppSecondaryHoverBackgroundBrush" Color="#374151" />
+          <SolidColorBrush x:Key="AppSecondaryPressedBackgroundBrush" Color="#4B5563" />
+          <SolidColorBrush x:Key="AppNavHoverBackgroundBrush" Color="#374151" />
+          <SolidColorBrush x:Key="AppNavPressedBackgroundBrush" Color="#4B5563" />
+          <SolidColorBrush x:Key="AppGhostHoverBackgroundBrush" Color="#374151" />
+          <SolidColorBrush x:Key="AppGhostPressedBackgroundBrush" Color="#4B5563" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <Style Selector="Button">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="14,8" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource AppSecondaryBackgroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AppSecondaryForegroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppSecondaryBorderBrush}" />
+  </Style>
+
+  <Style Selector="Button:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppSecondaryHoverBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="Button:pressed">
+    <Setter Property="Background" Value="{DynamicResource AppSecondaryPressedBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentForegroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+  <Style Selector="Button.primary:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppAccentHoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentHoverBrush}" />
+  </Style>
+
+  <Style Selector="Button.primary:pressed">
+    <Setter Property="Background" Value="{DynamicResource AppAccentPressedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentPressedBrush}" />
+  </Style>
+
+  <Style Selector="Button.primary.stretch">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="MinHeight" Value="40" />
+  </Style>
+
+  <Style Selector="Button.secondary">
+    <Setter Property="Background" Value="{DynamicResource AppSecondaryBackgroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AppSecondaryForegroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppSecondaryBorderBrush}" />
+  </Style>
+
+  <Style Selector="Button.secondary:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppSecondaryHoverBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="Button.secondary:pressed">
+    <Setter Property="Background" Value="{DynamicResource AppSecondaryPressedBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="Button.compact">
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+
+  <Style Selector="Button.nav">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Padding" Value="16,8" />
+  </Style>
+
+  <Style Selector="Button.nav:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppNavHoverBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="Button.nav:pressed">
+    <Setter Property="Background" Value="{DynamicResource AppNavPressedBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="Button.ghost">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Padding" Value="6" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+
+  <Style Selector="Button.ghost:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppGhostHoverBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="Button.ghost:pressed">
+    <Setter Property="Background" Value="{DynamicResource AppGhostPressedBackgroundBrush}" />
+  </Style>
+</Styles>

@@ -15,9 +15,15 @@
             Background="{DynamicResource CardBackgroundBrush}"
             Padding="24,16,24,12">
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button Content="Tickets" Command="{Binding OpenTicketListCommand}" />
-        <Button Content="Time Entries" Command="{Binding OpenTimeEntriesCommand}" />
-        <Button Content="Einstellungen" Command="{Binding OpenSettingsCommand}" />
+        <Button Classes="nav"
+                Content="Tickets"
+                Command="{Binding OpenTicketListCommand}" />
+        <Button Classes="nav"
+                Content="Time Entries"
+                Command="{Binding OpenTimeEntriesCommand}" />
+        <Button Classes="nav"
+                Content="Einstellungen"
+                Command="{Binding OpenSettingsCommand}" />
         <ToggleSwitch IsChecked="{Binding IsDarkMode}"
                       OnContent="Dark"
                       OffContent="Light" />

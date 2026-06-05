@@ -36,11 +36,6 @@
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Opacity" Value="0.85" />
     </Style>
-    <Style Selector="Button.primary-action">
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="MinHeight" Value="36" />
-    </Style>
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,*">
@@ -65,12 +60,12 @@
               <StackPanel Grid.Column="1"
                           Orientation="Horizontal"
                           Spacing="6">
-                <Button Content="Favoriten"
-                        Command="{Binding ReloadFavoritesCommand}"
-                        Padding="10,4" />
-                <Button Content="Aktivitäten"
-                        Command="{Binding ReloadActivitiesCommand}"
-                        Padding="10,4" />
+                <Button Classes="secondary compact"
+                        Content="Favoriten"
+                        Command="{Binding ReloadFavoritesCommand}" />
+                <Button Classes="secondary compact"
+                        Content="Aktivitäten"
+                        Command="{Binding ReloadActivitiesCommand}" />
               </StackPanel>
             </Grid>
 
@@ -140,13 +135,13 @@
                            FontWeight="SemiBold"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"
+                        Classes="secondary compact"
                         Content="Heute"
-                        Command="{Binding SetSpentOnTodayCommand}"
-                        Padding="12,4" />
+                        Command="{Binding SetSpentOnTodayCommand}" />
                 <Button Grid.Column="2"
+                        Classes="secondary compact"
                         Content="Gestern"
-                        Command="{Binding SetSpentOnYesterdayCommand}"
-                        Padding="12,4" />
+                        Command="{Binding SetSpentOnYesterdayCommand}" />
               </Grid>
 
               <TextBlock Text="{Binding SelectedDateLabel}" Opacity="0.85" />
@@ -163,7 +158,7 @@
               </Border>
             </StackPanel>
 
-            <Button Classes="primary-action"
+            <Button Classes="primary stretch"
                     Content="Zeiteintrag erstellen"
                     Command="{Binding CreateTimeEntryCommand}" />
           </StackPanel>
@@ -177,9 +172,9 @@
                          Text="Wochenübersicht"
                          VerticalAlignment="Center" />
               <Button Grid.Column="1"
+                      Classes="secondary compact"
                       Content="Aktualisieren"
-                      Command="{Binding ReloadWeeklySummaryCommand}"
-                      Padding="10,4" />
+                      Command="{Binding ReloadWeeklySummaryCommand}" />
             </Grid>
 
             <TextBlock Text="{Binding CurrentQuarterLabel}" Opacity="0.85" TextWrapping="Wrap" />
