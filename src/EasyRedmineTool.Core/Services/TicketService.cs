@@ -4,6 +4,8 @@ using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
+using System.Globalization;
+
 public class TicketService(EasyRedmineApiClient apiClient) : ITicketService
 {
     private const int TimeEntryLookbackMonths = 12;
@@ -38,10 +40,20 @@ public class TicketService(EasyRedmineApiClient apiClient) : ITicketService
             ? []
             : await _apiClient.GetIssuesByIdsAsync(baseUrl, apiKey, additionalIssueIds, cancellationToken);
 
+        var lastTimeEntryByIssue = BuildLastTimeEntryLookup(timeEntries);
+
         var tickets = openIssues
             .Concat(additionalIssues)
             .OrderBy(ticket => ticket.Id)
             .ToList();
+
+        foreach (var ticket in tickets)
+        {
+            if (lastTimeEntryByIssue.TryGetValue(ticket.Id, out var lastEntryDate))
+            {
+                ticket.LastTimeEntryOn = lastEntryDate;
+            }
+        }
 
         return new TicketListLoadResult
         {
@@ -55,5 +67,29 @@ public class TicketService(EasyRedmineApiClient apiClient) : ITicketService
     {
         var result = await _apiClient.GetIssueByIdAsync(baseUrl, apiKey, issueId, cancellationToken);
         return result?.Issue;
+    }
+
+    private static Dictionary<int, DateTime> BuildLastTimeEntryLookup(
+        IReadOnlyList<Models.TimeEntries.TimeEntryDto> timeEntries)
+    {
+        return timeEntries
+            .Select(entry => new
+            {
+                IssueId = entry.GetIssueId(),
+                SpentOn = TryParseSpentOn(entry.Spent_On)
+            })
+            .Where(x => x.IssueId > 0 && x.SpentOn.HasValue)
+            .GroupBy(x => x.IssueId)
+            .ToDictionary(g => g.Key, g => g.Max(x => x.SpentOn!.Value));
+    }
+
+    private static DateTime? TryParseSpentOn(string spentOn)
+    {
+        if (DateTime.TryParseExact(spentOn, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            return date;
+        }
+
+        return null;
     }
 }

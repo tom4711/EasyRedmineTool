@@ -6,14 +6,18 @@ using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Services.Interfaces;
 using EasyRedmineTool.Core.ViewModels;
 
 using System;
+using System.Linq;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    private readonly IAppSettingsService _appSettingsService;
+
     [ObservableProperty]
     private bool isSettingsVisible;
 
@@ -44,6 +48,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TimeEntriesViewModel = timeEntriesViewModel;
         WeeklySummaryViewModel = weeklySummaryViewModel;
         AboutViewModel = aboutViewModel;
+        _appSettingsService = appSettingsService;
 
         SettingsViewModel.SettingsSaved += OnSettingsSaved;
 
@@ -52,15 +57,7 @@ public partial class MainWindowViewModel : ViewModelBase
             IsDarkMode = app.RequestedThemeVariant == ThemeVariant.Dark;
         }
 
-        var settings = appSettingsService.Load();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
-        {
-            ShowSettings();
-        }
-        else
-        {
-            ShowTicketList();
-        }
+        ShowInitialView();
     }
 
     public SettingsViewModel SettingsViewModel { get; }
@@ -119,8 +116,32 @@ public partial class MainWindowViewModel : ViewModelBase
         TicketListViewModel.ReloadSettings();
         TimeEntriesViewModel.ReloadFavorites();
         _ = TimeEntriesViewModel.ReloadActivitiesAsync();
+        ShowInitialView();
+    }
+
+    private void ShowInitialView()
+    {
+        var settings = _appSettingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            ShowSettings();
+            return;
+        }
+
+        if (HasUsableFavorites(settings))
+        {
+            TimeEntriesViewModel.ReloadFavorites();
+            _ = TimeEntriesViewModel.ReloadActivitiesAsync();
+            ShowTimeEntries();
+            return;
+        }
+
         ShowTicketList();
     }
+
+    private static bool HasUsableFavorites(AppSettings settings) =>
+        settings.FavoriteTicketIds.Count > 0 &&
+        settings.CachedTickets.Any(t => settings.FavoriteTicketIds.Contains(t.Id));
 
     private void HideAllViews()
     {
