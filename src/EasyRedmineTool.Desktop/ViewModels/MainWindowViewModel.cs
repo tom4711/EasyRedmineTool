@@ -1,5 +1,8 @@
 ﻿namespace EasyRedmineTool.Desktop.ViewModels;
 
+using Avalonia;
+using Avalonia.Styling;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -45,6 +48,17 @@ public partial class MainWindowViewModel : ViewModelBase
     public SettingsViewModel SettingsViewModel { get; }
     public TicketListViewModel TicketListViewModel { get; }
     public TimeEntriesViewModel TimeEntriesViewModel { get; }
+
+    [ObservableProperty]
+    private bool _isDarkMode;
+
+    partial void OnIsDarkModeChanged(bool value)
+    {
+        if (Application.Current is { } app)
+        {
+            app.RequestedThemeVariant = value ? ThemeVariant.Dark : ThemeVariant.Light;
+        }
+    }
 
     [RelayCommand]
     private void OpenSettings()
