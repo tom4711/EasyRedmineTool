@@ -9,7 +9,7 @@
     <TextBlock Text="Einstellungen" FontSize="22" FontWeight="Bold" />
 
     <TextBlock Text="Base URL" />
-    <TextBox Text="{Binding BaseUrl}" Watermark="https://projects.hawe.com/" />
+    <TextBox Text="{Binding BaseUrl}" PlaceholderText="https://projects.hawe.com/" />
 
     <TextBlock Text="API Key" />
     <TextBox Text="{Binding ApiKey}" PasswordChar="*" />

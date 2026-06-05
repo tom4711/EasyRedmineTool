@@ -12,7 +12,7 @@
         <Button Content="Tickets laden" Command="{Binding LoadTicketsCommand}" />
 
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBox Width="180" Watermark="Ticket-ID" Text="{Binding TicketIdToAdd}" />
+          <TextBox Width="180" PlaceholderText="Ticket-ID" Text="{Binding TicketIdToAdd}" />
           <Button Content="Ticket per ID hinzufügen" Command="{Binding AddTicketByIdCommand}" />
         </StackPanel>
 
