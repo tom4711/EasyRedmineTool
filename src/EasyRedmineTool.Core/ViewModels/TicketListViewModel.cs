@@ -32,12 +32,9 @@ public partial class TicketListViewModel : ViewModelBase
     private string ticketIdToAdd = string.Empty;
 
     [ObservableProperty]
-    private IssueDto? selectedTicket;
+    private TicketListItemViewModel? selectedTicket;
 
-    [ObservableProperty]
-    private bool isSelectedFavorite;
-
-    public ObservableCollection<IssueDto> Tickets { get; } = [];
+    public ObservableCollection<TicketListItemViewModel> Tickets { get; } = [];
 
     public TicketListViewModel(ITicketService ticketService, IAppSettingsService appSettingsService)
     {
@@ -62,10 +59,8 @@ public partial class TicketListViewModel : ViewModelBase
         Tickets.Clear();
         foreach (var ticket in settings.CachedTickets)
         {
-            Tickets.Add(ticket);
+            Tickets.Add(CreateTicketItem(ticket));
         }
-
-        UpdateSelectedFavoriteState();
     }
 
     [RelayCommand]
@@ -84,7 +79,7 @@ public partial class TicketListViewModel : ViewModelBase
 
             foreach (var ticket in tickets)
             {
-                Tickets.Add(ticket);
+                Tickets.Add(CreateTicketItem(ticket));
             }
 
             PersistCurrentState();
@@ -112,7 +107,7 @@ public partial class TicketListViewModel : ViewModelBase
             return;
         }
 
-        if (Tickets.Any(t => t.Id == ticketId))
+        if (Tickets.Any(t => t.Ticket.Id == ticketId))
         {
             StatusMessage = "Ticket ist bereits in der Liste vorhanden.";
             return;
@@ -129,7 +124,7 @@ public partial class TicketListViewModel : ViewModelBase
                 return;
             }
 
-            Tickets.Add(ticket);
+            Tickets.Add(CreateTicketItem(ticket));
             TicketIdToAdd = string.Empty;
             PersistCurrentState();
             StatusMessage = $"Ticket #{ticket.Id} wurde hinzugefügt.";
@@ -145,54 +140,36 @@ public partial class TicketListViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ToggleSelectedFavorite()
+    private void ToggleFavoriteForTicket(TicketListItemViewModel? ticketItem)
     {
-        if (SelectedTicket is null)
-        {
-            StatusMessage = "Bitte zuerst ein Ticket auswählen.";
-            return;
-        }
-
-        ToggleFavorite(SelectedTicket);
-    }
-
-    [RelayCommand]
-    private void ToggleFavoriteForTicket(IssueDto? ticket)
-    {
-        if (ticket is null)
+        if (ticketItem is null)
         {
             return;
         }
 
-        ToggleFavorite(ticket);
+        ToggleFavorite(ticketItem);
     }
 
-    private void ToggleFavorite(IssueDto ticket)
+    private void ToggleFavorite(TicketListItemViewModel ticketItem)
     {
-        if (_favoriteTicketIds.Contains(ticket.Id))
+        if (ticketItem.IsFavorite)
         {
-            _favoriteTicketIds.Remove(ticket.Id);
-            StatusMessage = $"Ticket #{ticket.Id} aus Favoriten entfernt.";
+            _favoriteTicketIds.Remove(ticketItem.Ticket.Id);
+            ticketItem.IsFavorite = false;
+            StatusMessage = $"Ticket #{ticketItem.Ticket.Id} aus Favoriten entfernt.";
         }
         else
         {
-            _favoriteTicketIds.Add(ticket.Id);
-            StatusMessage = $"Ticket #{ticket.Id} als Favorit markiert.";
+            _favoriteTicketIds.Add(ticketItem.Ticket.Id);
+            ticketItem.IsFavorite = true;
+            StatusMessage = $"Ticket #{ticketItem.Ticket.Id} als Favorit markiert.";
         }
 
         PersistCurrentState();
-        UpdateSelectedFavoriteState();
     }
 
-    private void UpdateSelectedFavoriteState()
-    {
-        IsSelectedFavorite = SelectedTicket is not null && _favoriteTicketIds.Contains(SelectedTicket.Id);
-    }
-
-    partial void OnSelectedTicketChanged(IssueDto? value)
-    {
-        UpdateSelectedFavoriteState();
-    }
+    private TicketListItemViewModel CreateTicketItem(IssueDto ticket) =>
+        new(ticket, _favoriteTicketIds.Contains(ticket.Id));
 
     private void PersistCurrentState()
     {
@@ -201,9 +178,8 @@ public partial class TicketListViewModel : ViewModelBase
         {
             BaseUrl = BaseUrl,
             ApiKey = ApiKey,
-            CachedTickets = Tickets.ToList(),
+            CachedTickets = Tickets.Select(t => t.Ticket).ToList(),
             FavoriteTicketIds = _favoriteTicketIds.ToList()
         });
     }
 }
-
