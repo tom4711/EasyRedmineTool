@@ -11,12 +11,10 @@ public sealed class AppSettingsService : IAppSettingsService
 {
     private const string AppName = AppConstants.SettingsAppName;
     private const string SettingsFileName = AppConstants.SettingsFileName;
-    private const string LegacySettingsFileName = "appsettings.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private readonly string _settingsFilePath;
-    private readonly string _legacySettingsFilePath;
     private readonly ILogger<AppSettingsService> _logger;
 
     public AppSettingsService(ILogger<AppSettingsService> logger)
@@ -30,16 +28,12 @@ public sealed class AppSettingsService : IAppSettingsService
         Directory.CreateDirectory(settingsDirectory);
 
         _settingsFilePath = Path.Combine(settingsDirectory, SettingsFileName);
-        _legacySettingsFilePath = Path.Combine(AppContext.BaseDirectory, LegacySettingsFileName);
-
-        TryMigrateLegacySettings();
     }
 
     internal AppSettingsService(string settingsFilePath, ILogger<AppSettingsService> logger)
     {
         _logger = logger;
         _settingsFilePath = settingsFilePath;
-        _legacySettingsFilePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
     }
 
     public string SettingsFilePath => _settingsFilePath;
@@ -69,22 +63,6 @@ public sealed class AppSettingsService : IAppSettingsService
         var settings = Load();
         configure(settings);
         Save(settings);
-    }
-
-    private void TryMigrateLegacySettings()
-    {
-        if (File.Exists(_settingsFilePath) || !File.Exists(_legacySettingsFilePath))
-        {
-            return;
-        }
-
-        var legacySettings = ReadFromFile(_legacySettingsFilePath);
-        if (legacySettings is null)
-        {
-            return;
-        }
-
-        Save(legacySettings);
     }
 
     private AppSettings? ReadFromFile(string filePath)

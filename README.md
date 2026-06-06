@@ -11,7 +11,7 @@ Desktop-Anwendung für Redmine/Easy Redmine: Tickets im Blick behalten, Zeiteint
 
 ## Einstellungen
 
-Die Konfiguration wird lokal in einer JSON-Datei gespeichert:
+Die Konfiguration wird ausschließlich lokal in einer JSON-Datei im Benutzerverzeichnis gespeichert — nicht im Installationsordner der Anwendung:
 
 | Plattform | Pfad |
 |-----------|------|
