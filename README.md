@@ -3,12 +3,31 @@
 [![CI](https://github.com/tom4711/EasyRedmineTool/actions/workflows/ci.yml/badge.svg)](https://github.com/tom4711/EasyRedmineTool/actions/workflows/ci.yml)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Avalonia](https://img.shields.io/badge/Avalonia-12.0.4-7C3AED?logo=avalonia&logoColor=white)](https://avaloniaui.net/)
-[![License: MIT](https://img.shields.io/github/license/tom4711/EasyRedmineTool)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Plattform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](https://avaloniaui.net/)
 
 Desktop-Anwendung für **Redmine** und **Easy Redmine**: offene Tickets verwalten, Zeiteinträge schnell buchen und Arbeitszeiten auswerten — ohne Browser-Tab-Chaos.
 
 > **Hinweis:** API-Schlüssel und Einstellungen werden ausschließlich lokal im Benutzerverzeichnis gespeichert. Niemals Zugangsdaten in Code oder Git committen.
+
+---
+
+## Screenshots
+
+### Ticketliste
+Offene und zuletzt gebuchte Tickets laden, Favoriten markieren und direkt in Redmine öffnen.
+
+![Ticketliste](docs/screenshots/tickets.png)
+
+### Zeiteinträge
+Favoriten-Tickets schnell buchen — Stunden, Aktivität, Datum und Kommentar in einer Zeile.
+
+![Zeiteinträge](docs/screenshots/time-entries.png)
+
+### Auswertung
+Quartalsübersicht der gebuchten Stunden nach Kalenderwochen.
+
+![Auswertung](docs/screenshots/weekly-summary.png)
 
 ---
 
