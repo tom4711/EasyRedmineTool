@@ -138,6 +138,21 @@ Lokale `settings.json` im Benutzerverzeichnis ist davon **nicht** betroffen.
 
 ---
 
+## Release (Windows)
+
+Releases werden automatisch erstellt, wenn auf `main` ein Tag im Format `v*` gepusht wird (z. B. `v1.0.0`):
+
+```bash
+git checkout main
+git pull origin main
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Der [Release-Workflow](.github/workflows/release.yml) führt Tests aus, baut ein **Windows x64**-Paket (self-contained ZIP) und veröffentlicht es als GitHub Release zum Download. Vorab-Versionen (`v1.0.0-beta.1`) werden als Pre-Release markiert.
+
+---
+
 ## Weitere Dokumentation
 
 - [Redmine Time-Entries API (Referenz)](docs/API-TimeEntries.md)
