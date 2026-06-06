@@ -1,37 +1,149 @@
 # EasyRedmineTool
 
-Desktop-Anwendung für Redmine/Easy Redmine: Tickets im Blick behalten, Zeiteinträge erfassen und Auswertungen ansehen.
+[![CI](https://github.com/tom4711/EasyRedmineTool/actions/workflows/ci.yml/badge.svg)](https://github.com/tom4711/EasyRedmineTool/actions/workflows/ci.yml)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![Avalonia](https://img.shields.io/badge/Avalonia-12.0.4-7C3AED?logo=avalonia&logoColor=white)](https://avaloniaui.net/)
+[![License: MIT](https://img.shields.io/github/license/tom4711/EasyRedmineTool)](LICENSE)
+[![Platform](https://img.shields.io/badge/Plattform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](https://avaloniaui.net/)
+
+Desktop-Anwendung für **Redmine** und **Easy Redmine**: offene Tickets verwalten, Zeiteinträge schnell buchen und Arbeitszeiten auswerten — ohne Browser-Tab-Chaos.
+
+> **Hinweis:** API-Schlüssel und Einstellungen werden ausschließlich lokal im Benutzerverzeichnis gespeichert. Niemals Zugangsdaten in Code oder Git committen.
+
+---
 
 ## Funktionen
 
-- Ticketliste mit Favoriten und letztem Buchungsdatum
-- Schnelles Buchen über Favoriten-Tickets
-- Quartalsauswertung nach Kalenderwochen
-- Verbindungstest und lokale Einstellungen
+| Bereich | Beschreibung |
+|---------|--------------|
+| **Ticketliste** | Offene und kürzlich gebuchte Tickets laden, nach ID ergänzen, in Redmine öffnen |
+| **Favoriten** | Häufig genutzte Tickets markieren und sortiert nach letztem Buchungsdatum anzeigen |
+| **Zeiteinträge** | Stunden, Aktivität, Datum und Kommentar direkt aus der Favoritenliste buchen |
+| **Schnellaktionen** | Letzten Eintrag duplizieren, heutige Stunden live anzeigen |
+| **Auswertung** | Quartalsübersicht der gebuchten Stunden nach Kalenderwochen |
+| **Einstellungen** | Basis-URL, API-Schlüssel, Verbindungstest, Hell/Dunkel-Modus |
 
-## Einstellungen
+---
 
-Die Konfiguration wird ausschließlich lokal in einer JSON-Datei im Benutzerverzeichnis gespeichert — nicht im Installationsordner der Anwendung:
+## Voraussetzungen
 
-| Plattform | Pfad |
-|-----------|------|
-| macOS | `~/Library/Application Support/EasyRedmineTool/settings.json` |
-| Windows | `%AppData%\EasyRedmineTool\settings.json` |
-| Linux | `~/.config/EasyRedmineTool/settings.json` (falls vom System so aufgelöst) |
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- Zugang zu einer Redmine-/Easy-Redmine-Instanz
+- Persönlicher **API-Schlüssel** (Redmine: *Mein Konto → API-Zugangsschlüssel*)
 
-Enthalten sind Basis-URL, API-Schlüssel, zwischengespeicherte Tickets und Favoriten.
+---
 
-## Sicherheit
-
-- Der **API-Schlüssel wird unverschlüsselt** in `settings.json` gespeichert.
-- Die Datei liegt im Benutzerprofil und ist nur für Ihr Konto zugänglich — teilen oder synchronisieren Sie sie nicht (z. B. per Cloud-Ordner).
-- Verwenden Sie einen **persönlichen API-Schlüssel** mit den minimal nötigen Rechten in Redmine.
-- Nach dem Löschen der App bleibt `settings.json` erhalten, bis Sie sie manuell entfernen.
-
-## Entwicklung
+## Schnellstart (Entwicklung)
 
 ```bash
+git clone https://github.com/tom4711/EasyRedmineTool.git
+cd EasyRedmineTool
+git checkout develop
+
+dotnet restore EasyRedmineTool.slnx
 dotnet build
 dotnet test
 dotnet run --project src/EasyRedmineTool.Desktop
 ```
+
+Beim ersten Start öffnet sich die **Einstellungen**-Ansicht. Dort Basis-URL und API-Schlüssel eintragen, speichern und den Verbindungstest ausführen.
+
+---
+
+## Konfiguration
+
+Alle Einstellungen liegen **nur im Benutzerverzeichnis** — nicht neben der Anwendung und nicht im Repository:
+
+| Plattform | Pfad |
+|-----------|------|
+| **macOS** | `~/Library/Application Support/EasyRedmineTool/settings.json` |
+| **Windows** | `%AppData%\EasyRedmineTool\settings.json` |
+| **Linux** | `~/.config/EasyRedmineTool/settings.json` *(je nach System)* |
+
+Gespeichert werden u. a.:
+
+- Basis-URL der Redmine-Instanz
+- API-Schlüssel
+- Zwischengespeicherte Ticketliste
+- Favoriten und Vorlage für den letzten Zeiteintrag
+
+---
+
+## Sicherheit
+
+- Der API-Schlüssel wird **unverschlüsselt** in `settings.json` abgelegt.
+- Die Datei gehört nur in dein Benutzerprofil — **nicht** in Cloud-Sync-Ordner oder Git.
+- Verwende einen persönlichen Schlüssel mit den **minimal nötigen Rechten**.
+- Nach Deinstallation bleibt `settings.json` erhalten, bis du sie manuell löschst.
+- **Keine Secrets in ViewModels, Tests oder Commits** — nur Platzhalter wie `"secret"` in Unit-Tests.
+
+---
+
+## Architektur
+
+```mermaid
+graph TB
+    subgraph Desktop["EasyRedmineTool.Desktop"]
+        Views[Avalonia Views]
+        DI[Dependency Injection]
+    end
+
+    subgraph Core["EasyRedmineTool.Core"]
+        VM[ViewModels]
+        SVC[Services]
+        API[EasyRedmineApiClient]
+    end
+
+    Redmine[(Redmine REST API)]
+
+    Views --> VM
+    DI --> VM
+    DI --> SVC
+    VM --> SVC
+    SVC --> API
+    API --> Redmine
+```
+
+| Projekt | Rolle |
+|---------|-------|
+| `EasyRedmineTool.Desktop` | Avalonia-UI, Styles, Einstiegspunkt |
+| `EasyRedmineTool.Core` | ViewModels, Services, API-Client, Modelle |
+| `EasyRedmineTool.Tests` | Unit-Tests für Kernlogik |
+
+**Tech-Stack:** Avalonia 12 · CommunityToolkit.Mvvm · Microsoft.Extensions.DependencyInjection / Http / Logging · Material Icons
+
+---
+
+## Tests
+
+```bash
+dotnet test EasyRedmineTool.slnx
+```
+
+Abgedeckt u. a.: Einstellungen (`AppSettingsService`), Datums-Helfer (`RedmineDates`), Ticket-Lookup und API-Pagination.
+
+---
+
+## Git nach History-Rewrite
+
+Wurde die Branch-Historie neu geschrieben (z. B. nach Entfernen versehentlich committeter Secrets), auf anderen Rechnern:
+
+```bash
+git fetch origin
+git checkout develop
+git reset --hard origin/develop
+```
+
+Lokale `settings.json` im Benutzerverzeichnis ist davon **nicht** betroffen.
+
+---
+
+## Weitere Dokumentation
+
+- [Redmine Time-Entries API (Referenz)](docs/API-TimeEntries.md)
+
+---
+
+## Lizenz
+
+[MIT License](LICENSE) — Copyright © 2026 Thomas Menzl
