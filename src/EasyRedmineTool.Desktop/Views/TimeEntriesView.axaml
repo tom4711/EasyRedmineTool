@@ -5,29 +5,10 @@
     xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
     x:Class="EasyRedmineTool.Desktop.Views.TimeEntriesView"
     x:DataType="vm:TimeEntriesViewModel">
-  <UserControl.Resources>
-    <ResourceDictionary>
-      <ResourceDictionary.ThemeDictionaries>
-        <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="TimeEntryCardBorderBrush" Color="#E0E0E0" />
-          <SolidColorBrush x:Key="TimeEntryCardBackgroundBrush" Color="#FAFAFA" />
-          <SolidColorBrush x:Key="FavoriteRowBackgroundBrush" Color="#FFFFFF" />
-          <SolidColorBrush x:Key="FavoriteRowBorderBrush" Color="#D1D5DB" />
-        </ResourceDictionary>
-        <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="TimeEntryCardBorderBrush" Color="#525252" />
-          <SolidColorBrush x:Key="TimeEntryCardBackgroundBrush" Color="#2A2A2A" />
-          <SolidColorBrush x:Key="FavoriteRowBackgroundBrush" Color="#1F1F1F" />
-          <SolidColorBrush x:Key="FavoriteRowBorderBrush" Color="#525252" />
-        </ResourceDictionary>
-      </ResourceDictionary.ThemeDictionaries>
-    </ResourceDictionary>
-  </UserControl.Resources>
-
   <UserControl.Styles>
     <Style Selector="Border.time-entry-card">
-      <Setter Property="Background" Value="{DynamicResource TimeEntryCardBackgroundBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource TimeEntryCardBorderBrush}" />
+      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Padding" Value="20" />
@@ -273,7 +254,7 @@
                                Grid.Column="6"
                                Classes="row-field"
                                Text="{Binding Comments}"
-                               PlaceholderText="Optional" />
+                               PlaceholderText="optional" />
 
                       <Button Grid.Row="0"
                               Grid.RowSpan="2"

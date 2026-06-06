@@ -1,21 +1,25 @@
 ﻿namespace EasyRedmineTool.Core.Services;
 
+using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Api;
+using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
-
-using System.Globalization;
 
 public class TicketService(EasyRedmineApiClient apiClient) : ITicketService
 {
     private const int TimeEntryLookbackMonths = 12;
+    private static readonly TimeSpan TimeEntryCacheTtl = TimeSpan.FromMinutes(5);
 
     private readonly EasyRedmineApiClient _apiClient = apiClient;
+    private readonly object _timeEntryCacheLock = new();
+    private string? _timeEntryCacheKey;
+    private DateTime _timeEntryCacheExpiresAt;
+    private IReadOnlyList<TimeEntryDto> _cachedTimeEntries = [];
 
     public async Task<IReadOnlyList<IssueDto>> GetMyOpenIssuesAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default)
     {
-        var result = await _apiClient.GetMyOpenIssuesAsync(baseUrl, apiKey, cancellationToken);
-        return result?.Issues ?? [];
+        return await _apiClient.GetAllMyOpenIssuesAsync(baseUrl, apiKey, cancellationToken);
     }
 
     public async Task<TicketListLoadResult> GetTicketsForListAsync(
@@ -28,7 +32,7 @@ public class TicketService(EasyRedmineApiClient apiClient) : ITicketService
 
         var to = DateTime.Today;
         var from = to.AddMonths(-TimeEntryLookbackMonths);
-        var timeEntries = await _apiClient.GetAllMyTimeEntriesAsync(baseUrl, apiKey, from, to, cancellationToken);
+        var timeEntries = await GetTimeEntriesWithCacheAsync(baseUrl, apiKey, from, to, cancellationToken);
 
         var additionalIssueIds = timeEntries
             .Select(entry => entry.GetIssueId())
@@ -69,27 +73,45 @@ public class TicketService(EasyRedmineApiClient apiClient) : ITicketService
         return result?.Issue;
     }
 
-    private static Dictionary<int, DateTime> BuildLastTimeEntryLookup(
-        IReadOnlyList<Models.TimeEntries.TimeEntryDto> timeEntries)
+    internal static Dictionary<int, DateTime> BuildLastTimeEntryLookup(IReadOnlyList<TimeEntryDto> timeEntries)
     {
         return timeEntries
             .Select(entry => new
             {
                 IssueId = entry.GetIssueId(),
-                SpentOn = TryParseSpentOn(entry.Spent_On)
+                SpentOn = RedmineDates.TryParseSpentOn(entry.Spent_On)
             })
             .Where(x => x.IssueId > 0 && x.SpentOn.HasValue)
             .GroupBy(x => x.IssueId)
             .ToDictionary(g => g.Key, g => g.Max(x => x.SpentOn!.Value));
     }
 
-    private static DateTime? TryParseSpentOn(string spentOn)
+    private async Task<IReadOnlyList<TimeEntryDto>> GetTimeEntriesWithCacheAsync(
+        string baseUrl,
+        string apiKey,
+        DateTime from,
+        DateTime to,
+        CancellationToken cancellationToken)
     {
-        if (DateTime.TryParseExact(spentOn, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        var cacheKey = $"{baseUrl}|{apiKey}|{RedmineDates.FormatSpentOn(from)}|{RedmineDates.FormatSpentOn(to)}";
+
+        lock (_timeEntryCacheLock)
         {
-            return date;
+            if (_timeEntryCacheKey == cacheKey && DateTime.UtcNow < _timeEntryCacheExpiresAt)
+            {
+                return _cachedTimeEntries;
+            }
         }
 
-        return null;
+        var entries = await _apiClient.GetAllMyTimeEntriesAsync(baseUrl, apiKey, from, to, cancellationToken);
+
+        lock (_timeEntryCacheLock)
+        {
+            _timeEntryCacheKey = cacheKey;
+            _timeEntryCacheExpiresAt = DateTime.UtcNow.Add(TimeEntryCacheTtl);
+            _cachedTimeEntries = entries;
+        }
+
+        return entries;
     }
 }

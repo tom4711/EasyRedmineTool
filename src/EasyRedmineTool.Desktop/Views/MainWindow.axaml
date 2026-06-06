@@ -24,7 +24,7 @@
                   Content="{materialIcons:MaterialIconTextExt Kind=ClipboardListOutline, Text=Tickets}" />
           <Button Classes="nav"
                   Command="{Binding OpenTimeEntriesCommand}"
-                  Content="{materialIcons:MaterialIconTextExt Kind=ClockOutline, Text=Time Entries}" />
+                  Content="{materialIcons:MaterialIconTextExt Kind=ClockOutline, Text=Zeiteinträge}" />
           <Button Classes="nav"
                   Command="{Binding OpenWeeklySummaryCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=ChartTimelineVariant, Text=Auswertung}" />

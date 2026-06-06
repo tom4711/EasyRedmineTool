@@ -3,6 +3,7 @@ namespace EasyRedmineTool.Core.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Services.Interfaces;
 
@@ -16,6 +17,12 @@ public partial class WeeklySummaryViewModel : ViewModelBase
 
     [ObservableProperty]
     private string currentQuarterLabel = string.Empty;
+
+    [ObservableProperty]
+    private string statusMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool isBusy;
 
     [ObservableProperty]
     private double weeklyTotalHours;
@@ -34,43 +41,69 @@ public partial class WeeklySummaryViewModel : ViewModelBase
     [RelayCommand]
     public async Task ReloadWeeklySummaryAsync()
     {
-        var settings = _appSettingsService.Load();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        if (IsBusy)
         {
             return;
         }
 
-        var (from, to, label) = GetCurrentQuarterRange();
-        CurrentQuarterLabel = label;
-
-        var entries = await _timeEntryService.GetMyTimeEntriesAsync(settings.BaseUrl, settings.ApiKey, from, to);
-
-        var grouped = entries
-            .Where(e => DateTime.TryParseExact(e.Spent_On, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-            .Select(e => new
-            {
-                Entry = e,
-                Date = DateTime.ParseExact(e.Spent_On, "yyyy-MM-dd", CultureInfo.InvariantCulture)
-            })
-            .GroupBy(x => new { Year = ISOWeek.GetYear(x.Date), Week = ISOWeek.GetWeekOfYear(x.Date) })
-            .Select(g => new WeeklyHoursDto
-            {
-                Year = g.Key.Year,
-                Week = g.Key.Week,
-                Hours = Math.Round(g.Sum(x => x.Entry.Hours), 2)
-            })
-            .OrderBy(x => x.Year)
-            .ThenBy(x => x.Week)
-            .ToList();
-
-        WeeklyHours.Clear();
-        foreach (var item in grouped)
+        var settings = _appSettingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
-            WeeklyHours.Add(item);
+            StatusMessage = "API-Key fehlt. Bitte zuerst Einstellungen speichern.";
+            WeeklyHours.Clear();
+            WeeklyTotalHours = 0;
+            MaxWeeklyHours = 1;
+            return;
         }
 
-        WeeklyTotalHours = grouped.Sum(x => x.Hours);
-        MaxWeeklyHours = grouped.Count == 0 ? 1 : Math.Max(1, grouped.Max(x => x.Hours));
+        try
+        {
+            IsBusy = true;
+            StatusMessage = "Auswertung wird geladen …";
+
+            var (from, to, label) = GetCurrentQuarterRange();
+            CurrentQuarterLabel = label;
+
+            var result = await _timeEntryService.GetMyTimeEntriesAsync(settings.BaseUrl, settings.ApiKey, from, to);
+            if (!result.Success)
+            {
+                StatusMessage = result.Message;
+                WeeklyHours.Clear();
+                WeeklyTotalHours = 0;
+                MaxWeeklyHours = 1;
+                return;
+            }
+
+            var grouped = result.Entries
+                .Select(e => new { Entry = e, Date = RedmineDates.TryParseSpentOn(e.Spent_On) })
+                .Where(x => x.Date.HasValue)
+                .GroupBy(x => new { Year = ISOWeek.GetYear(x.Date!.Value), Week = ISOWeek.GetWeekOfYear(x.Date!.Value) })
+                .Select(g => new WeeklyHoursDto
+                {
+                    Year = g.Key.Year,
+                    Week = g.Key.Week,
+                    Hours = Math.Round(g.Sum(x => x.Entry.Hours), 2)
+                })
+                .OrderBy(x => x.Year)
+                .ThenBy(x => x.Week)
+                .ToList();
+
+            WeeklyHours.Clear();
+            foreach (var item in grouped)
+            {
+                WeeklyHours.Add(item);
+            }
+
+            WeeklyTotalHours = grouped.Sum(x => x.Hours);
+            MaxWeeklyHours = grouped.Count == 0 ? 1 : Math.Max(1, grouped.Max(x => x.Hours));
+            StatusMessage = grouped.Count == 0
+                ? "Keine Zeiteinträge im aktuellen Quartal."
+                : string.Empty;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private static (DateTime From, DateTime To, string Label) GetCurrentQuarterRange()
@@ -82,6 +115,6 @@ public partial class WeeklySummaryViewModel : ViewModelBase
         var from = new DateTime(today.Year, fromMonth, 1);
         var to = from.AddMonths(3).AddDays(-1);
 
-        return (from, to, $"Q{quarter} {today.Year} ({from:yyyy-MM-dd} – {to:yyyy-MM-dd})");
+        return (from, to, $"Q{quarter} {today.Year} ({RedmineDates.FormatSpentOn(from)} – {RedmineDates.FormatSpentOn(to)})");
     }
 }

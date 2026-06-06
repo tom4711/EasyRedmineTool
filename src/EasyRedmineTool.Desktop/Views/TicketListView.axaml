@@ -6,35 +6,10 @@
     xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
     x:Class="EasyRedmineTool.Desktop.Views.TicketListView"
     x:DataType="vm:TicketListViewModel">
-  <UserControl.Resources>
-    <ResourceDictionary>
-      <ResourceDictionary.ThemeDictionaries>
-        <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="TicketItemBorderBrush" Color="#E0E0E0" />
-          <SolidColorBrush x:Key="TicketFavoriteBackgroundBrush" Color="#FFF8E1" />
-          <SolidColorBrush x:Key="TicketFavoriteBorderBrush" Color="#F5A623" />
-          <SolidColorBrush x:Key="TicketFavoriteStarActiveBrush" Color="#F5A623" />
-          <SolidColorBrush x:Key="TicketFavoriteStarInactiveBrush" Color="#BDBDBD" />
-          <SolidColorBrush x:Key="TicketFavoriteBadgeBackgroundBrush" Color="#F5A623" />
-          <SolidColorBrush x:Key="TicketFavoriteBadgeForegroundBrush" Color="White" />
-        </ResourceDictionary>
-        <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="TicketItemBorderBrush" Color="#525252" />
-          <SolidColorBrush x:Key="TicketFavoriteBackgroundBrush" Color="#3D3220" />
-          <SolidColorBrush x:Key="TicketFavoriteBorderBrush" Color="#D4A017" />
-          <SolidColorBrush x:Key="TicketFavoriteStarActiveBrush" Color="#FFB74D" />
-          <SolidColorBrush x:Key="TicketFavoriteStarInactiveBrush" Color="#757575" />
-          <SolidColorBrush x:Key="TicketFavoriteBadgeBackgroundBrush" Color="#D4A017" />
-          <SolidColorBrush x:Key="TicketFavoriteBadgeForegroundBrush" Color="#1A1408" />
-        </ResourceDictionary>
-      </ResourceDictionary.ThemeDictionaries>
-    </ResourceDictionary>
-  </UserControl.Resources>
-
   <UserControl.Styles>
     <Style Selector="Border.ticket-item">
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="{DynamicResource TicketItemBorderBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
       <Setter Property="CornerRadius" Value="6" />
     </Style>
     <Style Selector="Border.ticket-item.favorite">

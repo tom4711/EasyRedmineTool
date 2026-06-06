@@ -3,6 +3,7 @@ namespace EasyRedmineTool.Core.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
@@ -18,9 +19,6 @@ public partial class TimeEntriesViewModel : ViewModelBase
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
-
-    [ObservableProperty]
-    private bool isBusy;
 
     [ObservableProperty]
     private string favoriteFilterText = string.Empty;
@@ -132,11 +130,16 @@ public partial class TimeEntriesViewModel : ViewModelBase
         }
 
         var today = DateTime.Today;
-        var entries = await _timeEntryService.GetMyTimeEntriesAsync(settings.BaseUrl, settings.ApiKey, today, today);
-        var todayKey = today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var result = await _timeEntryService.GetMyTimeEntriesAsync(settings.BaseUrl, settings.ApiKey, today, today);
+        if (!result.Success)
+        {
+            StatusMessage = result.Message;
+            return;
+        }
 
+        var todayKey = RedmineDates.TodayKey();
         TodayBookedHours = Math.Round(
-            entries
+            result.Entries
                 .Where(entry => string.Equals(entry.Spent_On, todayKey, StringComparison.Ordinal))
                 .Sum(entry => entry.Hours),
             2);
@@ -188,7 +191,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
 
         await row.LoadActivitiesAsync();
 
-        var hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? "1" : settings.LastTimeEntryHours;
+        var hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? AppConstants.DefaultHours : settings.LastTimeEntryHours;
         row.ApplyTemplate(
             settings.LastTimeEntryActivityId.Value,
             hours,
@@ -250,7 +253,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
             ? $"#{ticket.Id} {Truncate(ticket.Subject, 48)}"
             : $"#{settings.LastTimeEntryIssueId}";
 
-        var hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? "1" : settings.LastTimeEntryHours;
+        var hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? AppConstants.DefaultHours : settings.LastTimeEntryHours;
         var activity = string.IsNullOrWhiteSpace(settings.LastTimeEntryActivityName)
             ? "Aktivität"
             : settings.LastTimeEntryActivityName;

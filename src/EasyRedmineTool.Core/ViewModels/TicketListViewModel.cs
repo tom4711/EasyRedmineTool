@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core;
+using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
@@ -17,7 +18,7 @@ public partial class TicketListViewModel : ViewModelBase
     private readonly HashSet<int> _favoriteTicketIds = [];
 
     [ObservableProperty]
-    private string baseUrl = "https://projects.hawe.com/";
+    private string baseUrl = AppConstants.DefaultBaseUrl;
 
     [ObservableProperty]
     private string apiKey = string.Empty;

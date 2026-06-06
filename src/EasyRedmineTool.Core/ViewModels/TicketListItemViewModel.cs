@@ -2,9 +2,8 @@ namespace EasyRedmineTool.Core.ViewModels;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
+using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Models.Tickets;
-
-using System.Globalization;
 
 public partial class TicketListItemViewModel : ObservableObject
 {
@@ -78,11 +77,6 @@ public partial class TicketListItemViewModel : ObservableObject
             return false;
         }
 
-        return DateTime.TryParseExact(
-            Ticket.Due_Date,
-            "yyyy-MM-dd",
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.None,
-            out dueDate);
+        return RedmineDates.TryParseSpentOn(Ticket.Due_Date, out dueDate);
     }
 }

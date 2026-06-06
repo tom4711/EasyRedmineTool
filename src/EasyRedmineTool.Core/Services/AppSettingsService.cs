@@ -9,10 +9,9 @@ using System.Text.Json;
 
 public sealed class AppSettingsService : IAppSettingsService
 {
-    private const string AppName = "EasyRedmineTool";
-    private const string SettingsFileName = "settings.json";
+    private const string AppName = AppConstants.SettingsAppName;
+    private const string SettingsFileName = AppConstants.SettingsFileName;
     private const string LegacySettingsFileName = "appsettings.json";
-    private const string DefaultBaseUrl = "https://projects.hawe.com/";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -42,6 +41,8 @@ public sealed class AppSettingsService : IAppSettingsService
         _settingsFilePath = settingsFilePath;
         _legacySettingsFilePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
     }
+
+    public string SettingsFilePath => _settingsFilePath;
 
     public AppSettings Load()
     {
@@ -105,19 +106,19 @@ public sealed class AppSettingsService : IAppSettingsService
 
     internal static AppSettings Normalize(AppSettings settings) => new()
     {
-        BaseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? DefaultBaseUrl : settings.BaseUrl,
+        BaseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? AppConstants.DefaultBaseUrl : settings.BaseUrl,
         ApiKey = settings.ApiKey ?? string.Empty,
         CachedTickets = settings.CachedTickets ?? [],
         FavoriteTicketIds = settings.FavoriteTicketIds ?? [],
         LastTimeEntryIssueId = settings.LastTimeEntryIssueId,
         LastTimeEntryActivityId = settings.LastTimeEntryActivityId,
-        LastTimeEntryHours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? "1" : settings.LastTimeEntryHours,
+        LastTimeEntryHours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? AppConstants.DefaultHours : settings.LastTimeEntryHours,
         LastTimeEntryActivityName = settings.LastTimeEntryActivityName ?? string.Empty,
     };
 
     private static AppSettings CreateDefault() => new()
     {
-        BaseUrl = DefaultBaseUrl,
+        BaseUrl = AppConstants.DefaultBaseUrl,
         ApiKey = string.Empty,
         CachedTickets = [],
         FavoriteTicketIds = []

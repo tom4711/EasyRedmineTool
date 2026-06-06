@@ -17,9 +17,50 @@ public class EasyRedmineApiClient(HttpClient httpClient)
         return await _httpClient.SendAsync(request, cancellationToken);
     }
 
-    public async Task<IssueListResponse?> GetMyOpenIssuesAsync( string baseUrl, string apiKey, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<IssueDto>> GetAllMyOpenIssuesAsync(
+        string baseUrl,
+        string apiKey,
+        CancellationToken cancellationToken = default)
     {
-        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "issues.json?assigned_to_id=me&status_id=open&limit=100");
+        const int limit = 100;
+        var offset = 0;
+        var all = new List<IssueDto>();
+        int? totalCount = null;
+
+        while (true)
+        {
+            var page = await GetMyOpenIssuesPageAsync(baseUrl, apiKey, limit, offset, cancellationToken);
+            if (page?.Issues is null || page.Issues.Count == 0)
+            {
+                break;
+            }
+
+            all.AddRange(page.Issues);
+            totalCount ??= page.Total_Count;
+
+            if (all.Count >= totalCount || page.Issues.Count < limit)
+            {
+                break;
+            }
+
+            offset += limit;
+        }
+
+        return all;
+    }
+
+    private async Task<IssueListResponse?> GetMyOpenIssuesPageAsync(
+        string baseUrl,
+        string apiKey,
+        int limit,
+        int offset,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = CreateRequest(
+            HttpMethod.Get,
+            baseUrl,
+            apiKey,
+            $"issues.json?assigned_to_id=me&status_id=open&limit={limit}&offset={offset}");
         using var response = await _httpClient.SendAsync(request, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -30,7 +71,7 @@ public class EasyRedmineApiClient(HttpClient httpClient)
         return await response.Content.ReadFromJsonAsync<IssueListResponse>(RedmineJson.Options, cancellationToken);
     }
 
-    public async Task<IssueResponse?> GetIssueByIdAsync( string baseUrl, string apiKey, int issueId, CancellationToken cancellationToken = default)
+    public async Task<IssueResponse?> GetIssueByIdAsync(string baseUrl, string apiKey, int issueId, CancellationToken cancellationToken = default)
     {
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, $"issues/{issueId}.json");
         using var response = await _httpClient.SendAsync(request, cancellationToken);
@@ -41,11 +82,6 @@ public class EasyRedmineApiClient(HttpClient httpClient)
         }
 
         return await response.Content.ReadFromJsonAsync<IssueResponse>(RedmineJson.Options, cancellationToken);
-    }
-
-    public async Task<TimeEntriesListResponse?> GetMyTimeEntriesAsync( string baseUrl, string apiKey, DateTime from, DateTime to, CancellationToken cancellationToken = default)
-    {
-        return await GetMyTimeEntriesPageAsync(baseUrl, apiKey, from, to, limit: 500, offset: 0, cancellationToken);
     }
 
     public async Task<IReadOnlyList<TimeEntryDto>> GetAllMyTimeEntriesAsync(

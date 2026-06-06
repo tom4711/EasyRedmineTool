@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FAFAFA" />
+      <SolidColorBrush x:Key="CardBorderBrush" Color="#E0E0E0" />
+      <SolidColorBrush x:Key="FavoriteRowBackgroundBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="FavoriteRowBorderBrush" Color="#D1D5DB" />
+      <SolidColorBrush x:Key="TicketFavoriteBackgroundBrush" Color="#FFF8E1" />
+      <SolidColorBrush x:Key="TicketFavoriteBorderBrush" Color="#F5A623" />
+      <SolidColorBrush x:Key="TicketFavoriteStarActiveBrush" Color="#F5A623" />
+      <SolidColorBrush x:Key="TicketFavoriteStarInactiveBrush" Color="#BDBDBD" />
+      <SolidColorBrush x:Key="TicketFavoriteBadgeBackgroundBrush" Color="#F5A623" />
+      <SolidColorBrush x:Key="TicketFavoriteBadgeForegroundBrush" Color="White" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2A2A2A" />
+      <SolidColorBrush x:Key="CardBorderBrush" Color="#525252" />
+      <SolidColorBrush x:Key="FavoriteRowBackgroundBrush" Color="#1F1F1F" />
+      <SolidColorBrush x:Key="FavoriteRowBorderBrush" Color="#525252" />
+      <SolidColorBrush x:Key="TicketFavoriteBackgroundBrush" Color="#3D3220" />
+      <SolidColorBrush x:Key="TicketFavoriteBorderBrush" Color="#D4A017" />
+      <SolidColorBrush x:Key="TicketFavoriteStarActiveBrush" Color="#FFB74D" />
+      <SolidColorBrush x:Key="TicketFavoriteStarInactiveBrush" Color="#757575" />
+      <SolidColorBrush x:Key="TicketFavoriteBadgeBackgroundBrush" Color="#D4A017" />
+      <SolidColorBrush x:Key="TicketFavoriteBadgeForegroundBrush" Color="#1A1408" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

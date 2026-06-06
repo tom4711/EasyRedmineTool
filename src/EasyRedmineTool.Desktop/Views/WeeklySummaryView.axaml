@@ -6,25 +6,10 @@
     xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
     x:Class="EasyRedmineTool.Desktop.Views.WeeklySummaryView"
     x:DataType="vm:WeeklySummaryViewModel">
-  <UserControl.Resources>
-    <ResourceDictionary>
-      <ResourceDictionary.ThemeDictionaries>
-        <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="SummaryCardBorderBrush" Color="#E0E0E0" />
-          <SolidColorBrush x:Key="SummaryCardBackgroundBrush" Color="#FAFAFA" />
-        </ResourceDictionary>
-        <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="SummaryCardBorderBrush" Color="#525252" />
-          <SolidColorBrush x:Key="SummaryCardBackgroundBrush" Color="#2A2A2A" />
-        </ResourceDictionary>
-      </ResourceDictionary.ThemeDictionaries>
-    </ResourceDictionary>
-  </UserControl.Resources>
-
   <UserControl.Styles>
     <Style Selector="Border.summary-card">
-      <Setter Property="Background" Value="{DynamicResource SummaryCardBackgroundBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource SummaryCardBorderBrush}" />
+      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Padding" Value="20" />
@@ -41,11 +26,13 @@
         <Button Grid.Column="1"
                 Classes="secondary"
                 VerticalAlignment="Top"
+                IsEnabled="{Binding !IsBusy}"
                 Command="{Binding ReloadWeeklySummaryCommand}"
                 Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Aktualisieren}" />
       </Grid>
 
       <TextBlock Text="{Binding WeeklyTotalHours, StringFormat=Gesamtstunden im Zeitraum: {0}}" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Opacity="0.85" />
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" Margin="24,0,24,24">

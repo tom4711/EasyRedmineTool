@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core;
+using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
@@ -18,7 +19,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
     private readonly ITimeEntryService _timeEntryService;
 
     [ObservableProperty]
-    private string hours = "1";
+    private string hours = AppConstants.DefaultHours;
 
     [ObservableProperty]
     private DateTime? spentOn = DateTime.Today;
@@ -141,7 +142,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
     [RelayCommand]
     private async Task CreateTimeEntryAsync()
     {
-        if (_parent.IsBusy || IsSubmitting)
+        if (IsSubmitting)
         {
             return;
         }
@@ -174,7 +175,6 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         try
         {
             IsSubmitting = true;
-            _parent.IsBusy = true;
             _parent.SetStatusMessage($"Zeiteintrag für #{Ticket.Id} wird erstellt …");
 
             var result = await _timeEntryService.CreateTimeEntryAsync(
@@ -184,7 +184,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
                 {
                     IssueId = Ticket.Id,
                     Hours = parsedHours,
-                    SpentOn = SpentOn.Value.ToString("yyyy-MM-dd"),
+                    SpentOn = RedmineDates.FormatSpentOn(SpentOn.Value),
                     ActivityId = SelectedActivity.Id,
                     Comments = Comments
                 });
@@ -199,7 +199,6 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         finally
         {
             IsSubmitting = false;
-            _parent.IsBusy = false;
         }
     }
 }

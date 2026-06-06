@@ -10,6 +10,6 @@ public class AppSettings
     public List<int> FavoriteTicketIds { get; set; } = [];
     public int? LastTimeEntryIssueId { get; set; }
     public int? LastTimeEntryActivityId { get; set; }
-    public string LastTimeEntryHours { get; set; } = "1";
+    public string LastTimeEntryHours { get; set; } = AppConstants.DefaultHours;
     public string LastTimeEntryActivityName { get; set; } = string.Empty;
 }

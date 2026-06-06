@@ -29,7 +29,7 @@ public class TimeEntryService(EasyRedmineApiClient apiClient, ILogger<TimeEntryS
         }
     }
 
-    public async Task<IReadOnlyList<TimeEntryDto>> GetMyTimeEntriesAsync(
+    public async Task<TimeEntryLoadResult> GetMyTimeEntriesAsync(
         string baseUrl,
         string apiKey,
         DateTime from,
@@ -38,12 +38,17 @@ public class TimeEntryService(EasyRedmineApiClient apiClient, ILogger<TimeEntryS
     {
         try
         {
-            return await _apiClient.GetAllMyTimeEntriesAsync(baseUrl, apiKey, from, to, cancellationToken);
+            var entries = await _apiClient.GetAllMyTimeEntriesAsync(baseUrl, apiKey, from, to, cancellationToken);
+            return new TimeEntryLoadResult { Success = true, Entries = entries };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Zeiteinträge konnten nicht geladen werden ({From:yyyy-MM-dd} bis {To:yyyy-MM-dd}).", from, to);
-            return [];
+            return new TimeEntryLoadResult
+            {
+                Success = false,
+                Message = $"Zeiteinträge konnten nicht geladen werden: {ex.Message}"
+            };
         }
     }
 
