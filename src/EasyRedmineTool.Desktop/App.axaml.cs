@@ -6,7 +6,10 @@ using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 
+using Avalonia.Platform;
+
 using EasyRedmineTool.Desktop.DependencyInjection;
+using EasyRedmineTool.Desktop.Platform;
 using EasyRedmineTool.Desktop.ViewModels;
 using EasyRedmineTool.Desktop.Views;
 
@@ -45,6 +48,34 @@ public partial class App : Application
             };
         }
 
+        ApplyMacOsDockIcon();
+
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static void ApplyMacOsDockIcon()
+    {
+        if (!OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
+        try
+        {
+            using var icnsStream = AssetLoader.Open(new Uri("avares://EasyRedmineTool.Desktop/Assets/app-icon.icns"));
+            MacOsDockIcon.ApplyFromStream(icnsStream, ".icns");
+        }
+        catch
+        {
+            try
+            {
+                using var pngStream = AssetLoader.Open(new Uri("avares://EasyRedmineTool.Desktop/Assets/app-icon.png"));
+                MacOsDockIcon.ApplyFromStream(pngStream, ".png");
+            }
+            catch
+            {
+                // Dock icon is optional; .app bundles use Info.plist instead.
+            }
+        }
     }
 }
