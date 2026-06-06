@@ -3,7 +3,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
@@ -187,17 +186,12 @@ public partial class TicketListViewModel : ViewModelBase
 
     private void PersistCurrentState()
     {
-        var current = _appSettingsService.Load();
-        _appSettingsService.Save(new AppSettings
+        _appSettingsService.Update(settings =>
         {
-            BaseUrl = BaseUrl,
-            ApiKey = ApiKey,
-            CachedTickets = Tickets.Select(t => t.Ticket).ToList(),
-            FavoriteTicketIds = _favoriteTicketIds.ToList(),
-            LastTimeEntryIssueId = current.LastTimeEntryIssueId,
-            LastTimeEntryActivityId = current.LastTimeEntryActivityId,
-            LastTimeEntryHours = current.LastTimeEntryHours,
-            LastTimeEntryActivityName = current.LastTimeEntryActivityName,
+            settings.BaseUrl = BaseUrl;
+            settings.ApiKey = ApiKey;
+            settings.CachedTickets = Tickets.Select(t => t.Ticket).ToList();
+            settings.FavoriteTicketIds = _favoriteTicketIds.ToList();
         });
     }
 }

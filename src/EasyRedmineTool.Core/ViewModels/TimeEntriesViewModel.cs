@@ -200,29 +200,31 @@ public partial class TimeEntriesViewModel : ViewModelBase
 
     private void SaveLastTimeEntryTemplate(FavoriteTimeEntryRowViewModel row, TimeEntryActivityDto activity)
     {
-        var settings = _appSettingsService.Load();
-        settings.LastTimeEntryIssueId = row.Ticket.Id;
-        settings.LastTimeEntryActivityId = activity.Id;
-        settings.LastTimeEntryHours = row.Hours;
-        settings.LastTimeEntryActivityName = activity.Name;
-        _appSettingsService.Save(settings);
+        _appSettingsService.Update(settings =>
+        {
+            settings.LastTimeEntryIssueId = row.Ticket.Id;
+            settings.LastTimeEntryActivityId = activity.Id;
+            settings.LastTimeEntryHours = row.Hours;
+            settings.LastTimeEntryActivityName = activity.Name;
+        });
         UpdateCanRepeatLastEntry();
     }
 
     private void UpdateCachedTicketLastTimeEntry(int issueId, DateTime spentOn)
     {
-        var settings = _appSettingsService.Load();
-        var ticket = settings.CachedTickets.FirstOrDefault(t => t.Id == issueId);
-        if (ticket is null)
+        _appSettingsService.Update(settings =>
         {
-            return;
-        }
+            var ticket = settings.CachedTickets.FirstOrDefault(t => t.Id == issueId);
+            if (ticket is null)
+            {
+                return;
+            }
 
-        if (ticket.LastTimeEntryOn is null || spentOn >= ticket.LastTimeEntryOn)
-        {
-            ticket.LastTimeEntryOn = spentOn;
-            _appSettingsService.Save(settings);
-        }
+            if (ticket.LastTimeEntryOn is null || spentOn >= ticket.LastTimeEntryOn)
+            {
+                ticket.LastTimeEntryOn = spentOn;
+            }
+        });
     }
 
     private void UpdateCanRepeatLastEntry()

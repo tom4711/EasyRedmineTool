@@ -11,9 +11,9 @@ public class EasyRedmineApiClient(HttpClient httpClient)
 {
     private readonly HttpClient _httpClient = httpClient;
 
-    public async Task<HttpResponseMessage> GetCurrentUserAsync( string baseUrl, string apiKey, CancellationToken cancellationToken = default)
+    public async Task<HttpResponseMessage> GetCurrentUserAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default)
     {
-        var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "users/current.json");
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "users/current.json");
         return await _httpClient.SendAsync(request, cancellationToken);
     }
 
@@ -214,7 +214,7 @@ public class EasyRedmineApiClient(HttpClient httpClient)
             }
         };
 
-        var message = CreateRequest(HttpMethod.Post, baseUrl, apiKey, "time_entries.json");
+        using var message = CreateRequest(HttpMethod.Post, baseUrl, apiKey, "time_entries.json");
         message.Content = JsonContent.Create(payload);
 
         return await _httpClient.SendAsync(message, cancellationToken);

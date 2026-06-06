@@ -3,6 +3,8 @@ namespace EasyRedmineTool.Core.Services;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 using System.Text.Json;
 
 public sealed class AppSettingsService : IAppSettingsService
@@ -16,9 +18,12 @@ public sealed class AppSettingsService : IAppSettingsService
 
     private readonly string _settingsFilePath;
     private readonly string _legacySettingsFilePath;
+    private readonly ILogger<AppSettingsService> _logger;
 
-    public AppSettingsService()
+    public AppSettingsService(ILogger<AppSettingsService> logger)
     {
+        _logger = logger;
+
         var settingsDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             AppName);
@@ -29,6 +34,13 @@ public sealed class AppSettingsService : IAppSettingsService
         _legacySettingsFilePath = Path.Combine(AppContext.BaseDirectory, LegacySettingsFileName);
 
         TryMigrateLegacySettings();
+    }
+
+    internal AppSettingsService(string settingsFilePath, ILogger<AppSettingsService> logger)
+    {
+        _logger = logger;
+        _settingsFilePath = settingsFilePath;
+        _legacySettingsFilePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
     }
 
     public AppSettings Load()
@@ -47,6 +59,15 @@ public sealed class AppSettingsService : IAppSettingsService
         var wrapper = new AppSettingsWrapper { AppSettings = normalized };
         var json = JsonSerializer.Serialize(wrapper, JsonOptions);
         File.WriteAllText(_settingsFilePath, json);
+    }
+
+    public void Update(Action<AppSettings> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var settings = Load();
+        configure(settings);
+        Save(settings);
     }
 
     private void TryMigrateLegacySettings()
@@ -75,18 +96,23 @@ public sealed class AppSettingsService : IAppSettingsService
 
             return settings is null ? null : Normalize(settings);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Einstellungsdatei konnte nicht gelesen werden: {FilePath}", filePath);
             return null;
         }
     }
 
-    private static AppSettings Normalize(AppSettings settings) => new()
+    internal static AppSettings Normalize(AppSettings settings) => new()
     {
         BaseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? DefaultBaseUrl : settings.BaseUrl,
         ApiKey = settings.ApiKey ?? string.Empty,
         CachedTickets = settings.CachedTickets ?? [],
-        FavoriteTicketIds = settings.FavoriteTicketIds ?? []
+        FavoriteTicketIds = settings.FavoriteTicketIds ?? [],
+        LastTimeEntryIssueId = settings.LastTimeEntryIssueId,
+        LastTimeEntryActivityId = settings.LastTimeEntryActivityId,
+        LastTimeEntryHours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? "1" : settings.LastTimeEntryHours,
+        LastTimeEntryActivityName = settings.LastTimeEntryActivityName ?? string.Empty,
     };
 
     private static AppSettings CreateDefault() => new()

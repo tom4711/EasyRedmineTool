@@ -7,11 +7,18 @@ using EasyRedmineTool.Core.ViewModels;
 using EasyRedmineTool.Desktop.ViewModels;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddEasyRedmineTool(this IServiceCollection services)
     {
+        services.AddLogging(builder =>
+        {
+            builder.AddSimpleConsole(options => options.SingleLine = true);
+            builder.SetMinimumLevel(LogLevel.Information);
+        });
+
         services.AddHttpClient<EasyRedmineApiClient>();
 
         services.AddSingleton<IConnectionTestService, ConnectionTestService>();

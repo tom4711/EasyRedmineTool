@@ -4,9 +4,12 @@ using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Services.Interfaces;
 
-public class TimeEntryService(EasyRedmineApiClient apiClient) : ITimeEntryService
+using Microsoft.Extensions.Logging;
+
+public class TimeEntryService(EasyRedmineApiClient apiClient, ILogger<TimeEntryService> logger) : ITimeEntryService
 {
     private readonly EasyRedmineApiClient _apiClient = apiClient;
+    private readonly ILogger<TimeEntryService> _logger = logger;
 
     public async Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
         string baseUrl,
@@ -19,8 +22,9 @@ public class TimeEntryService(EasyRedmineApiClient apiClient) : ITimeEntryServic
         {
             return await _apiClient.GetTimeEntryActivitiesAsync(baseUrl, apiKey, issueId, projectId, cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Zeiteintrag-Aktivitäten konnten nicht geladen werden (Issue {IssueId}, Projekt {ProjectId}).", issueId, projectId);
             return [];
         }
     }
@@ -34,11 +38,11 @@ public class TimeEntryService(EasyRedmineApiClient apiClient) : ITimeEntryServic
     {
         try
         {
-            var result = await _apiClient.GetMyTimeEntriesAsync(baseUrl, apiKey, from, to, cancellationToken);
-            return result?.Time_Entries ?? [];
+            return await _apiClient.GetAllMyTimeEntriesAsync(baseUrl, apiKey, from, to, cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Zeiteinträge konnten nicht geladen werden ({From:yyyy-MM-dd} bis {To:yyyy-MM-dd}).", from, to);
             return [];
         }
     }
@@ -63,6 +67,12 @@ public class TimeEntryService(EasyRedmineApiClient apiClient) : ITimeEntryServic
             }
 
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning(
+                "Zeiteintrag für Issue {IssueId} fehlgeschlagen: {StatusCode} {ReasonPhrase}",
+                request.IssueId,
+                (int)response.StatusCode,
+                response.ReasonPhrase);
+
             return new TimeEntryOperationResult
             {
                 Success = false,
@@ -71,6 +81,7 @@ public class TimeEntryService(EasyRedmineApiClient apiClient) : ITimeEntryServic
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Zeiteintrag für Issue {IssueId} konnte nicht erstellt werden.", request.IssueId);
             return new TimeEntryOperationResult
             {
                 Success = false,

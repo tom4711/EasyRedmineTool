@@ -4,9 +4,12 @@ using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Models;
 using EasyRedmineTool.Core.Services.Interfaces;
 
-public class ConnectionTestService(EasyRedmineApiClient apiClient) : IConnectionTestService
+using Microsoft.Extensions.Logging;
+
+public class ConnectionTestService(EasyRedmineApiClient apiClient, ILogger<ConnectionTestService> logger) : IConnectionTestService
 {
     private readonly EasyRedmineApiClient _apiClient = apiClient;
+    private readonly ILogger<ConnectionTestService> _logger = logger;
 
     public async Task<ConnectionTestResult> TestConnectionAsync(ConnectionTestRequest request, CancellationToken cancellationToken = default)
     {
@@ -38,6 +41,7 @@ public class ConnectionTestService(EasyRedmineApiClient apiClient) : IConnection
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Verbindungstest fehlgeschlagen für {BaseUrl}.", request.BaseUrl);
             return new ConnectionTestResult
             {
                 Success = false,
