@@ -8,8 +8,4 @@ public class AppSettings
     public string ApiKey { get; set; } = string.Empty;
     public List<IssueDto> CachedTickets { get; set; } = [];
     public List<int> FavoriteTicketIds { get; set; } = [];
-    public int? LastTimeEntryIssueId { get; set; }
-    public int? LastTimeEntryActivityId { get; set; }
-    public string LastTimeEntryHours { get; set; } = AppConstants.DefaultHours;
-    public string LastTimeEntryActivityName { get; set; } = string.Empty;
 }

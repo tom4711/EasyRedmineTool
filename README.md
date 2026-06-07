@@ -20,14 +20,19 @@ Offene und zuletzt gebuchte Tickets laden, Favoriten markieren und direkt in Red
 ![Ticketliste](docs/screenshots/tickets.png)
 
 ### Zeiteinträge
-Favoriten-Tickets schnell buchen — Stunden, Aktivität, Datum und Kommentar in einer Zeile.
+Favoriten-Tickets buchen — Stunden, Aktivität, Datum und Kommentar; heutige Gesamtstunden oben.
 
 ![Zeiteinträge](docs/screenshots/time-entries.png)
 
 ### Auswertung
-Quartalsübersicht der gebuchten Stunden nach Kalenderwochen.
+Quartalsübersicht nach Kalenderwochen mit Ticket-Aufschlüsselung; Klick springt zur Zeiteingabe.
 
 ![Auswertung](docs/screenshots/weekly-summary.png)
+
+### Einstellungen
+Basis-URL und API-Schlüssel hinterlegen, Verbindung testen und speichern — alles nur lokal im Benutzerverzeichnis.
+
+![Einstellungen](docs/screenshots/settings.png)
 
 ---
 
@@ -37,9 +42,8 @@ Quartalsübersicht der gebuchten Stunden nach Kalenderwochen.
 |---------|--------------|
 | **Ticketliste** | Offene und kürzlich gebuchte Tickets laden, nach ID ergänzen, in Redmine öffnen |
 | **Favoriten** | Häufig genutzte Tickets markieren und sortiert nach letztem Buchungsdatum anzeigen |
-| **Zeiteinträge** | Stunden, Aktivität, Datum und Kommentar direkt aus der Favoritenliste buchen |
-| **Schnellaktionen** | Letzten Eintrag duplizieren, heutige Stunden live anzeigen |
-| **Auswertung** | Quartalsübersicht der gebuchten Stunden nach Kalenderwochen |
+| **Zeiteinträge** | Stunden, Aktivität, Datum und Kommentar direkt aus der Favoritenliste buchen; heutige Stunden live |
+| **Auswertung** | Quartalsübersicht nach Kalenderwochen inkl. Stunden pro Ticket; Sprung zur Zeiteingabe per Klick |
 | **Einstellungen** | Basis-URL, API-Schlüssel, Verbindungstest, Hell/Dunkel-Modus |
 
 ---

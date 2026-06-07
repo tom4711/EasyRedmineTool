@@ -186,7 +186,7 @@ public class EasyRedmineApiClient(HttpClient httpClient)
         int offset,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = $"time_entries.json?user_id=me&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&limit={limit}&offset={offset}";
+        var endpoint = $"time_entries.json?user_id=me&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&limit={limit}&offset={offset}&include=issue";
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
 

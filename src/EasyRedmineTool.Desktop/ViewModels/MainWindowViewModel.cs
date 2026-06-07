@@ -51,6 +51,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _appSettingsService = appSettingsService;
 
         SettingsViewModel.SettingsSaved += OnSettingsSaved;
+        WeeklySummaryViewModel.OpenTimeEntryRequested += OnOpenTimeEntryFromSummary;
 
         if (Application.Current is { } app)
         {
@@ -93,6 +94,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void OpenTimeEntries()
     {
+        TimeEntriesViewModel.ClearFocusedIssue();
         TimeEntriesViewModel.ReloadFavorites();
         _ = TimeEntriesViewModel.ReloadTodayBookedHoursAsync();
         ShowTimeEntries();
@@ -114,9 +116,17 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OnSettingsSaved(object? sender, EventArgs e)
     {
         TicketListViewModel.ReloadSettings();
+        TimeEntriesViewModel.ClearFocusedIssue();
         TimeEntriesViewModel.ReloadFavorites();
         _ = TimeEntriesViewModel.ReloadTodayBookedHoursAsync();
         ShowInitialView();
+    }
+
+    private void OnOpenTimeEntryFromSummary(object? sender, int issueId)
+    {
+        TimeEntriesViewModel.PrepareForIssue(issueId);
+        _ = TimeEntriesViewModel.ReloadTodayBookedHoursAsync();
+        ShowTimeEntries();
     }
 
     private void ShowInitialView()

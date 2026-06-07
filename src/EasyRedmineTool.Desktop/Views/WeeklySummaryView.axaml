@@ -14,6 +14,45 @@
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Padding" Value="20" />
     </Style>
+
+    <Style Selector="Expander.weekly-row">
+      <Setter Property="Margin" Value="0,0,0,12" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="Expander.weekly-row /template/ ToggleButton#PART_toggle">
+      <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <Style Selector="ListBox.weekly-summary > ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="ListBox.weekly-summary > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="ListBox.weekly-summary > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="Button.ticket-summary-link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,2" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="Button.ticket-summary-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppGhostHoverBackgroundBrush}" />
+    </Style>
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,*">
@@ -35,25 +74,66 @@
       <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Opacity="0.85" />
     </StackPanel>
 
-    <ScrollViewer Grid.Row="1" Margin="24,0,24,24">
-      <Border Classes="summary-card" HorizontalAlignment="Stretch">
-        <ListBox ItemsSource="{Binding WeeklyHours}"
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+      <Border Margin="24,0,24,24"
+              Classes="summary-card"
+              HorizontalAlignment="Stretch">
+        <ListBox Classes="weekly-summary"
+                 ItemsSource="{Binding WeeklyHours}"
                  Background="Transparent"
-                 BorderThickness="0">
+                 BorderThickness="0"
+                 HorizontalAlignment="Stretch">
           <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="models:WeeklyHoursDto">
-              <StackPanel Spacing="4" Margin="0,0,0,12">
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Grid.Column="0" Text="{Binding Label}" />
-                  <TextBlock Grid.Column="1"
-                             Text="{Binding Hours, StringFormat={}{0} h}"
-                             FontWeight="Bold" />
-                </Grid>
-                <ProgressBar Minimum="0"
-                             Maximum="{Binding $parent[UserControl].DataContext.MaxWeeklyHours}"
-                             Value="{Binding Hours}"
-                             Height="10" />
-              </StackPanel>
+            <DataTemplate x:DataType="vm:WeeklyHoursRowViewModel">
+              <Expander Classes="weekly-row"
+                        IsExpanded="{Binding IsExpanded}"
+                        IsEnabled="{Binding HasTickets}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                  <StackPanel Spacing="4" HorizontalAlignment="Stretch">
+                    <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
+                      <TextBlock Grid.Column="0" Text="{Binding Label}" />
+                      <TextBlock Grid.Column="1"
+                                 Text="{Binding HoursDisplay}"
+                                 FontWeight="Bold" />
+                    </Grid>
+                    <ProgressBar Minimum="0"
+                                 Maximum="{Binding $parent[UserControl].DataContext.MaxWeeklyHours}"
+                                 Value="{Binding Hours}"
+                                 Height="10"
+                                 HorizontalAlignment="Stretch" />
+                  </StackPanel>
+                </Expander.Header>
+
+                <ItemsControl ItemsSource="{Binding Tickets}"
+                              Margin="4,4,0,0"
+                              HorizontalAlignment="Stretch">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:WeeklyTicketHoursDto">
+                      <Button Classes="ticket-summary-link"
+                              HorizontalAlignment="Stretch"
+                              ToolTip.Tip="Zur Zeiteingabe springen"
+                              Command="{Binding $parent[UserControl].DataContext.OpenTimeEntryForTicketCommand}"
+                              CommandParameter="{Binding IssueId}">
+                        <Grid ColumnDefinitions="*,Auto"
+                              HorizontalAlignment="Stretch">
+                          <TextBlock Grid.Column="0"
+                                     Text="{Binding Label}"
+                                     FontSize="12"
+                                     Opacity="0.85"
+                                     TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding HoursDisplay}"
+                                     FontSize="12"
+                                     Opacity="0.85"
+                                     Margin="12,0,0,0" />
+                        </Grid>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Expander>
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>

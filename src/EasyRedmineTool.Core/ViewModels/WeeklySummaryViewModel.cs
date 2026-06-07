@@ -4,11 +4,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core;
-using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
-using System.Globalization;
 
 public partial class WeeklySummaryViewModel : ViewModelBase
 {
@@ -30,13 +28,15 @@ public partial class WeeklySummaryViewModel : ViewModelBase
     [ObservableProperty]
     private double maxWeeklyHours = 1;
 
-    public ObservableCollection<WeeklyHoursDto> WeeklyHours { get; } = [];
+    public ObservableCollection<WeeklyHoursRowViewModel> WeeklyHours { get; } = [];
 
     public WeeklySummaryViewModel(IAppSettingsService appSettingsService, ITimeEntryService timeEntryService)
     {
         _appSettingsService = appSettingsService;
         _timeEntryService = timeEntryService;
     }
+
+    public event EventHandler<int>? OpenTimeEntryRequested;
 
     [RelayCommand]
     public async Task ReloadWeeklySummaryAsync()
@@ -74,19 +74,11 @@ public partial class WeeklySummaryViewModel : ViewModelBase
                 return;
             }
 
-            var grouped = result.Entries
-                .Select(e => new { Entry = e, Date = RedmineDates.TryParseSpentOn(e.Spent_On) })
-                .Where(x => x.Date.HasValue)
-                .GroupBy(x => new { Year = ISOWeek.GetYear(x.Date!.Value), Week = ISOWeek.GetWeekOfYear(x.Date!.Value) })
-                .Select(g => new WeeklyHoursDto
-                {
-                    Year = g.Key.Year,
-                    Week = g.Key.Week,
-                    Hours = Math.Round(g.Sum(x => x.Entry.Hours), 2)
-                })
-                .OrderBy(x => x.Year)
-                .ThenBy(x => x.Week)
-                .ToList();
+            var ticketSubjectsById = settings.CachedTickets.ToDictionary(
+                ticket => ticket.Id,
+                ticket => ticket.Subject);
+
+            var grouped = WeeklySummaryBuilder.Build(result.Entries, ticketSubjectsById);
 
             WeeklyHours.Clear();
             foreach (var item in grouped)
@@ -116,5 +108,16 @@ public partial class WeeklySummaryViewModel : ViewModelBase
         var to = from.AddMonths(3).AddDays(-1);
 
         return (from, to, $"Q{quarter} {today.Year} ({RedmineDates.FormatSpentOn(from)} – {RedmineDates.FormatSpentOn(to)})");
+    }
+
+    [RelayCommand]
+    private void OpenTimeEntryForTicket(int issueId)
+    {
+        if (issueId <= 0)
+        {
+            return;
+        }
+
+        OpenTimeEntryRequested?.Invoke(this, issueId);
     }
 }
