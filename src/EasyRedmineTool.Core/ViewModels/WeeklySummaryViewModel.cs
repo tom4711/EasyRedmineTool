@@ -8,10 +8,11 @@ using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
 
-public partial class WeeklySummaryViewModel : ViewModelBase
+public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
 {
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
+    private CancellationTokenSource? _reloadCts;
 
     [ObservableProperty]
     private string currentQuarterLabel = string.Empty;
@@ -41,10 +42,9 @@ public partial class WeeklySummaryViewModel : ViewModelBase
     [RelayCommand]
     public async Task ReloadWeeklySummaryAsync()
     {
-        if (IsBusy)
-        {
-            return;
-        }
+        CancelReload();
+        var reloadCts = BeginReload();
+        var cancellationToken = reloadCts.Token;
 
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -53,6 +53,7 @@ public partial class WeeklySummaryViewModel : ViewModelBase
             WeeklyHours.Clear();
             WeeklyTotalHours = 0;
             MaxWeeklyHours = 1;
+            CompleteReload(reloadCts);
             return;
         }
 
@@ -64,7 +65,18 @@ public partial class WeeklySummaryViewModel : ViewModelBase
             var (from, to, label) = GetCurrentQuarterRange();
             CurrentQuarterLabel = label;
 
-            var result = await _timeEntryService.GetMyTimeEntriesAsync(settings.BaseUrl, settings.ApiKey, from, to);
+            var result = await _timeEntryService.GetMyTimeEntriesAsync(
+                settings.BaseUrl,
+                settings.ApiKey,
+                from,
+                to,
+                cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
             if (!result.Success)
             {
                 StatusMessage = result.Message;
@@ -92,9 +104,13 @@ public partial class WeeklySummaryViewModel : ViewModelBase
                 ? "Keine Zeiteinträge im aktuellen Quartal."
                 : string.Empty;
         }
+        catch (OperationCanceledException)
+        {
+            // A newer reload superseded this request.
+        }
         finally
         {
-            IsBusy = false;
+            CompleteReload(reloadCts);
         }
     }
 
@@ -119,5 +135,36 @@ public partial class WeeklySummaryViewModel : ViewModelBase
         }
 
         OpenTimeEntryRequested?.Invoke(this, issueId);
+    }
+
+    private void CancelReload()
+    {
+        _reloadCts?.Cancel();
+        _reloadCts?.Dispose();
+        _reloadCts = null;
+    }
+
+    private CancellationTokenSource BeginReload()
+    {
+        var reloadCts = new CancellationTokenSource();
+        _reloadCts = reloadCts;
+        return reloadCts;
+    }
+
+    private void CompleteReload(CancellationTokenSource reloadCts)
+    {
+        if (_reloadCts != reloadCts)
+        {
+            return;
+        }
+
+        IsBusy = false;
+        _reloadCts = null;
+    }
+
+    public void Dispose()
+    {
+        CancelReload();
+        GC.SuppressFinalize(this);
     }
 }
