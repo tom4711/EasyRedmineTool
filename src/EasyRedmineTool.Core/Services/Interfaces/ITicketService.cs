@@ -19,5 +19,7 @@ public interface ITicketService
         string apiKey,
         int issueId,
         CancellationToken cancellationToken = default);
+
+    void InvalidateTimeEntryCache();
 }
 

@@ -9,19 +9,13 @@ using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
-using System.Linq;
 
-public partial class TicketListViewModel : ViewModelBase
+public partial class TicketListViewModel : ViewModelBase, IDisposable
 {
     private readonly ITicketService _ticketService;
     private readonly IAppSettingsService _appSettingsService;
     private readonly HashSet<int> _favoriteTicketIds = [];
-
-    [ObservableProperty]
-    private string baseUrl = AppConstants.DefaultBaseUrl;
-
-    [ObservableProperty]
-    private string apiKey = string.Empty;
+    private CancellationTokenSource? _operationCts;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -48,8 +42,6 @@ public partial class TicketListViewModel : ViewModelBase
     public void ReloadSettings()
     {
         var settings = _appSettingsService.Load();
-        BaseUrl = settings.BaseUrl;
-        ApiKey = settings.ApiKey;
 
         _favoriteTicketIds.Clear();
         foreach (var id in settings.FavoriteTicketIds)
@@ -67,8 +59,8 @@ public partial class TicketListViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadTicketsAsync()
     {
-        if (IsBusy)
-            return;
+        var operationCts = BeginOperation();
+        var cancellationToken = operationCts.Token;
 
         try
         {
@@ -76,7 +68,13 @@ public partial class TicketListViewModel : ViewModelBase
             StatusMessage = "Tickets werden geladen ...";
             Tickets.Clear();
 
-            var result = await _ticketService.GetTicketsForListAsync(BaseUrl, ApiKey);
+            var (baseUrl, apiKey) = LoadCredentials();
+            var result = await _ticketService.GetTicketsForListAsync(baseUrl, apiKey, cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
 
             foreach (var ticket in result.Tickets)
             {
@@ -88,13 +86,17 @@ public partial class TicketListViewModel : ViewModelBase
                 ? $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} offen zugewiesen)."
                 : $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} offen zugewiesen, {result.TimeEntryTicketCount} mit Zeiteinträgen im letzten Jahr).";
         }
+        catch (OperationCanceledException)
+        {
+            // A newer operation superseded this request.
+        }
         catch (Exception ex)
         {
             StatusMessage = $"Fehler beim Laden: {ex.Message}";
         }
         finally
         {
-            IsBusy = false;
+            CompleteOperation(operationCts);
         }
     }
 
@@ -116,10 +118,19 @@ public partial class TicketListViewModel : ViewModelBase
             return;
         }
 
+        var operationCts = BeginOperation();
+        var cancellationToken = operationCts.Token;
+
         try
         {
             IsBusy = true;
-            var ticket = await _ticketService.GetIssueByIdAsync(BaseUrl, ApiKey, ticketId);
+            var (baseUrl, apiKey) = LoadCredentials();
+            var ticket = await _ticketService.GetIssueByIdAsync(baseUrl, apiKey, ticketId, cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
 
             if (ticket is null)
             {
@@ -132,13 +143,17 @@ public partial class TicketListViewModel : ViewModelBase
             PersistCurrentState();
             StatusMessage = $"Ticket #{ticket.Id} wurde hinzugefügt.";
         }
+        catch (OperationCanceledException)
+        {
+            // A newer operation superseded this request.
+        }
         catch (Exception ex)
         {
             StatusMessage = $"Fehler beim Hinzufügen: {ex.Message}";
         }
         finally
         {
-            IsBusy = false;
+            CompleteOperation(operationCts);
         }
     }
 
@@ -161,7 +176,8 @@ public partial class TicketListViewModel : ViewModelBase
             return;
         }
 
-        RedmineLinks.OpenIssueInBrowser(BaseUrl, ticketItem.Ticket.Id);
+        var (baseUrl, _) = LoadCredentials();
+        RedmineLinks.OpenIssueInBrowser(baseUrl, ticketItem.Ticket.Id);
     }
 
     private void ToggleFavorite(TicketListItemViewModel ticketItem)
@@ -185,14 +201,50 @@ public partial class TicketListViewModel : ViewModelBase
     private TicketListItemViewModel CreateTicketItem(IssueDto ticket) =>
         new(ticket, _favoriteTicketIds.Contains(ticket.Id));
 
+    private (string BaseUrl, string ApiKey) LoadCredentials()
+    {
+        var settings = _appSettingsService.Load();
+        return (settings.BaseUrl, settings.ApiKey);
+    }
+
     private void PersistCurrentState()
     {
         _appSettingsService.Update(settings =>
         {
-            settings.BaseUrl = BaseUrl;
-            settings.ApiKey = ApiKey;
             settings.CachedTickets = Tickets.Select(t => t.Ticket).ToList();
             settings.FavoriteTicketIds = _favoriteTicketIds.ToList();
         });
+    }
+
+    private CancellationTokenSource BeginOperation()
+    {
+        CancelOperation();
+        var operationCts = new CancellationTokenSource();
+        _operationCts = operationCts;
+        return operationCts;
+    }
+
+    private void CompleteOperation(CancellationTokenSource operationCts)
+    {
+        if (_operationCts != operationCts)
+        {
+            return;
+        }
+
+        IsBusy = false;
+        _operationCts = null;
+    }
+
+    private void CancelOperation()
+    {
+        _operationCts?.Cancel();
+        _operationCts?.Dispose();
+        _operationCts = null;
+    }
+
+    public void Dispose()
+    {
+        CancelOperation();
+        GC.SuppressFinalize(this);
     }
 }

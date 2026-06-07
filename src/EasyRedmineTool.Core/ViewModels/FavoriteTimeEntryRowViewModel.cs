@@ -68,7 +68,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedDateLabel));
     }
 
-    public async Task LoadActivitiesAsync()
+    public async Task LoadActivitiesAsync(CancellationToken cancellationToken = default)
     {
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -80,7 +80,13 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             settings.BaseUrl,
             settings.ApiKey,
             Ticket.Id,
-            Ticket.Project?.Id);
+            Ticket.Project?.Id,
+            cancellationToken);
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
 
         Activities.Clear();
         foreach (var activity in loadedActivities.OrderBy(a => a.Name))

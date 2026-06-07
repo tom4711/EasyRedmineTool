@@ -6,9 +6,9 @@ using EasyRedmineTool.Core.Services.Interfaces;
 
 using Microsoft.Extensions.Logging;
 
-public class ConnectionTestService(EasyRedmineApiClient apiClient, ILogger<ConnectionTestService> logger) : IConnectionTestService
+public class ConnectionTestService(IEasyRedmineApiClient apiClient, ILogger<ConnectionTestService> logger) : IConnectionTestService
 {
-    private readonly EasyRedmineApiClient _apiClient = apiClient;
+    private readonly IEasyRedmineApiClient _apiClient = apiClient;
     private readonly ILogger<ConnectionTestService> _logger = logger;
 
     public async Task<ConnectionTestResult> TestConnectionAsync(ConnectionTestRequest request, CancellationToken cancellationToken = default)

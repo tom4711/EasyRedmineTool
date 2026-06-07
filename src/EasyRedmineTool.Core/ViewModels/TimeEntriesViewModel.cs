@@ -12,10 +12,12 @@ using EasyRedmineTool.Core.Services.Interfaces;
 using System.Collections.ObjectModel;
 using System.Globalization;
 
-public partial class TimeEntriesViewModel : ViewModelBase
+public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
 {
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
+    private CancellationTokenSource? _todayHoursCts;
+    private CancellationTokenSource? _rowLoadCts;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -66,6 +68,9 @@ public partial class TimeEntriesViewModel : ViewModelBase
     [RelayCommand]
     public void ReloadFavorites()
     {
+        CancelRowLoads();
+        var rowLoadToken = BeginRowLoads();
+
         var settings = _appSettingsService.Load();
         var previousState = FavoriteRows.ToDictionary(
             row => row.Ticket.Id,
@@ -92,7 +97,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
             }
 
             FavoriteRows.Add(row);
-            _ = RestoreAndLoadRowAsync(row, selectedActivityId);
+            _ = RestoreAndLoadRowAsync(row, selectedActivityId, rowLoadToken);
         }
 
         ApplyFavoriteFilter();
@@ -102,41 +107,77 @@ public partial class TimeEntriesViewModel : ViewModelBase
             : string.Empty;
     }
 
-    private async Task RestoreAndLoadRowAsync(FavoriteTimeEntryRowViewModel row, int? selectedActivityId)
+    private async Task RestoreAndLoadRowAsync(
+        FavoriteTimeEntryRowViewModel row,
+        int? selectedActivityId,
+        CancellationToken cancellationToken)
     {
-        await row.LoadActivitiesAsync();
-
-        if (selectedActivityId.HasValue)
+        try
         {
-            row.SelectedActivity = row.Activities.FirstOrDefault(a => a.Id == selectedActivityId.Value)
-                ?? row.SelectedActivity;
+            await row.LoadActivitiesAsync(cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (selectedActivityId.HasValue)
+            {
+                row.SelectedActivity = row.Activities.FirstOrDefault(a => a.Id == selectedActivityId.Value)
+                    ?? row.SelectedActivity;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer ReloadFavorites call superseded this load.
         }
     }
 
     [RelayCommand]
     public async Task ReloadTodayBookedHoursAsync()
     {
-        var settings = _appSettingsService.Load();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
-        {
-            TodayBookedHours = 0;
-            return;
-        }
+        CancelTodayHoursLoad();
+        var cancellationToken = BeginTodayHoursLoad();
 
-        var today = DateTime.Today;
-        var result = await _timeEntryService.GetMyTimeEntriesAsync(settings.BaseUrl, settings.ApiKey, today, today);
-        if (!result.Success)
+        try
         {
-            StatusMessage = result.Message;
-            return;
-        }
+            var settings = _appSettingsService.Load();
+            if (string.IsNullOrWhiteSpace(settings.ApiKey))
+            {
+                TodayBookedHours = 0;
+                return;
+            }
 
-        var todayKey = RedmineDates.TodayKey();
-        TodayBookedHours = Math.Round(
-            result.Entries
-                .Where(entry => string.Equals(entry.Spent_On, todayKey, StringComparison.Ordinal))
-                .Sum(entry => entry.Hours),
-            2);
+            var today = DateTime.Today;
+            var result = await _timeEntryService.GetMyTimeEntriesAsync(
+                settings.BaseUrl,
+                settings.ApiKey,
+                today,
+                today,
+                cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (!result.Success)
+            {
+                StatusMessage = result.Message;
+                return;
+            }
+
+            var todayKey = RedmineDates.TodayKey();
+            TodayBookedHours = Math.Round(
+                result.Entries
+                    .Where(entry => string.Equals(entry.Spent_On, todayKey, StringComparison.Ordinal))
+                    .Sum(entry => entry.Hours),
+                2);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer reload superseded this request.
+        }
     }
 
     partial void OnFavoriteFilterTextChanged(string value)
@@ -236,5 +277,38 @@ public partial class TimeEntriesViewModel : ViewModelBase
                 ticket.LastTimeEntryOn = spentOn;
             }
         });
+    }
+
+    private void CancelTodayHoursLoad()
+    {
+        _todayHoursCts?.Cancel();
+        _todayHoursCts?.Dispose();
+        _todayHoursCts = null;
+    }
+
+    private CancellationToken BeginTodayHoursLoad()
+    {
+        _todayHoursCts = new CancellationTokenSource();
+        return _todayHoursCts.Token;
+    }
+
+    private void CancelRowLoads()
+    {
+        _rowLoadCts?.Cancel();
+        _rowLoadCts?.Dispose();
+        _rowLoadCts = null;
+    }
+
+    private CancellationToken BeginRowLoads()
+    {
+        _rowLoadCts = new CancellationTokenSource();
+        return _rowLoadCts.Token;
+    }
+
+    public void Dispose()
+    {
+        CancelTodayHoursLoad();
+        CancelRowLoads();
+        GC.SuppressFinalize(this);
     }
 }

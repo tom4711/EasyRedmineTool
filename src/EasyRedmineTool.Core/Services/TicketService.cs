@@ -6,16 +6,26 @@ using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
-public class TicketService(EasyRedmineApiClient apiClient) : ITicketService
+public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
 {
     private const int TimeEntryLookbackMonths = 12;
     private static readonly TimeSpan TimeEntryCacheTtl = TimeSpan.FromMinutes(5);
 
-    private readonly EasyRedmineApiClient _apiClient = apiClient;
+    private readonly IEasyRedmineApiClient _apiClient = apiClient;
     private readonly object _timeEntryCacheLock = new();
     private string? _timeEntryCacheKey;
     private DateTime _timeEntryCacheExpiresAt;
     private IReadOnlyList<TimeEntryDto> _cachedTimeEntries = [];
+
+    public void InvalidateTimeEntryCache()
+    {
+        lock (_timeEntryCacheLock)
+        {
+            _timeEntryCacheKey = null;
+            _timeEntryCacheExpiresAt = DateTime.MinValue;
+            _cachedTimeEntries = [];
+        }
+    }
 
     public async Task<IReadOnlyList<IssueDto>> GetMyOpenIssuesAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default)
     {

@@ -10,7 +10,7 @@
     <TextBlock Text="Einstellungen" FontSize="22" FontWeight="Bold" />
 
     <TextBlock Text="Basis-URL" />
-    <TextBox Text="{Binding BaseUrl}" PlaceholderText="https://projects.hawe.com/" />
+    <TextBox Text="{Binding BaseUrl}" PlaceholderText="https://redmine.example.com/" />
 
     <TextBlock Text="API-Schlüssel" />
     <TextBox Text="{Binding ApiKey}" PasswordChar="*" />

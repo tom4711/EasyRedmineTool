@@ -1,7 +1,6 @@
-namespace EasyRedmineTool.Core.Models.Tickets
+namespace EasyRedmineTool.Core.Models.Tickets;
+
+public class IssueResponse
 {
-    public class IssueResponse
-    {
-        public IssueDto? Issue { get; set; }
-    }
+    public IssueDto? Issue { get; set; }
 }

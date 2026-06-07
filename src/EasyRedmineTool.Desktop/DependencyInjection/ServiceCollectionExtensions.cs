@@ -19,7 +19,7 @@ public static class ServiceCollectionExtensions
             builder.SetMinimumLevel(LogLevel.Information);
         });
 
-        services.AddHttpClient<EasyRedmineApiClient>();
+        services.AddHttpClient<IEasyRedmineApiClient, EasyRedmineApiClient>();
 
         services.AddSingleton<IConnectionTestService, ConnectionTestService>();
         services.AddSingleton<ITicketService, TicketService>();

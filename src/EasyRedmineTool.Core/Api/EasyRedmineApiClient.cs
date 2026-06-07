@@ -3,13 +3,20 @@ namespace EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 
-public class EasyRedmineApiClient(HttpClient httpClient)
+public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiClient>? logger = null) : IEasyRedmineApiClient
 {
+    private const int PageLimit = 100;
+    private const int MaxPaginationPages = 100;
+
     private readonly HttpClient _httpClient = httpClient;
+    private readonly ILogger<EasyRedmineApiClient> _logger = logger ?? NullLogger<EasyRedmineApiClient>.Instance;
 
     public async Task<HttpResponseMessage> GetCurrentUserAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default)
     {
@@ -22,28 +29,30 @@ public class EasyRedmineApiClient(HttpClient httpClient)
         string apiKey,
         CancellationToken cancellationToken = default)
     {
-        const int limit = 100;
         var offset = 0;
         var all = new List<IssueDto>();
         int? totalCount = null;
 
-        while (true)
+        for (var pageIndex = 0; pageIndex < MaxPaginationPages; pageIndex++)
         {
-            var page = await GetMyOpenIssuesPageAsync(baseUrl, apiKey, limit, offset, cancellationToken);
+            var page = await GetMyOpenIssuesPageAsync(baseUrl, apiKey, PageLimit, offset, cancellationToken);
             if (page?.Issues is null || page.Issues.Count == 0)
             {
                 break;
             }
 
             all.AddRange(page.Issues);
-            totalCount ??= page.Total_Count;
+            if (page.Total_Count > 0)
+            {
+                totalCount ??= page.Total_Count;
+            }
 
-            if (all.Count >= totalCount || page.Issues.Count < limit)
+            if (IsLastPage(page.Issues.Count, PageLimit, all.Count, totalCount))
             {
                 break;
             }
 
-            offset += limit;
+            offset += PageLimit;
         }
 
         return all;
@@ -91,28 +100,30 @@ public class EasyRedmineApiClient(HttpClient httpClient)
         DateTime to,
         CancellationToken cancellationToken = default)
     {
-        const int limit = 100;
         var offset = 0;
         var all = new List<TimeEntryDto>();
         int? totalCount = null;
 
-        while (true)
+        for (var pageIndex = 0; pageIndex < MaxPaginationPages; pageIndex++)
         {
-            var page = await GetMyTimeEntriesPageAsync(baseUrl, apiKey, from, to, limit, offset, cancellationToken);
+            var page = await GetMyTimeEntriesPageAsync(baseUrl, apiKey, from, to, PageLimit, offset, cancellationToken);
             if (page?.Time_Entries is null || page.Time_Entries.Count == 0)
             {
                 break;
             }
 
             all.AddRange(page.Time_Entries);
-            totalCount ??= page.Total_Count;
+            if (page.Total_Count > 0)
+            {
+                totalCount ??= page.Total_Count;
+            }
 
-            if (all.Count >= totalCount || page.Time_Entries.Count < limit)
+            if (IsLastPage(page.Time_Entries.Count, PageLimit, all.Count, totalCount))
             {
                 break;
             }
 
-            offset += limit;
+            offset += PageLimit;
         }
 
         return all;
@@ -142,12 +153,20 @@ public class EasyRedmineApiClient(HttpClient httpClient)
 
             if (!response.IsSuccessStatusCode)
             {
+                _logger.LogWarning(
+                    "Issue-Batch konnte nicht geladen werden ({StatusCode} {ReasonPhrase}): {IssueIds}",
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    idsParam);
                 continue;
             }
 
             var result = await response.Content.ReadFromJsonAsync<IssueListResponse>(RedmineJson.Options, cancellationToken);
             if (result?.Issues is null)
             {
+                _logger.LogWarning(
+                    "Issue-Batch lieferte keine parsebare Antwort: {IssueIds}",
+                    idsParam);
                 continue;
             }
 
@@ -169,6 +188,14 @@ public class EasyRedmineApiClient(HttpClient httpClient)
             {
                 issuesById[issueId] = issueResponse.Issue;
             }
+        }
+
+        var unresolvedIds = issueIds.Where(id => !issuesById.ContainsKey(id)).ToList();
+        if (unresolvedIds.Count > 0)
+        {
+            _logger.LogWarning(
+                "Issues konnten nicht geladen werden: {IssueIds}",
+                string.Join(", ", unresolvedIds));
         }
 
         return issueIds
@@ -327,4 +354,8 @@ public class EasyRedmineApiClient(HttpClient httpClient)
 
     private static bool TryGetArray(JsonElement source, string propertyName, out JsonElement value) 
         => source.TryGetProperty(propertyName, out value) && value.ValueKind == JsonValueKind.Array;
+
+    private static bool IsLastPage(int pageItemCount, int pageLimit, int totalLoaded, int? totalCount) =>
+        pageItemCount < pageLimit
+        || (totalCount is > 0 && totalLoaded >= totalCount.Value);
 }
