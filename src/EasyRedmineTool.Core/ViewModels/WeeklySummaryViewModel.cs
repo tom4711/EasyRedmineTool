@@ -36,6 +36,8 @@ public partial class WeeklySummaryViewModel : ViewModelBase
         _timeEntryService = timeEntryService;
     }
 
+    public event EventHandler<int>? OpenTimeEntryRequested;
+
     [RelayCommand]
     public async Task ReloadWeeklySummaryAsync()
     {
@@ -106,5 +108,16 @@ public partial class WeeklySummaryViewModel : ViewModelBase
         var to = from.AddMonths(3).AddDays(-1);
 
         return (from, to, $"Q{quarter} {today.Year} ({RedmineDates.FormatSpentOn(from)} – {RedmineDates.FormatSpentOn(to)})");
+    }
+
+    [RelayCommand]
+    private void OpenTimeEntryForTicket(int issueId)
+    {
+        if (issueId <= 0)
+        {
+            return;
+        }
+
+        OpenTimeEntryRequested?.Invoke(this, issueId);
     }
 }

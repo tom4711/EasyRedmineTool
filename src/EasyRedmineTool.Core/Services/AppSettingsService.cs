@@ -88,10 +88,6 @@ public sealed class AppSettingsService : IAppSettingsService
         ApiKey = settings.ApiKey ?? string.Empty,
         CachedTickets = settings.CachedTickets ?? [],
         FavoriteTicketIds = settings.FavoriteTicketIds ?? [],
-        LastTimeEntryIssueId = settings.LastTimeEntryIssueId,
-        LastTimeEntryActivityId = settings.LastTimeEntryActivityId,
-        LastTimeEntryHours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? AppConstants.DefaultHours : settings.LastTimeEntryHours,
-        LastTimeEntryActivityName = settings.LastTimeEntryActivityName ?? string.Empty,
     };
 
     private static AppSettings CreateDefault() => new()

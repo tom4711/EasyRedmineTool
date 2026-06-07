@@ -27,10 +27,7 @@ public partial class TimeEntriesViewModel : ViewModelBase
     private double todayBookedHours;
 
     [ObservableProperty]
-    private bool canRepeatLastEntry;
-
-    [ObservableProperty]
-    private string lastEntrySummaryLabel = string.Empty;
+    private int? focusedIssueId;
 
     public ObservableCollection<FavoriteTimeEntryRowViewModel> FavoriteRows { get; } = [];
     public ObservableCollection<FavoriteTimeEntryRowViewModel> FilteredFavoriteRows { get; } = [];
@@ -59,10 +56,8 @@ public partial class TimeEntriesViewModel : ViewModelBase
 
     internal async Task HandleEntryCreatedAsync(
         FavoriteTimeEntryRowViewModel row,
-        DateTime spentOn,
-        TimeEntryActivityDto activity)
+        DateTime spentOn)
     {
-        SaveLastTimeEntryTemplate(row, activity);
         UpdateCachedTicketLastTimeEntry(row.Ticket.Id, spentOn);
         ReloadFavorites();
         await ReloadTodayBookedHoursAsync();
@@ -101,7 +96,6 @@ public partial class TimeEntriesViewModel : ViewModelBase
         }
 
         ApplyFavoriteFilter();
-        UpdateCanRepeatLastEntry();
 
         StatusMessage = FavoriteRows.Count == 0
             ? "Keine Favoriten vorhanden. Bitte in der Ticketliste Favoriten markieren."
@@ -147,7 +141,47 @@ public partial class TimeEntriesViewModel : ViewModelBase
 
     partial void OnFavoriteFilterTextChanged(string value)
     {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            FocusedIssueId = null;
+        }
+
         ApplyFavoriteFilter();
+    }
+
+    public void PrepareForIssue(int issueId)
+    {
+        ReloadFavorites();
+
+        var settings = _appSettingsService.Load();
+        if (!settings.FavoriteTicketIds.Contains(issueId))
+        {
+            FocusedIssueId = null;
+            FavoriteFilterText = string.Empty;
+            ApplyFavoriteFilter();
+
+            var ticket = settings.CachedTickets.FirstOrDefault(t => t.Id == issueId);
+            StatusMessage = ticket is not null
+                ? $"#{issueId} ist kein Favorit. Bitte in der Ticketliste als Favorit markieren."
+                : $"#{issueId} ist kein Favorit und nicht in der lokalen Ticketliste.";
+            return;
+        }
+
+        FocusedIssueId = issueId;
+        FavoriteFilterText = string.Empty;
+        ApplyFavoriteFilter();
+        StatusMessage = string.Empty;
+    }
+
+    public void ClearFocusedIssue()
+    {
+        if (FocusedIssueId is null)
+        {
+            return;
+        }
+
+        FocusedIssueId = null;
+        UpdateRowFocusStates();
     }
 
     private void ApplyFavoriteFilter()
@@ -157,10 +191,25 @@ public partial class TimeEntriesViewModel : ViewModelBase
         {
             FilteredFavoriteRows.Add(row);
         }
+
+        UpdateRowFocusStates();
+    }
+
+    private void UpdateRowFocusStates()
+    {
+        foreach (var row in FavoriteRows)
+        {
+            row.IsFocused = FocusedIssueId == row.Ticket.Id;
+        }
     }
 
     private bool MatchesFavoriteFilter(IssueDto ticket)
     {
+        if (FocusedIssueId.HasValue && ticket.Id != FocusedIssueId.Value)
+        {
+            return false;
+        }
+
         if (string.IsNullOrWhiteSpace(FavoriteFilterText))
         {
             return true;
@@ -170,47 +219,6 @@ public partial class TimeEntriesViewModel : ViewModelBase
         return ticket.Id.ToString(CultureInfo.InvariantCulture).Contains(query, StringComparison.OrdinalIgnoreCase)
             || ticket.Subject.Contains(query, StringComparison.OrdinalIgnoreCase)
             || (ticket.Project?.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanRepeatLastEntry))]
-    private async Task RepeatLastEntryAsync()
-    {
-        var settings = _appSettingsService.Load();
-        if (!settings.LastTimeEntryIssueId.HasValue || !settings.LastTimeEntryActivityId.HasValue)
-        {
-            return;
-        }
-
-        var row = FavoriteRows.FirstOrDefault(r => r.Ticket.Id == settings.LastTimeEntryIssueId.Value);
-        if (row is null)
-        {
-            StatusMessage = "Letztes Ticket ist kein Favorit mehr.";
-            UpdateCanRepeatLastEntry();
-            return;
-        }
-
-        await row.LoadActivitiesAsync();
-
-        var hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? AppConstants.DefaultHours : settings.LastTimeEntryHours;
-        row.ApplyTemplate(
-            settings.LastTimeEntryActivityId.Value,
-            hours,
-            DateTime.Today,
-            settings.LastTimeEntryActivityName);
-
-        await row.CreateTimeEntryCommand.ExecuteAsync(null);
-    }
-
-    private void SaveLastTimeEntryTemplate(FavoriteTimeEntryRowViewModel row, TimeEntryActivityDto activity)
-    {
-        _appSettingsService.Update(settings =>
-        {
-            settings.LastTimeEntryIssueId = row.Ticket.Id;
-            settings.LastTimeEntryActivityId = activity.Id;
-            settings.LastTimeEntryHours = row.Hours;
-            settings.LastTimeEntryActivityName = activity.Name;
-        });
-        UpdateCanRepeatLastEntry();
     }
 
     private void UpdateCachedTicketLastTimeEntry(int issueId, DateTime spentOn)
@@ -228,46 +236,5 @@ public partial class TimeEntriesViewModel : ViewModelBase
                 ticket.LastTimeEntryOn = spentOn;
             }
         });
-    }
-
-    private void UpdateCanRepeatLastEntry()
-    {
-        var settings = _appSettingsService.Load();
-        CanRepeatLastEntry = settings.LastTimeEntryIssueId.HasValue
-            && settings.LastTimeEntryActivityId.HasValue
-            && FavoriteRows.Any(r => r.Ticket.Id == settings.LastTimeEntryIssueId.Value);
-
-        LastEntrySummaryLabel = CanRepeatLastEntry
-            ? BuildLastEntrySummary(settings)
-            : string.Empty;
-
-        RepeatLastEntryCommand.NotifyCanExecuteChanged();
-    }
-
-    private string BuildLastEntrySummary(AppSettings settings)
-    {
-        var ticket = FavoriteRows.FirstOrDefault(r => r.Ticket.Id == settings.LastTimeEntryIssueId)?.Ticket
-            ?? _appSettingsService.Load().CachedTickets.FirstOrDefault(t => t.Id == settings.LastTimeEntryIssueId);
-
-        var ticketPart = ticket is not null
-            ? $"#{ticket.Id} {Truncate(ticket.Subject, 48)}"
-            : $"#{settings.LastTimeEntryIssueId}";
-
-        var hours = string.IsNullOrWhiteSpace(settings.LastTimeEntryHours) ? AppConstants.DefaultHours : settings.LastTimeEntryHours;
-        var activity = string.IsNullOrWhiteSpace(settings.LastTimeEntryActivityName)
-            ? "Aktivität"
-            : settings.LastTimeEntryActivityName;
-
-        return $"{ticketPart} · {hours} h · {activity}";
-    }
-
-    private static string Truncate(string value, int maxLength)
-    {
-        if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
-        {
-            return value;
-        }
-
-        return value[..(maxLength - 1)] + "…";
     }
 }

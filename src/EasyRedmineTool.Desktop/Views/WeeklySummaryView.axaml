@@ -39,6 +39,20 @@
     <Style Selector="ListBox.weekly-summary > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
     </Style>
+
+    <Style Selector="Button.ticket-summary-link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,2" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="Button.ticket-summary-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppGhostHoverBackgroundBrush}" />
+    </Style>
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,*">
@@ -97,20 +111,25 @@
                               HorizontalAlignment="Stretch">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="models:WeeklyTicketHoursDto">
-                      <Grid ColumnDefinitions="*,Auto"
-                            Margin="0,2"
-                            HorizontalAlignment="Stretch">
-                        <TextBlock Grid.Column="0"
-                                   Text="{Binding Label}"
-                                   FontSize="12"
-                                   Opacity="0.85"
-                                   TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding HoursDisplay}"
-                                   FontSize="12"
-                                   Opacity="0.85"
-                                   Margin="12,0,0,0" />
-                      </Grid>
+                      <Button Classes="ticket-summary-link"
+                              HorizontalAlignment="Stretch"
+                              ToolTip.Tip="Zur Zeiteingabe springen"
+                              Command="{Binding $parent[UserControl].DataContext.OpenTimeEntryForTicketCommand}"
+                              CommandParameter="{Binding IssueId}">
+                        <Grid ColumnDefinitions="*,Auto"
+                              HorizontalAlignment="Stretch">
+                          <TextBlock Grid.Column="0"
+                                     Text="{Binding Label}"
+                                     FontSize="12"
+                                     Opacity="0.85"
+                                     TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding HoursDisplay}"
+                                     FontSize="12"
+                                     Opacity="0.85"
+                                     Margin="12,0,0,0" />
+                        </Grid>
+                      </Button>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>

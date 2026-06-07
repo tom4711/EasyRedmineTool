@@ -36,6 +36,9 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
     [ObservableProperty]
     private bool isSubmitting;
 
+    [ObservableProperty]
+    private bool isFocused;
+
     public FavoriteTimeEntryRowViewModel(
         TimeEntriesViewModel parent,
         IssueDto ticket,
@@ -88,29 +91,6 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         if (SelectedActivity is null || Activities.All(a => a.Id != SelectedActivity.Id))
         {
             SelectedActivity = Activities.FirstOrDefault();
-        }
-    }
-
-    public void ApplyTemplate(int activityId, string hours, DateTime spentOn, string? activityName = null)
-    {
-        Hours = hours;
-        SpentOn = spentOn;
-        CalendarDisplayDate = spentOn;
-        OnPropertyChanged(nameof(SelectedDateLabel));
-
-        if (Activities.Any(a => a.Id == activityId))
-        {
-            SelectedActivity = Activities.First(a => a.Id == activityId);
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(activityName))
-        {
-            SelectedActivity = new TimeEntryActivityDto { Id = activityId, Name = activityName };
-            if (Activities.All(a => a.Id != activityId))
-            {
-                Activities.Add(SelectedActivity);
-            }
         }
     }
 
@@ -193,7 +173,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             if (result.Success)
             {
                 Comments = string.Empty;
-                await _parent.HandleEntryCreatedAsync(this, SpentOn.Value, SelectedActivity);
+                await _parent.HandleEntryCreatedAsync(this, SpentOn.Value);
             }
         }
         finally
