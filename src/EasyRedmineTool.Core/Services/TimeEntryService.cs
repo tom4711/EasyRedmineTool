@@ -6,9 +6,13 @@ using EasyRedmineTool.Core.Services.Interfaces;
 
 using Microsoft.Extensions.Logging;
 
-public class TimeEntryService(EasyRedmineApiClient apiClient, ILogger<TimeEntryService> logger) : ITimeEntryService
+public class TimeEntryService(
+    IEasyRedmineApiClient apiClient,
+    ITicketService ticketService,
+    ILogger<TimeEntryService> logger) : ITimeEntryService
 {
-    private readonly EasyRedmineApiClient _apiClient = apiClient;
+    private readonly IEasyRedmineApiClient _apiClient = apiClient;
+    private readonly ITicketService _ticketService = ticketService;
     private readonly ILogger<TimeEntryService> _logger = logger;
 
     public async Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
@@ -64,6 +68,8 @@ public class TimeEntryService(EasyRedmineApiClient apiClient, ILogger<TimeEntryS
 
             if (response.IsSuccessStatusCode)
             {
+                _ticketService.InvalidateTimeEntryCache();
+
                 return new TimeEntryOperationResult
                 {
                     Success = true,

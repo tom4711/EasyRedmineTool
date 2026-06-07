@@ -53,7 +53,16 @@ public sealed class AppSettingsService : IAppSettingsService
         var normalized = Normalize(settings);
         var wrapper = new AppSettingsWrapper { AppSettings = normalized };
         var json = JsonSerializer.Serialize(wrapper, JsonOptions);
-        File.WriteAllText(_settingsFilePath, json);
+
+        var directory = Path.GetDirectoryName(_settingsFilePath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var tempPath = _settingsFilePath + ".tmp";
+        File.WriteAllText(tempPath, json);
+        File.Move(tempPath, _settingsFilePath, overwrite: true);
     }
 
     public void Update(Action<AppSettings> configure)
@@ -84,8 +93,9 @@ public sealed class AppSettingsService : IAppSettingsService
 
     internal static AppSettings Normalize(AppSettings settings) => new()
     {
-        BaseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? AppConstants.DefaultBaseUrl : settings.BaseUrl,
+        BaseUrl = settings.BaseUrl?.Trim() ?? string.Empty,
         ApiKey = settings.ApiKey ?? string.Empty,
+        IsDarkMode = settings.IsDarkMode,
         CachedTickets = settings.CachedTickets ?? [],
         FavoriteTicketIds = settings.FavoriteTicketIds ?? [],
     };
@@ -94,6 +104,7 @@ public sealed class AppSettingsService : IAppSettingsService
     {
         BaseUrl = AppConstants.DefaultBaseUrl,
         ApiKey = string.Empty,
+        IsDarkMode = false,
         CachedTickets = [],
         FavoriteTicketIds = []
     };

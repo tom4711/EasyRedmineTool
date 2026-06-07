@@ -13,7 +13,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IAppSettingsService _appSettingsService;
 
     [ObservableProperty]
-    private string baseUrl = AppConstants.DefaultBaseUrl;
+    private string baseUrl = string.Empty;
 
     [ObservableProperty]
     private string apiKey = string.Empty;

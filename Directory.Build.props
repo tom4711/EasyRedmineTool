@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <NoWarn>$(NoWarn);CA1707;CA1716;CA1848;CA1822;CA2101;IDE0161</NoWarn>
+  </PropertyGroup>
+</Project>

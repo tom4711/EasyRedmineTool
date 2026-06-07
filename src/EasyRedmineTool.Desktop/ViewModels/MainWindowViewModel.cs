@@ -6,8 +6,8 @@ using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core;
+using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Services.Interfaces;
 using EasyRedmineTool.Core.ViewModels;
 
@@ -17,6 +17,7 @@ using System.Linq;
 public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly IAppSettingsService _appSettingsService;
+    private bool _isApplyingThemeFromSettings;
 
     [ObservableProperty]
     private bool isSettingsVisible;
@@ -53,11 +54,7 @@ public partial class MainWindowViewModel : ViewModelBase
         SettingsViewModel.SettingsSaved += OnSettingsSaved;
         WeeklySummaryViewModel.OpenTimeEntryRequested += OnOpenTimeEntryFromSummary;
 
-        if (Application.Current is { } app)
-        {
-            IsDarkMode = app.RequestedThemeVariant == ThemeVariant.Dark;
-        }
-
+        ApplyThemeFromSettings();
         ShowInitialView();
     }
 
@@ -75,6 +72,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (Application.Current is { } app)
         {
             app.RequestedThemeVariant = value ? ThemeVariant.Dark : ThemeVariant.Light;
+        }
+
+        if (!_isApplyingThemeFromSettings)
+        {
+            _appSettingsService.Update(settings => settings.IsDarkMode = value);
         }
     }
 
@@ -152,6 +154,15 @@ public partial class MainWindowViewModel : ViewModelBase
     private static bool HasUsableFavorites(AppSettings settings) =>
         settings.FavoriteTicketIds.Count > 0 &&
         settings.CachedTickets.Any(t => settings.FavoriteTicketIds.Contains(t.Id));
+
+    private void ApplyThemeFromSettings()
+    {
+        var settings = _appSettingsService.Load();
+
+        _isApplyingThemeFromSettings = true;
+        IsDarkMode = settings.IsDarkMode;
+        _isApplyingThemeFromSettings = false;
+    }
 
     private void HideAllViews()
     {

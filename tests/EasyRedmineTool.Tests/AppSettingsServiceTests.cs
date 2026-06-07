@@ -18,8 +18,9 @@ public class AppSettingsServiceTests
 
         var normalized = AppSettingsService.Normalize(settings);
 
-        Assert.Equal("https://projects.hawe.com/", normalized.BaseUrl);
+        Assert.Equal(string.Empty, normalized.BaseUrl);
         Assert.Equal(string.Empty, normalized.ApiKey);
+        Assert.False(normalized.IsDarkMode);
         Assert.Empty(normalized.CachedTickets);
         Assert.Empty(normalized.FavoriteTicketIds);
     }
@@ -45,6 +46,37 @@ public class AppSettingsServiceTests
             Assert.Equal("https://new.example/", loaded.BaseUrl);
             Assert.Equal("secret", loaded.ApiKey);
             Assert.Equal([42], loaded.FavoriteTicketIds);
+        }
+        finally
+        {
+            if (File.Exists(settingsPath))
+            {
+                File.Delete(settingsPath);
+            }
+        }
+    }
+
+    [Fact]
+    public void Save_writes_settings_without_leaving_temp_file()
+    {
+        var settingsPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".json");
+        var service = new AppSettingsService(settingsPath, NullLogger<AppSettingsService>.Instance);
+
+        try
+        {
+            service.Save(new AppSettings
+            {
+                BaseUrl = "https://redmine.example/",
+                ApiKey = "secret",
+                IsDarkMode = true
+            });
+
+            Assert.True(File.Exists(settingsPath));
+            Assert.False(File.Exists(settingsPath + ".tmp"));
+
+            var loaded = service.Load();
+            Assert.Equal("https://redmine.example/", loaded.BaseUrl);
+            Assert.True(loaded.IsDarkMode);
         }
         finally
         {

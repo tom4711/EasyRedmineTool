@@ -9,19 +9,12 @@ using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
-using System.Linq;
 
 public partial class TicketListViewModel : ViewModelBase
 {
     private readonly ITicketService _ticketService;
     private readonly IAppSettingsService _appSettingsService;
     private readonly HashSet<int> _favoriteTicketIds = [];
-
-    [ObservableProperty]
-    private string baseUrl = AppConstants.DefaultBaseUrl;
-
-    [ObservableProperty]
-    private string apiKey = string.Empty;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -48,8 +41,6 @@ public partial class TicketListViewModel : ViewModelBase
     public void ReloadSettings()
     {
         var settings = _appSettingsService.Load();
-        BaseUrl = settings.BaseUrl;
-        ApiKey = settings.ApiKey;
 
         _favoriteTicketIds.Clear();
         foreach (var id in settings.FavoriteTicketIds)
@@ -76,7 +67,8 @@ public partial class TicketListViewModel : ViewModelBase
             StatusMessage = "Tickets werden geladen ...";
             Tickets.Clear();
 
-            var result = await _ticketService.GetTicketsForListAsync(BaseUrl, ApiKey);
+            var (baseUrl, apiKey) = LoadCredentials();
+            var result = await _ticketService.GetTicketsForListAsync(baseUrl, apiKey);
 
             foreach (var ticket in result.Tickets)
             {
@@ -119,7 +111,8 @@ public partial class TicketListViewModel : ViewModelBase
         try
         {
             IsBusy = true;
-            var ticket = await _ticketService.GetIssueByIdAsync(BaseUrl, ApiKey, ticketId);
+            var (baseUrl, apiKey) = LoadCredentials();
+            var ticket = await _ticketService.GetIssueByIdAsync(baseUrl, apiKey, ticketId);
 
             if (ticket is null)
             {
@@ -161,7 +154,8 @@ public partial class TicketListViewModel : ViewModelBase
             return;
         }
 
-        RedmineLinks.OpenIssueInBrowser(BaseUrl, ticketItem.Ticket.Id);
+        var (baseUrl, _) = LoadCredentials();
+        RedmineLinks.OpenIssueInBrowser(baseUrl, ticketItem.Ticket.Id);
     }
 
     private void ToggleFavorite(TicketListItemViewModel ticketItem)
@@ -185,12 +179,16 @@ public partial class TicketListViewModel : ViewModelBase
     private TicketListItemViewModel CreateTicketItem(IssueDto ticket) =>
         new(ticket, _favoriteTicketIds.Contains(ticket.Id));
 
+    private (string BaseUrl, string ApiKey) LoadCredentials()
+    {
+        var settings = _appSettingsService.Load();
+        return (settings.BaseUrl, settings.ApiKey);
+    }
+
     private void PersistCurrentState()
     {
         _appSettingsService.Update(settings =>
         {
-            settings.BaseUrl = BaseUrl;
-            settings.ApiKey = ApiKey;
             settings.CachedTickets = Tickets.Select(t => t.Ticket).ToList();
             settings.FavoriteTicketIds = _favoriteTicketIds.ToList();
         });
