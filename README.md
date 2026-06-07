@@ -162,7 +162,7 @@ Lokale `settings.json` im Benutzerverzeichnis ist davon **nicht** betroffen.
 
 ---
 
-## Release (Windows)
+## Release
 
 Releases werden automatisch erstellt, wenn auf `main` ein Tag im Format `v*` gepusht wird (z. B. `v1.0.0`):
 
@@ -173,7 +173,44 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-Der [Release-Workflow](.github/workflows/release.yml) führt Tests aus, baut ein **Windows x64**-Paket (self-contained ZIP) und veröffentlicht es als GitHub Release zum Download. Vorab-Versionen (`v1.0.0-beta.1`) werden als Pre-Release markiert.
+Der [Release-Workflow](.github/workflows/release.yml) führt Tests aus und veröffentlicht self-contained Pakete als GitHub Release:
+
+| Plattform | Artefakt |
+|-----------|----------|
+| **Windows** | `EasyRedmineTool-v*-win-x64.zip` |
+| **macOS Intel** | `EasyRedmineTool-v*-osx-x64.zip` |
+| **macOS Apple Silicon** | `EasyRedmineTool-v*-osx-arm64.zip` |
+| **Linux x64** | `EasyRedmineTool-v*-linux-x64.tar.gz` |
+| **Linux ARM64** | `EasyRedmineTool-v*-linux-arm64.tar.gz` |
+
+Vorab-Versionen (`v1.0.0-beta.1`) werden als Pre-Release markiert.
+
+### Windows
+
+ZIP entpacken und `EasyRedmineTool.Desktop.exe` starten.
+
+### macOS (unsigned)
+
+Die macOS-Builds sind **nicht** mit Apple signiert oder notarisiert. Beim ersten Start kann Gatekeeper warnen (*„App kann nicht geprüft werden“*).
+
+- Rechtsklick auf `EasyRedmineTool.Desktop` → **Öffnen**, oder
+- Systemeinstellungen → Datenschutz & Sicherheit → **Trotzdem öffnen**
+
+Für breite Verteilung ohne Warnungen wäre ein Apple Developer Program und Notarisierung nötig.
+
+```bash
+unzip EasyRedmineTool-v*-osx-arm64.zip -d EasyRedmineTool
+chmod +x EasyRedmineTool/EasyRedmineTool.Desktop
+./EasyRedmineTool/EasyRedmineTool.Desktop
+```
+
+### Linux
+
+```bash
+tar -xzf EasyRedmineTool-v*-linux-x64.tar.gz -C EasyRedmineTool
+chmod +x EasyRedmineTool/EasyRedmineTool.Desktop
+./EasyRedmineTool/EasyRedmineTool.Desktop
+```
 
 ---
 
