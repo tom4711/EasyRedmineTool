@@ -80,6 +80,37 @@ public class SettingsViewModelTests
         Assert.Equal("Verbindung erfolgreich.", viewModel.StatusMessage);
     }
 
+    [Fact]
+    public async Task TestConnectionAsync_uses_latest_request_when_called_twice()
+    {
+        using var context = TestContext.Create();
+        context.ConnectionTestService.FirstCallDelay = TimeSpan.FromMilliseconds(150);
+        context.ConnectionTestService.NextResult = new ConnectionTestResult
+        {
+            Success = true,
+            Message = "first"
+        };
+        context.ConnectionTestService.LatestResult = new ConnectionTestResult
+        {
+            Success = true,
+            Message = "second"
+        };
+
+        var viewModel = new SettingsViewModel(context.ConnectionTestService, context.SettingsService)
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret"
+        };
+
+        var firstCall = viewModel.TestConnectionCommand.ExecuteAsync(null);
+        await viewModel.TestConnectionCommand.ExecuteAsync(null);
+        await firstCall;
+
+        Assert.Equal("second", viewModel.StatusMessage);
+        Assert.Equal(2, context.ConnectionTestService.CallCount);
+        Assert.False(viewModel.IsBusy);
+    }
+
     private sealed class TestContext : IDisposable
     {
         private readonly string _settingsPath;
@@ -118,15 +149,26 @@ public class SettingsViewModelTests
 
     private sealed class FakeConnectionTestService : IConnectionTestService
     {
-        public ConnectionTestResult NextResult { get; set; } = new() { Success = true, Message = "ok" };
-        public int CallCount { get; private set; }
+        private int _callCount;
 
-        public Task<ConnectionTestResult> TestConnectionAsync(
+        public TimeSpan FirstCallDelay { get; set; }
+        public ConnectionTestResult NextResult { get; set; } = new() { Success = true, Message = "ok" };
+        public ConnectionTestResult LatestResult { get; set; } = new() { Success = true, Message = "ok" };
+        public int CallCount => _callCount;
+
+        public async Task<ConnectionTestResult> TestConnectionAsync(
             ConnectionTestRequest request,
             CancellationToken cancellationToken = default)
         {
-            CallCount++;
-            return Task.FromResult(NextResult);
+            _callCount++;
+
+            if (_callCount == 1 && FirstCallDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(FirstCallDelay, cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return _callCount == 1 ? NextResult : LatestResult;
         }
     }
 }

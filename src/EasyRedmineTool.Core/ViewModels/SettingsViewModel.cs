@@ -7,10 +7,11 @@ using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models;
 using EasyRedmineTool.Core.Services.Interfaces;
 
-public partial class SettingsViewModel : ViewModelBase
+public partial class SettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly IConnectionTestService _connectionTestService;
     private readonly IAppSettingsService _appSettingsService;
+    private CancellationTokenSource? _connectionTestCts;
 
     [ObservableProperty]
     private string baseUrl = string.Empty;
@@ -55,25 +56,68 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private async Task TestConnectionAsync()
     {
-        if (IsBusy)
-            return;
+        CancelConnectionTest();
+        var testCts = BeginConnectionTest();
+        var cancellationToken = testCts.Token;
 
         try
         {
             IsBusy = true;
             StatusMessage = "Verbindung wird geprüft ...";
 
-            var result = await _connectionTestService.TestConnectionAsync(new ConnectionTestRequest
+            var result = await _connectionTestService.TestConnectionAsync(
+                new ConnectionTestRequest
+                {
+                    BaseUrl = BaseUrl,
+                    ApiKey = ApiKey
+                },
+                cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
             {
-                BaseUrl = BaseUrl,
-                ApiKey = ApiKey
-            });
+                return;
+            }
 
             StatusMessage = result.Message;
         }
+        catch (OperationCanceledException)
+        {
+            // A newer connection test superseded this request.
+        }
         finally
         {
-            IsBusy = false;
+            CompleteConnectionTest(testCts);
         }
+    }
+
+    private void CancelConnectionTest()
+    {
+        _connectionTestCts?.Cancel();
+        _connectionTestCts?.Dispose();
+        _connectionTestCts = null;
+    }
+
+    private CancellationTokenSource BeginConnectionTest()
+    {
+        var testCts = new CancellationTokenSource();
+        _connectionTestCts = testCts;
+        return testCts;
+    }
+
+    private void CompleteConnectionTest(CancellationTokenSource testCts)
+    {
+        if (_connectionTestCts != testCts)
+        {
+            return;
+        }
+
+        IsBusy = false;
+        _connectionTestCts = null;
+    }
+
+    public void Dispose()
+    {
+        CancelConnectionTest();
+        GC.SuppressFinalize(this);
     }
 }

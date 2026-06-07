@@ -44,7 +44,7 @@ Basis-URL und API-Schlüssel hinterlegen, Verbindung testen und speichern — al
 | **Favoriten** | Häufig genutzte Tickets markieren und sortiert nach letztem Buchungsdatum anzeigen |
 | **Zeiteinträge** | Stunden, Aktivität, Datum und Kommentar direkt aus der Favoritenliste buchen; heutige Stunden live |
 | **Auswertung** | Quartalsübersicht nach Kalenderwochen inkl. Stunden pro Ticket; Sprung zur Zeiteingabe per Klick |
-| **Einstellungen** | Basis-URL, API-Schlüssel, Verbindungstest, Hell/Dunkel-Modus |
+| **Einstellungen** | Basis-URL, API-Schlüssel, Verbindungstest, Hell/Dunkel-Modus (persistiert) |
 
 ---
 
@@ -87,6 +87,7 @@ Gespeichert werden u. a.:
 
 - Basis-URL der Redmine-Instanz
 - API-Schlüssel
+- Hell/Dunkel-Modus (`IsDarkMode`) — bleibt über Neustarts erhalten
 - Zwischengespeicherte Ticketliste
 - Favoriten und Vorlage für den letzten Zeiteintrag
 
