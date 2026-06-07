@@ -1,7 +1,5 @@
 namespace EasyRedmineTool.Core.Models.TimeEntries;
 
-using EasyRedmineTool.Core.Models.Tickets;
-
 using System.Text.Json.Serialization;
 
 public class TimeEntryDto
@@ -11,7 +9,7 @@ public class TimeEntryDto
     [JsonPropertyName("issue_id")]
     public int Issue_Id { get; set; }
 
-    public NamedEntityDto? Issue { get; set; }
+    public TimeEntryIssueDto? Issue { get; set; }
 
     public double Hours { get; set; }
 
