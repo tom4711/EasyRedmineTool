@@ -71,11 +71,108 @@ jobs:
           path: ${{ env.ARCHIVE_NAME }}
           retention-days: 90
 
+  release-macos:
+    needs: validate
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [osx-x64, osx-arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish macOS ${{ matrix.rid }}
+        run: >
+          dotnet publish src/EasyRedmineTool.Desktop/EasyRedmineTool.Desktop.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=false
+          --output publish/${{ matrix.rid }}
+
+      - name: Create ZIP archive
+        run: |
+          version="${{ github.ref_name }}"
+          archive="EasyRedmineTool-${version}-${{ matrix.rid }}.zip"
+          cd "publish/${{ matrix.rid }}"
+          zip -r "../../${archive}" .
+          echo "ARCHIVE_NAME=${archive}" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EasyRedmineTool-${{ github.ref_name }}-${{ matrix.rid }}
+          path: ${{ env.ARCHIVE_NAME }}
+          retention-days: 90
+
+  release-linux:
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [linux-x64, linux-arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish Linux ${{ matrix.rid }}
+        run: >
+          dotnet publish src/EasyRedmineTool.Desktop/EasyRedmineTool.Desktop.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=false
+          --output publish/${{ matrix.rid }}
+
+      - name: Create tar.gz archive
+        run: |
+          version="${{ github.ref_name }}"
+          archive="EasyRedmineTool-${version}-${{ matrix.rid }}.tar.gz"
+          tar -czf "${archive}" -C "publish/${{ matrix.rid }}" .
+          echo "ARCHIVE_NAME=${archive}" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EasyRedmineTool-${{ github.ref_name }}-${{ matrix.rid }}
+          path: ${{ env.ARCHIVE_NAME }}
+          retention-days: 90
+
+  create-release:
+    needs: [release-windows, release-macos, release-linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: EasyRedmineTool-*
+          merge-multiple: true
+          path: release-assets
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: EasyRedmineTool ${{ github.ref_name }}
-          files: ${{ env.ARCHIVE_NAME }}
+          files: release-assets/*
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
