@@ -3,16 +3,20 @@ namespace EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 
-public class EasyRedmineApiClient(HttpClient httpClient) : IEasyRedmineApiClient
+public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiClient>? logger = null) : IEasyRedmineApiClient
 {
     private const int PageLimit = 100;
     private const int MaxPaginationPages = 100;
 
     private readonly HttpClient _httpClient = httpClient;
+    private readonly ILogger<EasyRedmineApiClient> _logger = logger ?? NullLogger<EasyRedmineApiClient>.Instance;
 
     public async Task<HttpResponseMessage> GetCurrentUserAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default)
     {
@@ -149,12 +153,20 @@ public class EasyRedmineApiClient(HttpClient httpClient) : IEasyRedmineApiClient
 
             if (!response.IsSuccessStatusCode)
             {
+                _logger.LogWarning(
+                    "Issue-Batch konnte nicht geladen werden ({StatusCode} {ReasonPhrase}): {IssueIds}",
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    idsParam);
                 continue;
             }
 
             var result = await response.Content.ReadFromJsonAsync<IssueListResponse>(RedmineJson.Options, cancellationToken);
             if (result?.Issues is null)
             {
+                _logger.LogWarning(
+                    "Issue-Batch lieferte keine parsebare Antwort: {IssueIds}",
+                    idsParam);
                 continue;
             }
 
@@ -176,6 +188,14 @@ public class EasyRedmineApiClient(HttpClient httpClient) : IEasyRedmineApiClient
             {
                 issuesById[issueId] = issueResponse.Issue;
             }
+        }
+
+        var unresolvedIds = issueIds.Where(id => !issuesById.ContainsKey(id)).ToList();
+        if (unresolvedIds.Count > 0)
+        {
+            _logger.LogWarning(
+                "Issues konnten nicht geladen werden: {IssueIds}",
+                string.Join(", ", unresolvedIds));
         }
 
         return issueIds

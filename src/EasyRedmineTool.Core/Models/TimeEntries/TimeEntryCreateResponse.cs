@@ -1,7 +1,6 @@
-namespace EasyRedmineTool.Core.Models.TimeEntries
+namespace EasyRedmineTool.Core.Models.TimeEntries;
+
+public class TimeEntryCreateResponse
 {
-    public class TimeEntryCreateResponse
-    {
-        public TimeEntryDto? Time_Entry { get; set; }
-    }
+    public TimeEntryDto? Time_Entry { get; set; }
 }
