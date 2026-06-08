@@ -1,0 +1,223 @@
+name: Prerelease (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit SHA to build
+        required: true
+        type: string
+        default: develop
+      platform:
+        description: Target platform(s)
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - windows
+          - macos
+          - linux
+      create_github_prerelease:
+        description: Also publish a GitHub prerelease (otherwise Actions artifacts only)
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version_label: ${{ steps.meta.outputs.version_label }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore EasyRedmineTool.slnx
+
+      - name: Build
+        run: dotnet build EasyRedmineTool.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test EasyRedmineTool.slnx --no-build --configuration Release --verbosity normal
+
+      - name: Resolve prerelease label
+        id: meta
+        shell: bash
+        run: |
+          ref="${{ inputs.ref }}"
+          safe_ref="${ref#refs/heads/}"
+          safe_ref="${safe_ref//\//-}"
+          version_label="preview-${safe_ref}-${GITHUB_SHA:0:7}-build${GITHUB_RUN_NUMBER}"
+          echo "version_label=${version_label}" >> "$GITHUB_OUTPUT"
+
+  release-windows:
+    needs: prepare
+    if: inputs.platform == 'all' || inputs.platform == 'windows'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish Windows x64
+        run: >
+          dotnet publish src/EasyRedmineTool.Desktop/EasyRedmineTool.Desktop.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishSingleFile=false
+          --output publish/win-x64
+
+      - name: Create ZIP archive
+        shell: pwsh
+        run: |
+          $version = "${{ needs.prepare.outputs.version_label }}"
+          $archive = "EasyRedmineTool-$version-win-x64.zip"
+          Compress-Archive -Path "publish/win-x64/*" -DestinationPath $archive
+          echo "ARCHIVE_NAME=$archive" >> $env:GITHUB_ENV
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EasyRedmineTool-${{ needs.prepare.outputs.version_label }}-win-x64
+          path: ${{ env.ARCHIVE_NAME }}
+          retention-days: 30
+
+  release-macos:
+    needs: prepare
+    if: inputs.platform == 'all' || inputs.platform == 'macos'
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [osx-x64, osx-arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish macOS ${{ matrix.rid }}
+        run: >
+          dotnet publish src/EasyRedmineTool.Desktop/EasyRedmineTool.Desktop.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=false
+          --output publish/${{ matrix.rid }}
+
+      - name: Create ZIP archive
+        run: |
+          version="${{ needs.prepare.outputs.version_label }}"
+          archive="EasyRedmineTool-${version}-${{ matrix.rid }}.zip"
+          cd "publish/${{ matrix.rid }}"
+          zip -r "../../${archive}" .
+          echo "ARCHIVE_NAME=${archive}" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EasyRedmineTool-${{ needs.prepare.outputs.version_label }}-${{ matrix.rid }}
+          path: ${{ env.ARCHIVE_NAME }}
+          retention-days: 30
+
+  release-linux:
+    needs: prepare
+    if: inputs.platform == 'all' || inputs.platform == 'linux'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [linux-x64, linux-arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish Linux ${{ matrix.rid }}
+        run: >
+          dotnet publish src/EasyRedmineTool.Desktop/EasyRedmineTool.Desktop.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=false
+          --output publish/${{ matrix.rid }}
+
+      - name: Create tar.gz archive
+        run: |
+          version="${{ needs.prepare.outputs.version_label }}"
+          archive="EasyRedmineTool-${version}-${{ matrix.rid }}.tar.gz"
+          tar -czf "${archive}" -C "publish/${{ matrix.rid }}" .
+          echo "ARCHIVE_NAME=${archive}" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EasyRedmineTool-${{ needs.prepare.outputs.version_label }}-${{ matrix.rid }}
+          path: ${{ env.ARCHIVE_NAME }}
+          retention-days: 30
+
+  create-prerelease:
+    needs: [prepare, release-windows, release-macos, release-linux]
+    if: ${{ always() && inputs.create_github_prerelease && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: EasyRedmineTool-${{ needs.prepare.outputs.version_label }}-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Create GitHub prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.version_label }}
+          name: EasyRedmineTool ${{ needs.prepare.outputs.version_label }}
+          body: |
+            Manual prerelease build for testing.
+
+            - Source ref: `${{ inputs.ref }}`
+            - Commit: `${{ github.sha }}`
+            - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          files: release-assets/*
+          prerelease: true
+          make_latest: false
