@@ -97,6 +97,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OpenTimeEntries()
     {
         TimeEntriesViewModel.ClearFocusedIssue();
+        TimeEntriesViewModel.ShowFavoritesOnly = true;
         TimeEntriesViewModel.ReloadFavorites();
         _ = TimeEntriesViewModel.ReloadTodayBookedHoursAsync();
         ShowTimeEntries();
