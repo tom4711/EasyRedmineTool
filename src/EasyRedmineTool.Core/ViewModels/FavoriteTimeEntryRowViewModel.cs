@@ -8,6 +8,7 @@ using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
+using EasyRedmineTool.Core.TimeTracking;
 
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -38,6 +39,21 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool isFocused;
+
+    [ObservableProperty]
+    private bool isWorkTimerRunning;
+
+    [ObservableProperty]
+    private bool hasPausedWorkTime;
+
+    [ObservableProperty]
+    private bool canStopAndBook;
+
+    [ObservableProperty]
+    private string elapsedDisplay = string.Empty;
+
+    [ObservableProperty]
+    private string startWorkButtonLabel = "Start";
 
     public FavoriteTimeEntryRowViewModel(
         TimeEntriesViewModel parent,
@@ -125,8 +141,34 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         RedmineLinks.OpenIssueInBrowser(settings.BaseUrl, Ticket.Id);
     }
 
+    internal void UpdateWorkTimerState(WorkTimerSession? session, bool isRunning, DateTime now)
+    {
+        IsWorkTimerRunning = isRunning;
+        HasPausedWorkTime = session is not null && !isRunning && session.HasTrackedTime(now);
+        ElapsedDisplay = session is null ? string.Empty : WorkTimerFormatting.FormatElapsed(session.GetElapsed(now));
+        CanStopAndBook = session is not null && session.HasTrackedTime(now);
+        StartWorkButtonLabel = HasPausedWorkTime ? "Weiter" : "Start";
+
+        StartWorkCommand.NotifyCanExecuteChanged();
+        PauseWorkCommand.NotifyCanExecuteChanged();
+        StopAndBookWorkCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanStartOrResumeWork => !IsWorkTimerRunning;
+
+    [RelayCommand(CanExecute = nameof(CanStartOrResumeWork))]
+    private void StartWork() => _parent.StartWork(this);
+
+    [RelayCommand(CanExecute = nameof(IsWorkTimerRunning))]
+    private void PauseWork() => _parent.PauseWork(this);
+
+    [RelayCommand(CanExecute = nameof(CanStopAndBook))]
+    private async Task StopAndBookWorkAsync() => await _parent.StopWorkAndBookAsync(this);
+
     [RelayCommand]
-    private async Task CreateTimeEntryAsync()
+    private async Task CreateTimeEntryAsync() => await SubmitTimeEntryAsync();
+
+    public async Task SubmitTimeEntryAsync()
     {
         if (IsSubmitting)
         {

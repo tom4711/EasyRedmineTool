@@ -32,6 +32,17 @@
       <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
       <Setter Property="BorderThickness" Value="2" />
     </Style>
+    <Style Selector="Border.favorite-booking-row.timer-running">
+      <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="TextBlock.timer-elapsed">
+      <Setter Property="FontFamily" Value="Consolas, Courier New, monospace" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="MinWidth" Value="64" />
+    </Style>
     <Style Selector="TextBlock.favorite-row-id">
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="FontSize" Value="13" />
@@ -112,6 +123,26 @@
         <TextBlock Classes="today-booked-caption" Text="Heute gebucht" />
         <TextBlock Classes="today-booked-value" Text="{Binding TodayBookedHoursDisplay}" />
       </StackPanel>
+
+      <Border Margin="0,8,0,0"
+              Padding="12,8"
+              CornerRadius="8"
+              Background="{DynamicResource FavoriteRowBackgroundBrush}"
+              BorderBrush="{DynamicResource AppAccentBrush}"
+              BorderThickness="1"
+              IsVisible="{Binding ActiveWorkTimerLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <materialIcons:MaterialIcon Kind="TimerOutline"
+                                      Width="18"
+                                      Height="18"
+                                      VerticalAlignment="Center"
+                                      Foreground="{DynamicResource AppAccentBrush}" />
+          <TextBlock Text="{Binding ActiveWorkTimerLabel}"
+                     FontWeight="SemiBold"
+                     VerticalAlignment="Center"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
@@ -159,8 +190,24 @@
               <DataTemplate x:DataType="vm:FavoriteTimeEntryRowViewModel">
                 <Border Classes="favorite-booking-row"
                         Classes.focused="{Binding IsFocused}"
+                        Classes.timer-running="{Binding IsWorkTimerRunning}"
                         Margin="0,0,0,10">
                   <StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Classes="timer-elapsed"
+                                 Text="{Binding ElapsedDisplay}"
+                                 IsVisible="{Binding CanStopAndBook}" />
+                      <Button Classes="secondary compact"
+                              Content="{Binding StartWorkButtonLabel}"
+                              Command="{Binding StartWorkCommand}" />
+                      <Button Classes="secondary compact"
+                              Content="Pause"
+                              Command="{Binding PauseWorkCommand}" />
+                      <Button Classes="primary compact"
+                              Content="Stop &amp; Buchen"
+                              Command="{Binding StopAndBookWorkCommand}" />
+                    </StackPanel>
+
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                       <TextBlock Grid.Column="0"
                                  Classes="favorite-row-id"
