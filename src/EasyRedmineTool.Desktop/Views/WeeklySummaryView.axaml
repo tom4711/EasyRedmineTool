@@ -63,11 +63,12 @@
           <TextBlock Text="{Binding CurrentQuarterLabel}" Opacity="0.85" TextWrapping="Wrap" />
         </StackPanel>
         <Button Grid.Column="1"
-                Classes="secondary"
+                Classes.primary="{Binding !HasLoadedData}"
+                Classes.secondary="{Binding HasLoadedData}"
                 VerticalAlignment="Top"
                 IsEnabled="{Binding !IsBusy}"
                 Command="{Binding ReloadWeeklySummaryCommand}"
-                Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Aktualisieren}" />
+                Content="{Binding LoadActionLabel}" />
       </Grid>
 
       <TextBlock Text="{Binding WeeklyTotalHours, StringFormat=Gesamtstunden im Zeitraum: {0}}" FontWeight="SemiBold" />

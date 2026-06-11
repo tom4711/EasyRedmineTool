@@ -13,6 +13,25 @@ using Microsoft.Extensions.Logging.Abstractions;
 public class WeeklySummaryViewModelTests
 {
     [Fact]
+    public void PrepareView_does_not_request_time_entries()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret"
+        });
+
+        var viewModel = new WeeklySummaryViewModel(context.SettingsService, context.TimeEntryService);
+        viewModel.PrepareView();
+
+        Assert.Equal(0, context.TimeEntryService.LoadCallCount);
+        Assert.False(viewModel.HasLoadedData);
+        Assert.Contains("Daten laden", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Contains("Q", viewModel.CurrentQuarterLabel, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ReloadWeeklySummaryAsync_shows_message_when_api_key_missing()
     {
         using var context = TestContext.Create();
@@ -61,7 +80,39 @@ public class WeeklySummaryViewModelTests
         await firstCall;
 
         Assert.Equal(2, viewModel.WeeklyTotalHours);
+        Assert.True(viewModel.HasLoadedData);
+        Assert.Equal("Aktualisieren", viewModel.LoadActionLabel);
         Assert.False(viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task PrepareView_keeps_loaded_data_without_new_request()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret"
+        });
+        context.TimeEntryService.NextEntries =
+        [
+            new TimeEntryDto
+            {
+                Issue_Id = 1,
+                Spent_On = RedmineDates.FormatSpentOn(DateTime.Today),
+                Hours = 4
+            }
+        ];
+
+        var viewModel = new WeeklySummaryViewModel(context.SettingsService, context.TimeEntryService);
+        await viewModel.ReloadWeeklySummaryAsync();
+        var callsAfterLoad = context.TimeEntryService.LoadCallCount;
+
+        viewModel.PrepareView();
+
+        Assert.Equal(callsAfterLoad, context.TimeEntryService.LoadCallCount);
+        Assert.True(viewModel.HasLoadedData);
+        Assert.Equal(4, viewModel.WeeklyTotalHours);
     }
 
     private sealed class TestContext : IDisposable
@@ -97,6 +148,8 @@ public class WeeklySummaryViewModelTests
     private sealed class DelayedTimeEntryService : ITimeEntryService
     {
         private int _callCount;
+
+        public int LoadCallCount => _callCount;
 
         public TimeSpan FirstCallDelay { get; set; }
         public IReadOnlyList<TimeEntryDto> NextEntries { get; set; } = [];
