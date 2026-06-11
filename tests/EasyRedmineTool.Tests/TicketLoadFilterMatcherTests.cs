@@ -20,6 +20,30 @@ public class TicketLoadFilterMatcherTests
     }
 
     [Fact]
+    public void MatchesLastBookedUntil_with_booking_data_excludes_unbooked_and_recently_booked_issues()
+    {
+        var until = new DateTime(2026, 6, 10);
+        var bookedAfterFilter = new HashSet<int> { 2, 5 };
+
+        Assert.False(TicketLoadFilterMatcher.MatchesLastBookedUntil(
+            new IssueDto { Id = 1 },
+            until,
+            bookedAfterFilter));
+        Assert.False(TicketLoadFilterMatcher.MatchesLastBookedUntil(
+            new IssueDto { Id = 2, LastTimeEntryOn = new DateTime(2026, 6, 11) },
+            until,
+            bookedAfterFilter));
+        Assert.True(TicketLoadFilterMatcher.MatchesLastBookedUntil(
+            new IssueDto { Id = 3, LastTimeEntryOn = new DateTime(2026, 6, 9) },
+            until,
+            bookedAfterFilter));
+        Assert.True(TicketLoadFilterMatcher.MatchesLastBookedUntil(
+            new IssueDto { Id = 4, LastTimeEntryOn = new DateTime(2026, 6, 10) },
+            until,
+            bookedAfterFilter));
+    }
+
+    [Fact]
     public void MatchesAssignee_respects_me_unassigned_and_all()
     {
         var issueAssignedToMe = new IssueDto { Assigned_To = new NamedEntityDto { Id = 7 } };

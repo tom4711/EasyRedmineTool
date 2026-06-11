@@ -101,6 +101,7 @@ public class TimeEntriesViewModelTests
         });
 
         var viewModel = new TimeEntriesViewModel(context.SettingsService, context.TimeEntryService);
+        viewModel.ReloadFavorites();
         Assert.Single(viewModel.FavoriteRows);
 
         viewModel.ShowAllTicketsViewCommand.Execute(null);
@@ -127,6 +128,7 @@ public class TimeEntriesViewModelTests
         });
 
         var viewModel = new TimeEntriesViewModel(context.SettingsService, context.TimeEntryService);
+        viewModel.ReloadFavorites();
         viewModel.FavoriteFilterText = "beta";
 
         Assert.Empty(viewModel.FilteredFavoriteRows);
@@ -157,6 +159,7 @@ public class TimeEntriesViewModelTests
         });
 
         var viewModel = new TimeEntriesViewModel(context.SettingsService, context.TimeEntryService);
+        viewModel.ReloadFavorites();
         viewModel.FavoriteFilterText = "beta";
 
         Assert.Single(viewModel.FilteredFavoriteRows);
@@ -271,6 +274,7 @@ public class TimeEntriesViewModelTests
         public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
             string baseUrl,
             string apiKey,
+            int? projectId = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>>([]);
 

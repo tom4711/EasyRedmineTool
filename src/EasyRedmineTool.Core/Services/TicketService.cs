@@ -50,8 +50,11 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
         var knownIds = new HashSet<int>(primaryIssues.Select(i => i.Id));
 
         var to = DateTime.Today;
-        var from = to.AddMonths(-TimeEntryLookbackMonths);
+        var from = GetTimeEntryFetchFrom(to, filter.LastBookedUntil);
         var timeEntries = await GetTimeEntriesWithCacheAsync(baseUrl, apiKey, from, to, cancellationToken);
+        var issueIdsBookedAfterFilter = filter.LastBookedUntil.HasValue
+            ? BuildIssueIdsWithSpentOnAfter(timeEntries, filter.LastBookedUntil.Value)
+            : null;
 
         var additionalIssueIds = timeEntries
             .Select(entry => entry.GetIssueId())
@@ -81,8 +84,15 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
         var primaryIds = primaryIssues.Select(issue => issue.Id).ToHashSet();
         var filteredTickets = tickets
             .Where(ticket => primaryIds.Contains(ticket.Id)
-                ? TicketLoadFilterMatcher.MatchesLastBookedUntil(ticket, filter.LastBookedUntil)
-                : TicketLoadFilterMatcher.Matches(ticket, filter, currentUserId))
+                ? TicketLoadFilterMatcher.MatchesLastBookedUntil(
+                    ticket,
+                    filter.LastBookedUntil,
+                    issueIdsBookedAfterFilter)
+                : TicketLoadFilterMatcher.Matches(
+                    ticket,
+                    filter,
+                    currentUserId,
+                    issueIdsBookedAfterFilter))
             .ToList();
 
         var primaryTicketCount = filteredTickets.Count(ticket => primaryIds.Contains(ticket.Id));
@@ -107,6 +117,33 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
         string apiKey,
         CancellationToken cancellationToken = default) =>
         _apiClient.GetIssueStatusesAsync(baseUrl, apiKey, cancellationToken);
+
+    internal static DateTime GetTimeEntryFetchFrom(DateTime to, DateTime? lastBookedUntil)
+    {
+        var defaultFrom = to.AddMonths(-TimeEntryLookbackMonths);
+        if (!lastBookedUntil.HasValue)
+        {
+            return defaultFrom;
+        }
+
+        var filterFrom = lastBookedUntil.Value.Date;
+        return filterFrom < defaultFrom ? filterFrom : defaultFrom;
+    }
+
+    internal static HashSet<int> BuildIssueIdsWithSpentOnAfter(
+        IReadOnlyList<TimeEntryDto> timeEntries,
+        DateTime lastBookedUntil) =>
+        timeEntries
+            .Select(entry => new
+            {
+                IssueId = entry.GetIssueId(),
+                SpentOn = RedmineDates.TryParseSpentOn(entry.Spent_On)
+            })
+            .Where(x => x.IssueId > 0
+                && x.SpentOn.HasValue
+                && x.SpentOn.Value.Date > lastBookedUntil.Date)
+            .Select(x => x.IssueId)
+            .ToHashSet();
 
     internal static Dictionary<int, DateTime> BuildLastTimeEntryLookup(IReadOnlyList<TimeEntryDto> timeEntries)
     {

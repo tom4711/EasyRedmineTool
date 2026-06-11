@@ -29,6 +29,35 @@ public class TimeEntryCustomFieldSupportTests
     }
 
     [Fact]
+    public void CreateRows_prefers_existing_entry_values_over_defaults()
+    {
+        var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [
+                new TimeEntryCustomFieldDefinitionDto
+                {
+                    Id = 5,
+                    Name = "Produktdaten Hierarchie",
+                    Possible_Values = ["A", "B"]
+                }
+            ],
+            [],
+            new AppSettings
+            {
+                TimeEntryCustomFieldDefaults =
+                [
+                    new TimeEntryCustomFieldDefault { Id = 5, Name = "Produktdaten Hierarchie", Value = "A" }
+                ]
+            },
+            existingValues:
+            [
+                new TimeEntryCustomFieldValueDto { Id = 5, Name = "Produktdaten Hierarchie", Value = "B" }
+            ]);
+
+        Assert.Single(rows);
+        Assert.Equal("B", rows[0].Value);
+    }
+
+    [Fact]
     public void BuildValues_includes_only_filled_fields()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(

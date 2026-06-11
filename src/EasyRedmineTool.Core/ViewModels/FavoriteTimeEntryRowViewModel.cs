@@ -107,6 +107,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         var definitions = await _timeEntryService.GetCustomFieldDefinitionsAsync(
             settings.BaseUrl,
             settings.ApiKey,
+            Ticket.Project?.Id,
             cancellationToken);
 
         var recentValues = await _timeEntryService.GetRecentCustomFieldValuesAsync(

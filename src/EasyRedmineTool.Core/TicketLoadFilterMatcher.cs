@@ -4,7 +4,11 @@ using EasyRedmineTool.Core.Models.Tickets;
 
 public static class TicketLoadFilterMatcher
 {
-    public static bool Matches(IssueDto issue, TicketLoadFilter filter, int? currentUserId)
+    public static bool Matches(
+        IssueDto issue,
+        TicketLoadFilter filter,
+        int? currentUserId,
+        IReadOnlySet<int>? issueIdsBookedAfterFilter = null)
     {
         if (!MatchesAssignee(issue, filter.Assignee, currentUserId))
         {
@@ -16,7 +20,7 @@ public static class TicketLoadFilterMatcher
             return false;
         }
 
-        return MatchesLastBookedUntil(issue, filter.LastBookedUntil);
+        return MatchesLastBookedUntil(issue, filter.LastBookedUntil, issueIdsBookedAfterFilter);
     }
 
     public static bool MatchesAssignee(IssueDto issue, TicketAssigneeFilter filter, int? currentUserId) =>
@@ -37,11 +41,29 @@ public static class TicketLoadFilterMatcher
             _ => true
         };
 
-    public static bool MatchesLastBookedUntil(IssueDto issue, DateTime? lastBookedUntil)
+    public static bool MatchesLastBookedUntil(
+        IssueDto issue,
+        DateTime? lastBookedUntil,
+        IReadOnlySet<int>? issueIdsBookedAfterFilter = null)
     {
         if (!lastBookedUntil.HasValue)
         {
             return true;
+        }
+
+        if (issueIdsBookedAfterFilter is not null)
+        {
+            if (issueIdsBookedAfterFilter.Contains(issue.Id))
+            {
+                return false;
+            }
+
+            if (!issue.LastTimeEntryOn.HasValue)
+            {
+                return false;
+            }
+
+            return issue.LastTimeEntryOn.Value.Date <= lastBookedUntil.Value.Date;
         }
 
         if (!issue.LastTimeEntryOn.HasValue)

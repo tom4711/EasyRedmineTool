@@ -62,6 +62,10 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
 
     public ObservableCollection<TimeEntryActivityDto> Activities { get; } = [];
 
+    public ObservableCollection<TimeEntryCustomFieldRowViewModel> CustomFields { get; } = [];
+
+    public bool HasCustomFields => CustomFields.Count > 0;
+
     public string TicketLabel
     {
         get
@@ -93,11 +97,13 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
         {
             Hours = _entry.Hours.ToString("0.##", CultureInfo.InvariantCulture);
             Comments = _entry.Comments;
-            _ = LoadActivitiesAsync();
+            _ = LoadEditFormDataAsync();
         }
         else
         {
             IsDeleteConfirmationVisible = false;
+            CustomFields.Clear();
+            OnPropertyChanged(nameof(HasCustomFields));
         }
     }
 
@@ -149,6 +155,13 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             return;
         }
 
+        var customFieldError = TimeEntryCustomFieldSupport.Validate(CustomFields);
+        if (customFieldError is not null)
+        {
+            _parent.SetStatusMessage($"Eintrag #{EntryId}: {customFieldError}");
+            return;
+        }
+
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
@@ -171,12 +184,14 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
                     Hours = parsedHours,
                     SpentOn = _entry.Spent_On,
                     ActivityId = SelectedActivity.Id,
-                    Comments = Comments
+                    Comments = Comments,
+                    CustomFields = TimeEntryCustomFieldSupport.BuildValues(CustomFields).ToList()
                 });
 
             _parent.SetStatusMessage(result.Message);
             if (result.Success)
             {
+                TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, CustomFields);
                 IsEditing = false;
                 await _parent.ReloadTodayBookedHoursAsync();
             }
@@ -225,7 +240,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadActivitiesAsync()
+    private async Task LoadEditFormDataAsync()
     {
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -233,12 +248,13 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             return;
         }
 
+        var projectId = CachedTicket?.Project?.Id;
+
         var loadedActivities = await _timeEntryService.GetActivitiesAsync(
             settings.BaseUrl,
             settings.ApiKey,
             IssueId,
-            CachedTicket?.Project?.Id,
-            CancellationToken.None);
+            projectId);
 
         Activities.Clear();
         foreach (var activity in loadedActivities.OrderBy(activity => activity.Name))
@@ -249,5 +265,28 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
         SelectedActivity = Activities.FirstOrDefault(activity => activity.Id == _entry.Activity_Id)
             ?? Activities.FirstOrDefault(activity => activity.Id == _entry.Activity?.Id)
             ?? Activities.FirstOrDefault();
+
+        var definitions = await _timeEntryService.GetCustomFieldDefinitionsAsync(
+            settings.BaseUrl,
+            settings.ApiKey,
+            projectId);
+
+        var recentValues = await _timeEntryService.GetRecentCustomFieldValuesAsync(
+            settings.BaseUrl,
+            settings.ApiKey,
+            IssueId,
+            projectId);
+
+        CustomFields.Clear();
+        foreach (var row in TimeEntryCustomFieldSupport.CreateRows(
+                     definitions,
+                     recentValues,
+                     settings,
+                     _entry.Custom_Fields))
+        {
+            CustomFields.Add(row);
+        }
+
+        OnPropertyChanged(nameof(HasCustomFields));
     }
 }

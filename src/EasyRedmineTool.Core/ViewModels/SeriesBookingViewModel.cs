@@ -119,6 +119,11 @@ public partial class SeriesBookingViewModel : ViewModelBase
     {
         ReloadTickets();
         StatusMessage = string.Empty;
+
+        if (SelectedTicket is not null)
+        {
+            _ = LoadTicketDetailsAsync();
+        }
     }
 
     partial void OnSelectedTicketChanged(IssueDto? value)
@@ -517,6 +522,7 @@ public partial class SeriesBookingViewModel : ViewModelBase
             var definitions = await _timeEntryService.GetCustomFieldDefinitionsAsync(
                 settings.BaseUrl,
                 settings.ApiKey,
+                ticket.Project?.Id,
                 loadToken);
 
             if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))

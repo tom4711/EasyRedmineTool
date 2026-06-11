@@ -10,11 +10,13 @@ public static class TimeEntryCustomFieldSupport
     public static IReadOnlyList<TimeEntryCustomFieldRowViewModel> CreateRows(
         IReadOnlyList<TimeEntryCustomFieldDefinitionDto> definitions,
         IReadOnlyList<TimeEntryCustomFieldValueDto> recentValues,
-        AppSettings settings)
+        AppSettings settings,
+        IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null)
     {
         if (definitions.Count == 0 &&
             settings.TimeEntryCustomFieldDefaults.Count == 0 &&
-            recentValues.Count == 0)
+            recentValues.Count == 0 &&
+            existingValues is not { Count: > 0 })
         {
             return [];
         }
@@ -28,6 +30,17 @@ public static class TimeEntryCustomFieldSupport
             if (!string.IsNullOrWhiteSpace(recentValue.Value))
             {
                 savedValues[recentValue.Id] = recentValue.Value;
+            }
+        }
+
+        if (existingValues is not null)
+        {
+            foreach (var existingValue in existingValues)
+            {
+                if (!string.IsNullOrWhiteSpace(existingValue.Value))
+                {
+                    savedValues[existingValue.Id] = existingValue.Value;
+                }
             }
         }
 
