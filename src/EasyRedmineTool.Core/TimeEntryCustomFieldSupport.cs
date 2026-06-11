@@ -8,79 +8,44 @@ using EasyRedmineTool.Core.ViewModels;
 public static class TimeEntryCustomFieldSupport
 {
     public static IReadOnlyList<TimeEntryCustomFieldRowViewModel> CreateRows(
-        IReadOnlyList<TimeEntryCustomFieldDefinitionDto> definitions,
         IReadOnlyList<TimeEntryCustomFieldValueDto> recentValues,
         AppSettings settings,
         IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null)
     {
-        if (definitions.Count == 0 &&
-            settings.TimeEntryCustomFieldDefaults.Count == 0 &&
-            recentValues.Count == 0 &&
-            existingValues is not { Count: > 0 })
-        {
-            return [];
-        }
+        var fields = new Dictionary<int, (string Name, string Value)>();
 
-        var savedValues = settings.TimeEntryCustomFieldDefaults.ToDictionary(
-            field => field.Id,
-            field => field.Value);
+        foreach (var field in settings.TimeEntryCustomFieldDefaults)
+        {
+            fields[field.Id] = (field.Name, field.Value);
+        }
 
         foreach (var recentValue in recentValues)
         {
-            if (!string.IsNullOrWhiteSpace(recentValue.Value))
-            {
-                savedValues[recentValue.Id] = recentValue.Value;
-            }
+            UpsertField(fields, recentValue);
         }
 
         if (existingValues is not null)
         {
             foreach (var existingValue in existingValues)
             {
-                if (!string.IsNullOrWhiteSpace(existingValue.Value))
-                {
-                    savedValues[existingValue.Id] = existingValue.Value;
-                }
+                UpsertField(fields, existingValue);
             }
         }
 
-        if (definitions.Count > 0)
+        if (fields.Count == 0)
         {
-            return definitions
-                .OrderBy(field => field.Name)
-                .Select(field => new TimeEntryCustomFieldRowViewModel(
-                    field.Id,
-                    field.Name,
-                    field.Is_Required,
-                    field.HasPossibleValues,
-                    field.Possible_Values,
-                    savedValues.GetValueOrDefault(field.Id) ?? field.Default_Value ?? string.Empty))
-                .ToList();
+            return [];
         }
 
-        if (settings.TimeEntryCustomFieldDefaults.Count > 0)
-        {
-            return settings.TimeEntryCustomFieldDefaults
-                .OrderBy(field => field.Name)
-                .Select(field => new TimeEntryCustomFieldRowViewModel(
-                    field.Id,
-                    field.Name,
-                    isRequired: true,
-                    hasPossibleValues: false,
-                    possibleValues: [],
-                    value: field.Value))
-                .ToList();
-        }
-
-        return recentValues
-            .OrderBy(field => field.Name)
+        return fields
+            .OrderBy(field => field.Value.Name)
             .Select(field => new TimeEntryCustomFieldRowViewModel(
-                field.Id,
-                field.Name,
+                field.Key,
+                field.Value.Name,
                 isRequired: true,
                 hasPossibleValues: false,
                 possibleValues: [],
-                value: field.Value ?? string.Empty))
+                value: field.Value.Value))
             .ToList();
     }
 
@@ -125,5 +90,25 @@ public static class TimeEntryCustomFieldSupport
         }
 
         settingsService.Update(settings => settings.TimeEntryCustomFieldDefaults = defaults);
+    }
+
+    private static void UpsertField(
+        Dictionary<int, (string Name, string Value)> fields,
+        TimeEntryCustomFieldValueDto value)
+    {
+        if (!fields.TryGetValue(value.Id, out var current))
+        {
+            fields[value.Id] = (value.Name, value.Value ?? string.Empty);
+            return;
+        }
+
+        var name = string.IsNullOrWhiteSpace(value.Name) ? current.Name : value.Name;
+        if (!string.IsNullOrWhiteSpace(value.Value))
+        {
+            fields[value.Id] = (name, value.Value);
+            return;
+        }
+
+        fields[value.Id] = (name, current.Value);
     }
 }

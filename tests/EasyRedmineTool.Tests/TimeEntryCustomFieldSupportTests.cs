@@ -11,16 +11,13 @@ public class TimeEntryCustomFieldSupportTests
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
             [
-                new TimeEntryCustomFieldDefinitionDto
+                new TimeEntryCustomFieldValueDto
                 {
                     Id = 5,
                     Name = "Produktdaten Hierarchie",
-                    Is_Required = true,
-                    Field_Format = "list",
-                    Possible_Values = ["A", "B"]
+                    Value = string.Empty
                 }
             ],
-            [],
             new AppSettings());
 
         var message = TimeEntryCustomFieldSupport.Validate(rows);
@@ -32,14 +29,6 @@ public class TimeEntryCustomFieldSupportTests
     public void CreateRows_prefers_existing_entry_values_over_defaults()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
-            [
-                new TimeEntryCustomFieldDefinitionDto
-                {
-                    Id = 5,
-                    Name = "Produktdaten Hierarchie",
-                    Possible_Values = ["A", "B"]
-                }
-            ],
             [],
             new AppSettings
             {
@@ -58,17 +47,32 @@ public class TimeEntryCustomFieldSupportTests
     }
 
     [Fact]
+    public void CreateRows_uses_recent_values_without_defaults()
+    {
+        var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [
+                new TimeEntryCustomFieldValueDto
+                {
+                    Id = 5,
+                    Name = "Produktdaten Hierarchie",
+                    Value = "Projekt A"
+                }
+            ],
+            new AppSettings());
+
+        Assert.Single(rows);
+        Assert.Equal("Projekt A", rows[0].Value);
+    }
+
+    [Fact]
     public void BuildValues_includes_only_filled_fields()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
             [
-                new TimeEntryCustomFieldDefinitionDto { Id = 1, Name = "A", Possible_Values = ["x"] },
-                new TimeEntryCustomFieldDefinitionDto { Id = 2, Name = "B" }
+                new TimeEntryCustomFieldValueDto { Id = 1, Name = "A", Value = "x" },
+                new TimeEntryCustomFieldValueDto { Id = 2, Name = "B", Value = string.Empty }
             ],
-            [],
             new AppSettings());
-
-        rows[0].SelectedValue = "x";
 
         var values = TimeEntryCustomFieldSupport.BuildValues(rows);
 

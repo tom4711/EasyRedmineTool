@@ -271,13 +271,6 @@ public class TimeEntriesViewModelTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TimeEntryActivityDto>>([]);
 
-        public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
-            string baseUrl,
-            string apiKey,
-            int? projectId = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>>([]);
-
         public Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentCustomFieldValuesAsync(
             string baseUrl,
             string apiKey,

@@ -16,21 +16,6 @@ public class TimeEntryService(
     private readonly ILogger<TimeEntryService> _logger = logger;
     private readonly TimeEntryFormDataCache _formDataCache = new();
 
-    public async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
-        string baseUrl,
-        string apiKey,
-        int? projectId = null,
-        CancellationToken cancellationToken = default)
-    {
-        var cacheKey = TimeEntryFormDataCache.BuildDefinitionsKey(baseUrl, apiKey);
-        var allDefinitions = await _formDataCache.GetOrLoadCustomFieldDefinitionsAsync(
-            cacheKey,
-            token => _apiClient.GetAllTimeEntryCustomFieldDefinitionsAsync(baseUrl, apiKey, token),
-            cancellationToken);
-
-        return TimeEntryFormDataCache.FilterDefinitionsForProject(allDefinitions, projectId);
-    }
-
     public Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentCustomFieldValuesAsync(
         string baseUrl,
         string apiKey,
