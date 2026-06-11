@@ -22,5 +22,7 @@ public class TimeEntryCustomFieldDefinitionDto
 
     public List<string> Possible_Values { get; set; } = [];
 
+    public List<int> Project_Ids { get; set; } = [];
+
     public bool HasPossibleValues => Possible_Values.Count > 0;
 }

@@ -336,7 +336,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return [];
     }
 
-    public async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetTimeEntryCustomFieldDefinitionsAsync(
+    public async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetAllTimeEntryCustomFieldDefinitionsAsync(
         string baseUrl,
         string apiKey,
         CancellationToken cancellationToken = default)
@@ -514,11 +514,40 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
                 Field_Format = ReadString(fieldElement, "field_format"),
                 Is_Required = ReadBool(fieldElement, "is_required"),
                 Default_Value = ReadNullableString(fieldElement, "default_value"),
-                Possible_Values = ReadPossibleValues(fieldElement)
+                Possible_Values = ReadPossibleValues(fieldElement),
+                Project_Ids = ReadProjectIds(fieldElement)
             });
         }
 
         return definitions;
+    }
+
+    private static List<int> ReadProjectIds(JsonElement fieldElement)
+    {
+        if (!fieldElement.TryGetProperty("projects", out var projectsElement) ||
+            projectsElement.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var projectIds = new List<int>();
+        foreach (var projectElement in projectsElement.EnumerateArray())
+        {
+            if (projectElement.ValueKind == JsonValueKind.Number && projectElement.TryGetInt32(out var projectId))
+            {
+                projectIds.Add(projectId);
+                continue;
+            }
+
+            if (projectElement.ValueKind == JsonValueKind.Object &&
+                projectElement.TryGetProperty("id", out var idElement) &&
+                idElement.TryGetInt32(out projectId))
+            {
+                projectIds.Add(projectId);
+            }
+        }
+
+        return projectIds;
     }
 
     private static List<string> ReadPossibleValues(JsonElement fieldElement)

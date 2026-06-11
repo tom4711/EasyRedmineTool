@@ -14,12 +14,22 @@ public class TimeEntryService(
     private readonly IEasyRedmineApiClient _apiClient = apiClient;
     private readonly ITicketService _ticketService = ticketService;
     private readonly ILogger<TimeEntryService> _logger = logger;
+    private readonly TimeEntryFormDataCache _formDataCache = new();
 
-    public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
+    public async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
         string baseUrl,
         string apiKey,
-        CancellationToken cancellationToken = default) =>
-        _apiClient.GetTimeEntryCustomFieldDefinitionsAsync(baseUrl, apiKey, cancellationToken);
+        int? projectId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var cacheKey = TimeEntryFormDataCache.BuildDefinitionsKey(baseUrl, apiKey);
+        var allDefinitions = await _formDataCache.GetOrLoadCustomFieldDefinitionsAsync(
+            cacheKey,
+            token => _apiClient.GetAllTimeEntryCustomFieldDefinitionsAsync(baseUrl, apiKey, token),
+            cancellationToken);
+
+        return TimeEntryFormDataCache.FilterDefinitionsForProject(allDefinitions, projectId);
+    }
 
     public Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentCustomFieldValuesAsync(
         string baseUrl,
@@ -36,9 +46,18 @@ public class TimeEntryService(
         int? projectId = null,
         CancellationToken cancellationToken = default)
     {
+        var cacheKey = TimeEntryFormDataCache.BuildActivitiesKey(baseUrl, apiKey, issueId, projectId);
+
         try
         {
-            return await _apiClient.GetTimeEntryActivitiesAsync(baseUrl, apiKey, issueId, projectId, cancellationToken);
+            return await _formDataCache.GetOrLoadActivitiesAsync(
+                cacheKey,
+                token => _apiClient.GetTimeEntryActivitiesAsync(baseUrl, apiKey, issueId, projectId, token),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -117,6 +136,7 @@ public class TimeEntryService(
             if (response.IsSuccessStatusCode)
             {
                 _ticketService.InvalidateTimeEntryCache();
+                _formDataCache.Invalidate();
 
                 return new TimeEntryOperationResult
                 {

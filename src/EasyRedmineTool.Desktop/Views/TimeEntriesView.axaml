@@ -264,6 +264,33 @@
                                    Text="{Binding Comments}"
                                    PlaceholderText="optional" />
                         </StackPanel>
+
+                        <StackPanel Spacing="8" IsVisible="{Binding HasCustomFields}">
+                          <ItemsControl ItemsSource="{Binding CustomFields}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate DataType="vm:TimeEntryCustomFieldRowViewModel">
+                                <Grid ColumnDefinitions="140,*" ColumnSpacing="12" Margin="0,0,0,8">
+                                  <TextBlock Grid.Column="0"
+                                             Classes="inline-field-label"
+                                             Text="{Binding Name}"
+                                             TextWrapping="Wrap" />
+                                  <ComboBox Grid.Column="1"
+                                            IsVisible="{Binding HasPossibleValues}"
+                                            ItemsSource="{Binding PossibleValues}"
+                                            SelectedItem="{Binding SelectedValue}"
+                                            HorizontalAlignment="Stretch"
+                                            PlaceholderText="Bitte wählen …" />
+                                  <TextBox Grid.Column="1"
+                                           IsVisible="{Binding !HasPossibleValues}"
+                                           Text="{Binding Value}"
+                                           Classes="row-field"
+                                           HorizontalAlignment="Stretch"
+                                           PlaceholderText="Wert eingeben …" />
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
                       </StackPanel>
 
                       <Border Classes="today-entry-delete-warning"

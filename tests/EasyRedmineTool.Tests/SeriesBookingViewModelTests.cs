@@ -211,6 +211,7 @@ public class SeriesBookingViewModelTests
         public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
             string baseUrl,
             string apiKey,
+            int? projectId = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>>([]);
 
