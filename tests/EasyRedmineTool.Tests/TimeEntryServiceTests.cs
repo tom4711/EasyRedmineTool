@@ -67,6 +67,48 @@ public class TimeEntryServiceTests
     }
 
     [Fact]
+    public async Task UpdateTimeEntryAsync_invalidates_ticket_cache_on_success()
+    {
+        var apiClient = new FakeApiClient
+        {
+            CreateResponse = new HttpResponseMessage(HttpStatusCode.OK)
+        };
+        var ticketService = new RecordingTicketService();
+        var service = new TimeEntryService(apiClient, ticketService, NullLogger<TimeEntryService>.Instance);
+
+        var result = await service.UpdateTimeEntryAsync(
+            "https://redmine.example/",
+            "secret",
+            7,
+            new TimeEntryUpdateRequest
+            {
+                IssueId = 42,
+                Hours = 2,
+                SpentOn = "2026-06-07",
+                ActivityId = 9
+            });
+
+        Assert.True(result.Success);
+        Assert.Equal(1, ticketService.InvalidateCount);
+    }
+
+    [Fact]
+    public async Task DeleteTimeEntryAsync_invalidates_ticket_cache_on_success()
+    {
+        var apiClient = new FakeApiClient
+        {
+            CreateResponse = new HttpResponseMessage(HttpStatusCode.NoContent)
+        };
+        var ticketService = new RecordingTicketService();
+        var service = new TimeEntryService(apiClient, ticketService, NullLogger<TimeEntryService>.Instance);
+
+        var result = await service.DeleteTimeEntryAsync("https://redmine.example/", "secret", 7);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, ticketService.InvalidateCount);
+    }
+
+    [Fact]
     public async Task GetMyTimeEntriesAsync_returns_failure_result_on_exception()
     {
         var apiClient = new FakeApiClient
@@ -151,6 +193,21 @@ public class TimeEntryServiceTests
             string baseUrl,
             string apiKey,
             TimeEntryCreateRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateResponse);
+
+        public Task<HttpResponseMessage> UpdateTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
+            TimeEntryUpdateRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateResponse);
+
+        public Task<HttpResponseMessage> DeleteTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(CreateResponse);
     }

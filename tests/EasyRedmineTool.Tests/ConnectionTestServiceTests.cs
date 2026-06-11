@@ -171,5 +171,20 @@ public class ConnectionTestServiceTests
             TimeEntryCreateRequest request,
             CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
+
+        public Task<HttpResponseMessage> UpdateTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
+            TimeEntryUpdateRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<HttpResponseMessage> DeleteTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
     }
 }

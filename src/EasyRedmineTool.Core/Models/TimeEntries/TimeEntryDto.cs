@@ -19,6 +19,8 @@ public class TimeEntryDto
     [JsonPropertyName("activity_id")]
     public int Activity_Id { get; set; }
 
+    public TimeEntryActivityDto? Activity { get; set; }
+
     public string Comments { get; set; } = string.Empty;
 
     public int GetIssueId() => Issue?.Id ?? Issue_Id;

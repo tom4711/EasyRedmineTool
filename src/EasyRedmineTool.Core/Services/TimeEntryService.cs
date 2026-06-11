@@ -56,15 +56,49 @@ public class TimeEntryService(
         }
     }
 
-    public async Task<TimeEntryOperationResult> CreateTimeEntryAsync(
+    public Task<TimeEntryOperationResult> CreateTimeEntryAsync(
         string baseUrl,
         string apiKey,
         TimeEntryCreateRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ExecuteTimeEntryMutationAsync(
+            () => _apiClient.CreateTimeEntryAsync(baseUrl, apiKey, request, cancellationToken),
+            request.IssueId,
+            "Zeiteintrag wurde erstellt.",
+            "Zeiteintrag fehlgeschlagen");
+
+    public Task<TimeEntryOperationResult> UpdateTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        int timeEntryId,
+        TimeEntryUpdateRequest request,
+        CancellationToken cancellationToken = default) =>
+        ExecuteTimeEntryMutationAsync(
+            () => _apiClient.UpdateTimeEntryAsync(baseUrl, apiKey, timeEntryId, request, cancellationToken),
+            request.IssueId,
+            "Zeiteintrag wurde aktualisiert.",
+            "Aktualisierung fehlgeschlagen");
+
+    public Task<TimeEntryOperationResult> DeleteTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        int timeEntryId,
+        CancellationToken cancellationToken = default) =>
+        ExecuteTimeEntryMutationAsync(
+            () => _apiClient.DeleteTimeEntryAsync(baseUrl, apiKey, timeEntryId, cancellationToken),
+            issueId: null,
+            successMessage: "Zeiteintrag wurde gelöscht.",
+            failurePrefix: "Löschen fehlgeschlagen");
+
+    private async Task<TimeEntryOperationResult> ExecuteTimeEntryMutationAsync(
+        Func<Task<HttpResponseMessage>> sendRequest,
+        int? issueId,
+        string successMessage,
+        string failurePrefix)
     {
         try
         {
-            using var response = await _apiClient.CreateTimeEntryAsync(baseUrl, apiKey, request, cancellationToken);
+            using var response = await sendRequest();
 
             if (response.IsSuccessStatusCode)
             {
@@ -73,26 +107,44 @@ public class TimeEntryService(
                 return new TimeEntryOperationResult
                 {
                     Success = true,
-                    Message = "Zeiteintrag wurde erstellt."
+                    Message = successMessage
                 };
             }
 
-            var error = await response.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogWarning(
-                "Zeiteintrag für Issue {IssueId} fehlgeschlagen: {StatusCode} {ReasonPhrase}",
-                request.IssueId,
-                (int)response.StatusCode,
-                response.ReasonPhrase);
+            var error = await response.Content.ReadAsStringAsync();
+            if (issueId.HasValue)
+            {
+                _logger.LogWarning(
+                    "Zeiteintrag für Issue {IssueId} fehlgeschlagen: {StatusCode} {ReasonPhrase}",
+                    issueId.Value,
+                    (int)response.StatusCode,
+                    response.ReasonPhrase);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Zeiteintrag-Änderung fehlgeschlagen: {StatusCode} {ReasonPhrase}",
+                    (int)response.StatusCode,
+                    response.ReasonPhrase);
+            }
 
             return new TimeEntryOperationResult
             {
                 Success = false,
-                Message = $"Zeiteintrag fehlgeschlagen: {(int)response.StatusCode} {response.ReasonPhrase} {error}".Trim()
+                Message = $"{failurePrefix}: {(int)response.StatusCode} {response.ReasonPhrase} {error}".Trim()
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Zeiteintrag für Issue {IssueId} konnte nicht erstellt werden.", request.IssueId);
+            if (issueId.HasValue)
+            {
+                _logger.LogError(ex, "Zeiteintrag für Issue {IssueId} konnte nicht verarbeitet werden.", issueId.Value);
+            }
+            else
+            {
+                _logger.LogError(ex, "Zeiteintrag konnte nicht verarbeitet werden.");
+            }
+
             return new TimeEntryOperationResult
             {
                 Success = false,

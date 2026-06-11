@@ -183,6 +183,39 @@ public class TimeEntriesViewModelTests
         await viewModel.ReloadTodayBookedHoursAsync();
 
         Assert.Equal(3.75, viewModel.TodayBookedHours);
+        Assert.Equal(2, viewModel.TodayTimeEntries.Count);
+        Assert.True(viewModel.HasTodayTimeEntries);
+    }
+
+    [Fact]
+    public async Task ReloadTodayBookedHoursAsync_populates_today_entry_rows()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            CachedTickets = [new IssueDto { Id = 42, Subject = "Support Task" }]
+        });
+        context.TimeEntryService.Entries =
+        [
+            new TimeEntryDto
+            {
+                Id = 10,
+                Issue_Id = 42,
+                Spent_On = RedmineDates.FormatSpentOn(DateTime.Today),
+                Hours = 1.5,
+                Activity = new TimeEntryActivityDto { Id = 3, Name = "Entwicklung" },
+                Comments = "Fix"
+            }
+        ];
+
+        var viewModel = new TimeEntriesViewModel(context.SettingsService, context.TimeEntryService);
+        await viewModel.ReloadTodayBookedHoursAsync();
+
+        Assert.Single(viewModel.TodayTimeEntries);
+        Assert.Equal(10, viewModel.TodayTimeEntries[0].EntryId);
+        Assert.Contains("Support Task", viewModel.TodayTimeEntries[0].TicketLabel, StringComparison.Ordinal);
     }
 
     private sealed class TestContext : IDisposable
@@ -225,6 +258,8 @@ public class TimeEntriesViewModelTests
     {
         public IReadOnlyList<TimeEntryDto> Entries { get; set; } = [];
 
+        public bool LoadSuccess { get; set; } = true;
+
         public Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
             string baseUrl,
             string apiKey,
@@ -239,16 +274,29 @@ public class TimeEntriesViewModelTests
             DateTime from,
             DateTime to,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(new TimeEntryLoadResult
-            {
-                Success = true,
-                Entries = Entries
-            });
+            Task.FromResult(LoadSuccess
+                ? new TimeEntryLoadResult { Success = true, Entries = Entries }
+                : new TimeEntryLoadResult { Success = false, Message = "load failed" });
 
         public Task<TimeEntryOperationResult> CreateTimeEntryAsync(
             string baseUrl,
             string apiKey,
             TimeEntryCreateRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TimeEntryOperationResult { Success = true });
+
+        public Task<TimeEntryOperationResult> UpdateTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
+            TimeEntryUpdateRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TimeEntryOperationResult { Success = true });
+
+        public Task<TimeEntryOperationResult> DeleteTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new TimeEntryOperationResult { Success = true });
     }
