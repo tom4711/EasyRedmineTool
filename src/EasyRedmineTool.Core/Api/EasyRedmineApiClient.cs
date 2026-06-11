@@ -336,25 +336,68 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return [];
     }
 
-    public async Task<HttpResponseMessage> CreateTimeEntryAsync( string baseUrl, string apiKey, TimeEntryCreateRequest request, CancellationToken cancellationToken = default)
+    public async Task<HttpResponseMessage> CreateTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        TimeEntryCreateRequest request,
+        CancellationToken cancellationToken = default)
     {
-        var payload = new
-        {
-            time_entry = new
-            {
-                issue_id = request.IssueId,
-                hours = request.Hours,
-                spent_on = request.SpentOn,
-                activity_id = request.ActivityId,
-                comments = request.Comments
-            }
-        };
-
         using var message = CreateRequest(HttpMethod.Post, baseUrl, apiKey, "time_entries.json");
-        message.Content = JsonContent.Create(payload);
+        message.Content = JsonContent.Create(CreateTimeEntryPayload(
+            request.IssueId,
+            request.Hours,
+            request.SpentOn,
+            request.ActivityId,
+            request.Comments));
 
         return await _httpClient.SendAsync(message, cancellationToken);
     }
+
+    public async Task<HttpResponseMessage> UpdateTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        int timeEntryId,
+        TimeEntryUpdateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var message = CreateRequest(HttpMethod.Put, baseUrl, apiKey, $"time_entries/{timeEntryId}.json");
+        message.Content = JsonContent.Create(CreateTimeEntryPayload(
+            request.IssueId,
+            request.Hours,
+            request.SpentOn,
+            request.ActivityId,
+            request.Comments));
+
+        return await _httpClient.SendAsync(message, cancellationToken);
+    }
+
+    public Task<HttpResponseMessage> DeleteTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        int timeEntryId,
+        CancellationToken cancellationToken = default)
+    {
+        using var message = CreateRequest(HttpMethod.Delete, baseUrl, apiKey, $"time_entries/{timeEntryId}.json");
+        return _httpClient.SendAsync(message, cancellationToken);
+    }
+
+    private static object CreateTimeEntryPayload(
+        int issueId,
+        double hours,
+        string spentOn,
+        int activityId,
+        string comments) =>
+        new
+        {
+            time_entry = new
+            {
+                issue_id = issueId,
+                hours,
+                spent_on = spentOn,
+                activity_id = activityId,
+                comments
+            }
+        };
 
     private static HttpRequestMessage CreateRequest(HttpMethod method, string baseUrl, string apiKey, string relativeOrAbsolutePath)
     {

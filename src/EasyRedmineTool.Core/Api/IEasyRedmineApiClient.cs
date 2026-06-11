@@ -61,4 +61,17 @@ public interface IEasyRedmineApiClient
         string apiKey,
         TimeEntryCreateRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<HttpResponseMessage> UpdateTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        int timeEntryId,
+        TimeEntryUpdateRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<HttpResponseMessage> DeleteTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        int timeEntryId,
+        CancellationToken cancellationToken = default);
 }

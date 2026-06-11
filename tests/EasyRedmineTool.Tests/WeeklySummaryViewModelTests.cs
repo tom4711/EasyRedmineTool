@@ -192,5 +192,20 @@ public class WeeklySummaryViewModelTests
             TimeEntryCreateRequest request,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new TimeEntryOperationResult { Success = true });
+
+        public Task<TimeEntryOperationResult> UpdateTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
+            TimeEntryUpdateRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TimeEntryOperationResult { Success = true });
+
+        public Task<TimeEntryOperationResult> DeleteTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TimeEntryOperationResult { Success = true });
     }
 }

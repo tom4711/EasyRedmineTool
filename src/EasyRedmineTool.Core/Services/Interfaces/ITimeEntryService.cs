@@ -23,4 +23,17 @@ public interface ITimeEntryService
         string apiKey,
         TimeEntryCreateRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<TimeEntryOperationResult> UpdateTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        int timeEntryId,
+        TimeEntryUpdateRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<TimeEntryOperationResult> DeleteTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        int timeEntryId,
+        CancellationToken cancellationToken = default);
 }
