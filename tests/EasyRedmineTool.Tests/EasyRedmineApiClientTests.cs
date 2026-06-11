@@ -61,6 +61,29 @@ public class EasyRedmineApiClientTests
         Assert.Equal(10_000, issues.Count);
     }
 
+    [Theory]
+    [InlineData(TicketAssigneeFilter.Me, TicketStatusFilterKind.Open, null, "assigned_to_id=me", "status_id=open")]
+    [InlineData(TicketAssigneeFilter.Unassigned, TicketStatusFilterKind.Closed, null, "assigned_to_id=!*", "status_id=closed")]
+    [InlineData(TicketAssigneeFilter.All, TicketStatusFilterKind.All, null, "status_id=*")]
+    [InlineData(TicketAssigneeFilter.Me, TicketStatusFilterKind.Specific, 3, "assigned_to_id=me", "status_id=3")]
+    public void BuildIssuesQuery_includes_selected_assignee_and_status_filters(
+        TicketAssigneeFilter assigneeFilter,
+        TicketStatusFilterKind statusKind,
+        int? statusId,
+        params string[] expectedParts)
+    {
+        var query = EasyRedmineApiClient.BuildIssuesQuery(assigneeFilter, statusKind, statusId, limit: 25, offset: 50);
+
+        Assert.StartsWith("issues.json?", query, StringComparison.Ordinal);
+        Assert.Contains("limit=25", query, StringComparison.Ordinal);
+        Assert.Contains("offset=50", query, StringComparison.Ordinal);
+
+        foreach (var expectedPart in expectedParts)
+        {
+            Assert.Contains(expectedPart, query, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task GetIssuesByIdsAsync_falls_back_to_single_issue_requests_when_batch_fails()
     {

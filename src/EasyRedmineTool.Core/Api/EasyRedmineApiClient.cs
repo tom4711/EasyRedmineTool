@@ -2,6 +2,7 @@ namespace EasyRedmineTool.Core.Api;
 
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
+using EasyRedmineTool.Core.Models.Users;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -24,9 +25,47 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return await _httpClient.SendAsync(request, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<IssueDto>> GetAllMyOpenIssuesAsync(
+    public async Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default)
+    {
+        using var response = await GetCurrentUserAsync(baseUrl, apiKey, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<UserResponse>(RedmineJson.Options, cancellationToken);
+        return result?.User.Id;
+    }
+
+    public Task<IReadOnlyList<IssueDto>> GetAllMyOpenIssuesAsync(
         string baseUrl,
         string apiKey,
+        CancellationToken cancellationToken = default) =>
+        GetIssuesAsync(baseUrl, apiKey, TicketAssigneeFilter.Me, TicketStatusFilterKind.Open, cancellationToken: cancellationToken);
+
+    public async Task<IReadOnlyList<StatusDto>> GetIssueStatusesAsync(
+        string baseUrl,
+        string apiKey,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "issue_statuses.json");
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<IssueStatusListResponse>(RedmineJson.Options, cancellationToken);
+        return result?.Issue_Statuses ?? [];
+    }
+
+    public async Task<IReadOnlyList<IssueDto>> GetIssuesAsync(
+        string baseUrl,
+        string apiKey,
+        TicketAssigneeFilter assigneeFilter,
+        TicketStatusFilterKind statusKind,
+        int? statusId = null,
         CancellationToken cancellationToken = default)
     {
         var offset = 0;
@@ -35,7 +74,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
 
         for (var pageIndex = 0; pageIndex < MaxPaginationPages; pageIndex++)
         {
-            var page = await GetMyOpenIssuesPageAsync(baseUrl, apiKey, PageLimit, offset, cancellationToken);
+            var page = await GetIssuesPageAsync(baseUrl, apiKey, assigneeFilter, statusKind, statusId, PageLimit, offset, cancellationToken);
             if (page?.Issues is null || page.Issues.Count == 0)
             {
                 break;
@@ -58,18 +97,18 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return all;
     }
 
-    private async Task<IssueListResponse?> GetMyOpenIssuesPageAsync(
+    private async Task<IssueListResponse?> GetIssuesPageAsync(
         string baseUrl,
         string apiKey,
+        TicketAssigneeFilter assigneeFilter,
+        TicketStatusFilterKind statusKind,
+        int? statusId,
         int limit,
         int offset,
         CancellationToken cancellationToken = default)
     {
-        using var request = CreateRequest(
-            HttpMethod.Get,
-            baseUrl,
-            apiKey,
-            $"issues.json?assigned_to_id=me&status_id=open&limit={limit}&offset={offset}");
+        var query = BuildIssuesQuery(assigneeFilter, statusKind, statusId, limit, offset);
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, query);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -78,6 +117,40 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         }
 
         return await response.Content.ReadFromJsonAsync<IssueListResponse>(RedmineJson.Options, cancellationToken);
+    }
+
+    internal static string BuildIssuesQuery(
+        TicketAssigneeFilter assigneeFilter,
+        TicketStatusFilterKind statusKind,
+        int? statusId,
+        int limit,
+        int offset)
+    {
+        var parameters = new List<string>
+        {
+            $"limit={limit}",
+            $"offset={offset}"
+        };
+
+        switch (assigneeFilter)
+        {
+            case TicketAssigneeFilter.Me:
+                parameters.Add("assigned_to_id=me");
+                break;
+            case TicketAssigneeFilter.Unassigned:
+                parameters.Add("assigned_to_id=!*");
+                break;
+        }
+
+        parameters.Add(statusKind switch
+        {
+            TicketStatusFilterKind.Open => "status_id=open",
+            TicketStatusFilterKind.Closed => "status_id=closed",
+            TicketStatusFilterKind.Specific when statusId.HasValue => $"status_id={statusId.Value}",
+            _ => "status_id=*"
+        });
+
+        return $"issues.json?{string.Join('&', parameters)}";
     }
 
     public async Task<IssueResponse?> GetIssueByIdAsync(string baseUrl, string apiKey, int issueId, CancellationToken cancellationToken = default)
