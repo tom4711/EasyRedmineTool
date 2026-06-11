@@ -16,6 +16,7 @@ public partial class SeriesBookingViewModel : ViewModelBase
 {
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
+    private CancellationTokenSource? _ticketDetailsCts;
 
     [ObservableProperty]
     private IssueDto? selectedTicket;
@@ -468,16 +469,22 @@ public partial class SeriesBookingViewModel : ViewModelBase
 
     private async Task LoadTicketDetailsAsync()
     {
+        var ticket = SelectedTicket;
+        CancelTicketDetailsLoad();
+
         Activities.Clear();
         CustomFields.Clear();
         SelectedActivity = null;
         OnPropertyChanged(nameof(HasCustomFields));
         ClearPreview();
 
-        if (SelectedTicket is null)
+        if (ticket is null)
         {
             return;
         }
+
+        var loadToken = BeginTicketDetailsLoad();
+        var ticketId = ticket.Id;
 
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -485,35 +492,77 @@ public partial class SeriesBookingViewModel : ViewModelBase
             return;
         }
 
-        var loadedActivities = await _timeEntryService.GetActivitiesAsync(
-            settings.BaseUrl,
-            settings.ApiKey,
-            SelectedTicket.Id,
-            SelectedTicket.Project?.Id);
-
-        foreach (var activity in loadedActivities.OrderBy(activity => activity.Name))
+        try
         {
-            Activities.Add(activity);
+            var loadedActivities = await _timeEntryService.GetActivitiesAsync(
+                settings.BaseUrl,
+                settings.ApiKey,
+                ticketId,
+                ticket.Project?.Id,
+                loadToken);
+
+            if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))
+            {
+                return;
+            }
+
+            Activities.Clear();
+            foreach (var activity in loadedActivities.OrderBy(activity => activity.Name))
+            {
+                Activities.Add(activity);
+            }
+
+            SelectedActivity = Activities.FirstOrDefault();
+
+            var definitions = await _timeEntryService.GetCustomFieldDefinitionsAsync(
+                settings.BaseUrl,
+                settings.ApiKey,
+                loadToken);
+
+            if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))
+            {
+                return;
+            }
+
+            var recentValues = await _timeEntryService.GetRecentCustomFieldValuesAsync(
+                settings.BaseUrl,
+                settings.ApiKey,
+                ticketId,
+                ticket.Project?.Id,
+                loadToken);
+
+            if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))
+            {
+                return;
+            }
+
+            CustomFields.Clear();
+            foreach (var row in TimeEntryCustomFieldSupport.CreateRows(definitions, recentValues, settings))
+            {
+                CustomFields.Add(row);
+            }
+
+            OnPropertyChanged(nameof(HasCustomFields));
         }
-
-        SelectedActivity = Activities.FirstOrDefault();
-
-        var definitions = await _timeEntryService.GetCustomFieldDefinitionsAsync(
-            settings.BaseUrl,
-            settings.ApiKey);
-
-        var recentValues = await _timeEntryService.GetRecentCustomFieldValuesAsync(
-            settings.BaseUrl,
-            settings.ApiKey,
-            SelectedTicket.Id,
-            SelectedTicket.Project?.Id);
-
-        foreach (var row in TimeEntryCustomFieldSupport.CreateRows(definitions, recentValues, settings))
+        catch (OperationCanceledException) when (loadToken.IsCancellationRequested)
         {
-            CustomFields.Add(row);
         }
+    }
 
-        OnPropertyChanged(nameof(HasCustomFields));
+    private bool ShouldIgnoreTicketDetailsResult(CancellationToken loadToken, int ticketId) =>
+        loadToken.IsCancellationRequested || SelectedTicket?.Id != ticketId;
+
+    private void CancelTicketDetailsLoad()
+    {
+        _ticketDetailsCts?.Cancel();
+        _ticketDetailsCts?.Dispose();
+        _ticketDetailsCts = null;
+    }
+
+    private CancellationToken BeginTicketDetailsLoad()
+    {
+        _ticketDetailsCts = new CancellationTokenSource();
+        return _ticketDetailsCts.Token;
     }
 
     private IReadOnlySet<DayOfWeek> GetSelectedWeekdays() =>

@@ -99,6 +99,12 @@ public sealed class AppSettingsService : IAppSettingsService
         CachedTickets = settings.CachedTickets ?? [],
         FavoriteTicketIds = settings.FavoriteTicketIds ?? [],
         LastLoadedTicketIds = settings.LastLoadedTicketIds ?? [],
+        TicketLoadAssigneeFilter = settings.TicketLoadAssigneeFilter,
+        TicketLoadStatusFilterKind = settings.TicketLoadStatusFilterKind,
+        TicketLoadStatusId = settings.TicketLoadStatusId,
+        TicketLoadStatusName = settings.TicketLoadStatusName,
+        TicketLoadLastBookedUntil = settings.TicketLoadLastBookedUntil,
+        TimeEntryCustomFieldDefaults = settings.TimeEntryCustomFieldDefaults ?? [],
     };
 
     private static AppSettings CreateDefault() => new()

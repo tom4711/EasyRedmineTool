@@ -419,14 +419,14 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return await _httpClient.SendAsync(message, cancellationToken);
     }
 
-    public Task<HttpResponseMessage> DeleteTimeEntryAsync(
+    public async Task<HttpResponseMessage> DeleteTimeEntryAsync(
         string baseUrl,
         string apiKey,
         int timeEntryId,
         CancellationToken cancellationToken = default)
     {
         using var message = CreateRequest(HttpMethod.Delete, baseUrl, apiKey, $"time_entries/{timeEntryId}.json");
-        return _httpClient.SendAsync(message, cancellationToken);
+        return await _httpClient.SendAsync(message, cancellationToken);
     }
 
     private static object CreateTimeEntryPayload(TimeEntryCreateRequest request) =>
