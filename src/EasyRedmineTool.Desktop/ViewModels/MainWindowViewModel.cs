@@ -106,7 +106,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void OpenWeeklySummary()
     {
-        _ = WeeklySummaryViewModel.ReloadWeeklySummaryAsync();
+        WeeklySummaryViewModel.PrepareView();
         ShowWeeklySummary();
     }
 
