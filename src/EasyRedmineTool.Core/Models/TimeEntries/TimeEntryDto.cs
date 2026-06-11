@@ -23,5 +23,7 @@ public class TimeEntryDto
 
     public string Comments { get; set; } = string.Empty;
 
+    public List<TimeEntryCustomFieldValueDto> Custom_Fields { get; set; } = [];
+
     public int GetIssueId() => Issue?.Id ?? Issue_Id;
 }

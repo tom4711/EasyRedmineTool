@@ -11,4 +11,6 @@ public class TimeEntryUpdateRequest
     public int ActivityId { get; set; }
 
     public string Comments { get; set; } = string.Empty;
+
+    public List<TimeEntryCustomFieldValue> CustomFields { get; set; } = [];
 }

@@ -55,6 +55,10 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
 
     public ObservableCollection<TimeEntryActivityDto> Activities { get; } = [];
 
+    public ObservableCollection<TimeEntryCustomFieldRowViewModel> CustomFields { get; } = [];
+
+    public bool HasCustomFields => CustomFields.Count > 0;
+
     public string SelectedDateLabel =>
         SpentOn?.ToString("dddd, dd.MM.yyyy", CultureInfo.GetCultureInfo("de-DE")) ?? "Kein Datum";
 
@@ -98,6 +102,31 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         {
             SelectedActivity = Activities.FirstOrDefault();
         }
+
+        CustomFields.Clear();
+        var definitions = await _timeEntryService.GetCustomFieldDefinitionsAsync(
+            settings.BaseUrl,
+            settings.ApiKey,
+            cancellationToken);
+
+        var recentValues = await _timeEntryService.GetRecentCustomFieldValuesAsync(
+            settings.BaseUrl,
+            settings.ApiKey,
+            Ticket.Id,
+            Ticket.Project?.Id,
+            cancellationToken);
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        foreach (var row in TimeEntryCustomFieldSupport.CreateRows(definitions, recentValues, settings))
+        {
+            CustomFields.Add(row);
+        }
+
+        OnPropertyChanged(nameof(HasCustomFields));
     }
 
     [RelayCommand]
@@ -151,6 +180,13 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             return;
         }
 
+        var customFieldError = TimeEntryCustomFieldSupport.Validate(CustomFields);
+        if (customFieldError is not null)
+        {
+            _parent.SetStatusMessage($"Ticket #{Ticket.Id}: {customFieldError}");
+            return;
+        }
+
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
@@ -172,12 +208,14 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
                     Hours = parsedHours,
                     SpentOn = RedmineDates.FormatSpentOn(SpentOn.Value),
                     ActivityId = SelectedActivity.Id,
-                    Comments = Comments
+                    Comments = Comments,
+                    CustomFields = TimeEntryCustomFieldSupport.BuildValues(CustomFields).ToList()
                 });
 
             _parent.SetStatusMessage(result.Message);
             if (result.Success)
             {
+                TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, CustomFields);
                 Comments = string.Empty;
                 await _parent.HandleEntryCreatedAsync(this, SpentOn.Value);
             }

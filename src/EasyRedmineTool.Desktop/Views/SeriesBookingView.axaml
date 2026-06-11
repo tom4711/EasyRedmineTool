@@ -1,0 +1,256 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:EasyRedmineTool.Core.ViewModels"
+    xmlns:tickets="using:EasyRedmineTool.Core.Models.Tickets"
+    xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+    x:Class="EasyRedmineTool.Desktop.Views.SeriesBookingView"
+    x:DataType="vm:SeriesBookingViewModel">
+  <UserControl.Styles>
+    <Style Selector="Border.series-card">
+      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="20" />
+    </Style>
+    <Style Selector="TextBlock.field-label">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Opacity" Value="0.85" />
+      <Setter Property="MinWidth" Value="88" />
+    </Style>
+    <Style Selector="CheckBox.weekday-toggle">
+      <Setter Property="MinWidth" Value="44" />
+    </Style>
+    <Style Selector="Border.preview-row">
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Padding" Value="0,8" />
+    </Style>
+    <Style Selector="Border.preview-row.conflict">
+      <Setter Property="Background" Value="{DynamicResource AppGhostHoverBackgroundBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,*">
+    <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="8">
+      <TextBlock Text="Serienbuchung" FontSize="22" FontWeight="Bold" />
+      <TextBlock Text="Rückwirkende Zeiteinträge für ein Ticket über einen Zeitraum erstellen."
+                 TextWrapping="Wrap"
+                 Opacity="0.85" />
+      <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Opacity="0.85" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="24,0,24,24" Spacing="16">
+        <Border Classes="series-card">
+          <StackPanel Spacing="12">
+            <TextBlock Text="Einstellungen" FontSize="16" FontWeight="SemiBold" />
+
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" RowSpacing="10">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+
+              <TextBlock Grid.Row="0" Grid.Column="0" Classes="field-label" Text="Ticket" />
+              <ComboBox Grid.Row="0" Grid.Column="1"
+                        ItemsSource="{Binding Tickets}"
+                        SelectedItem="{Binding SelectedTicket}"
+                        HorizontalAlignment="Stretch"
+                        PlaceholderText="Ticket wählen …">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate DataType="tickets:IssueDto">
+                    <TextBlock>
+                      <TextBlock.Text>
+                        <MultiBinding StringFormat="#{0} {1}">
+                          <Binding Path="Id" />
+                          <Binding Path="Subject" />
+                        </MultiBinding>
+                      </TextBlock.Text>
+                    </TextBlock>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+
+              <TextBlock Grid.Row="1" Grid.Column="0" Classes="field-label" Text="Von" />
+              <DatePicker Grid.Row="1" Grid.Column="1" SelectedDate="{Binding FromDate}" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" Classes="field-label" Text="Bis" />
+              <DatePicker Grid.Row="2" Grid.Column="1" SelectedDate="{Binding ToDate}" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" Classes="field-label" Text="Wochentage" />
+              <StackPanel Grid.Row="3" Grid.Column="1" Spacing="8">
+                <WrapPanel Orientation="Horizontal">
+                  <CheckBox Classes="weekday-toggle" Content="Mo" IsChecked="{Binding IncludeMonday}" />
+                  <CheckBox Classes="weekday-toggle" Content="Di" IsChecked="{Binding IncludeTuesday}" />
+                  <CheckBox Classes="weekday-toggle" Content="Mi" IsChecked="{Binding IncludeWednesday}" />
+                  <CheckBox Classes="weekday-toggle" Content="Do" IsChecked="{Binding IncludeThursday}" />
+                  <CheckBox Classes="weekday-toggle" Content="Fr" IsChecked="{Binding IncludeFriday}" />
+                  <CheckBox Classes="weekday-toggle" Content="Sa" IsChecked="{Binding IncludeSaturday}" />
+                  <CheckBox Classes="weekday-toggle" Content="So" IsChecked="{Binding IncludeSunday}" />
+                </WrapPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="secondary"
+                          Command="{Binding SelectWeekdaysOnlyCommand}"
+                          Content="Mo–Fr" />
+                  <Button Classes="secondary"
+                          Command="{Binding SelectAllWeekdaysCommand}"
+                          Content="Alle Tage" />
+                </StackPanel>
+              </StackPanel>
+
+              <TextBlock Grid.Row="4" Grid.Column="0" Classes="field-label" Text="Stunden" />
+              <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Hours}" PlaceholderText="z. B. 2" />
+
+              <TextBlock Grid.Row="5" Grid.Column="0" Classes="field-label" Text="Aktivität" />
+              <ComboBox Grid.Row="5" Grid.Column="1"
+                        ItemsSource="{Binding Activities}"
+                        SelectedItem="{Binding SelectedActivity}"
+                        HorizontalAlignment="Stretch"
+                        PlaceholderText="Aktivität wählen …">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding Name}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+
+              <TextBlock Grid.Row="6" Grid.Column="0" Classes="field-label" Text="Kommentar" />
+              <TextBox Grid.Row="6" Grid.Column="1"
+                       Text="{Binding Comments}"
+                       AcceptsReturn="True"
+                       MinHeight="56"
+                       PlaceholderText="Optional" />
+            </Grid>
+
+            <StackPanel Spacing="8" IsVisible="{Binding HasCustomFields}">
+              <TextBlock Text="Zusatzfelder" FontWeight="SemiBold" />
+              <ItemsControl ItemsSource="{Binding CustomFields}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:TimeEntryCustomFieldRowViewModel">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="0,0,0,8">
+                      <TextBlock Grid.Column="0"
+                                 Classes="field-label"
+                                 Text="{Binding Name}" />
+                      <ComboBox Grid.Column="1"
+                                IsVisible="{Binding HasPossibleValues}"
+                                ItemsSource="{Binding PossibleValues}"
+                                SelectedItem="{Binding SelectedValue}"
+                                HorizontalAlignment="Stretch"
+                                PlaceholderText="Bitte wählen …" />
+                      <TextBox Grid.Column="1"
+                               IsVisible="{Binding !HasPossibleValues}"
+                               Text="{Binding Value}"
+                               HorizontalAlignment="Stretch"
+                               PlaceholderText="Wert eingeben …" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="secondary"
+                      Command="{Binding ApplyLastWeekPresetCommand}"
+                      Content="Letzte Woche" />
+              <Button Classes="secondary"
+                      Command="{Binding ApplyLast2WeeksPresetCommand}"
+                      Content="Letzte 2 Wochen" />
+              <Button Classes="secondary"
+                      Command="{Binding ApplyLast3WeeksPresetCommand}"
+                      Content="Letzte 3 Wochen" />
+            </StackPanel>
+
+            <Button Classes="primary"
+                    HorizontalAlignment="Left"
+                    IsEnabled="{Binding !IsLoadingPreview}"
+                    Command="{Binding RefreshPreviewCommand}"
+                    Content="Vorschau aktualisieren" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="series-card" IsVisible="{Binding HasPreview}">
+          <StackPanel Spacing="12">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Text="Vorschau" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding PreviewSummary}" Opacity="0.85" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button Classes="secondary"
+                        Command="{Binding SelectAllPreviewRowsCommand}"
+                        Content="Alle" />
+                <Button Classes="secondary"
+                        Command="{Binding DeselectAllPreviewRowsCommand}"
+                        Content="Keine" />
+                <Button Classes="secondary"
+                        Command="{Binding DeselectConflictRowsCommand}"
+                        Content="Konflikte abwählen" />
+              </StackPanel>
+            </Grid>
+
+            <ItemsControl ItemsSource="{Binding PreviewRows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:SeriesBookingPreviewRowViewModel">
+                  <Border Classes="preview-row"
+                          Classes.conflict="{Binding HasConflict}">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="12">
+                      <CheckBox Grid.Column="0"
+                                IsChecked="{Binding IsSelected}"
+                                VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1"
+                                 VerticalAlignment="Center"
+                                 Text="{Binding DateLabel}" />
+                      <TextBlock Grid.Column="2"
+                                 VerticalAlignment="Center"
+                                 Opacity="0.75"
+                                 Text="{Binding DayOfWeekLabel}" />
+                      <TextBlock Grid.Column="3"
+                                 VerticalAlignment="Center"
+                                 Text="{Binding Hours, StringFormat={}{0:0.##} h}" />
+                      <TextBlock Grid.Column="4"
+                                 VerticalAlignment="Center"
+                                 Opacity="0.85"
+                                 Text="{Binding StatusLabel}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Button Classes="primary"
+                    HorizontalAlignment="Left"
+                    IsEnabled="{Binding CanBook}"
+                    Command="{Binding RequestBookSeriesCommand}"
+                    Content="Serienbuchung starten" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="series-card"
+                IsVisible="{Binding ShowBookingConfirmation}"
+                BorderBrush="{DynamicResource AppAccentBrush}"
+                BorderThickness="2">
+          <StackPanel Spacing="12">
+            <TextBlock Text="Buchung bestätigen" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding BookingConfirmationText}" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="primary"
+                      Command="{Binding ConfirmBookSeriesCommand}"
+                      Content="Ja, buchen" />
+              <Button Classes="secondary"
+                      Command="{Binding CancelBookSeriesConfirmationCommand}"
+                      Content="Abbrechen" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

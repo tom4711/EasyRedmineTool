@@ -15,6 +15,20 @@ public class TimeEntryService(
     private readonly ITicketService _ticketService = ticketService;
     private readonly ILogger<TimeEntryService> _logger = logger;
 
+    public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
+        string baseUrl,
+        string apiKey,
+        CancellationToken cancellationToken = default) =>
+        _apiClient.GetTimeEntryCustomFieldDefinitionsAsync(baseUrl, apiKey, cancellationToken);
+
+    public Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentCustomFieldValuesAsync(
+        string baseUrl,
+        string apiKey,
+        int? issueId = null,
+        int? projectId = null,
+        CancellationToken cancellationToken = default) =>
+        _apiClient.GetRecentTimeEntryCustomFieldValuesAsync(baseUrl, apiKey, issueId, projectId, cancellationToken);
+
     public async Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
         string baseUrl,
         string apiKey,

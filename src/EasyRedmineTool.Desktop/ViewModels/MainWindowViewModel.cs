@@ -34,6 +34,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool isWeeklySummaryVisible;
 
+    [ObservableProperty]
+    private bool isSeriesBookingVisible;
+
     public string WindowTitle => AppInfo.WindowTitle;
 
     public MainWindowViewModel(
@@ -41,6 +44,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TicketListViewModel ticketListViewModel,
         TimeEntriesViewModel timeEntriesViewModel,
         WeeklySummaryViewModel weeklySummaryViewModel,
+        SeriesBookingViewModel seriesBookingViewModel,
         AboutViewModel aboutViewModel,
         IAppSettingsService appSettingsService)
     {
@@ -48,6 +52,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TicketListViewModel = ticketListViewModel;
         TimeEntriesViewModel = timeEntriesViewModel;
         WeeklySummaryViewModel = weeklySummaryViewModel;
+        SeriesBookingViewModel = seriesBookingViewModel;
         AboutViewModel = aboutViewModel;
         _appSettingsService = appSettingsService;
 
@@ -62,6 +67,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public TicketListViewModel TicketListViewModel { get; }
     public TimeEntriesViewModel TimeEntriesViewModel { get; }
     public WeeklySummaryViewModel WeeklySummaryViewModel { get; }
+    public SeriesBookingViewModel SeriesBookingViewModel { get; }
     public AboutViewModel AboutViewModel { get; }
 
     [ObservableProperty]
@@ -108,6 +114,13 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         WeeklySummaryViewModel.PrepareView();
         ShowWeeklySummary();
+    }
+
+    [RelayCommand]
+    private void OpenSeriesBooking()
+    {
+        SeriesBookingViewModel.PrepareView();
+        ShowSeriesBooking();
     }
 
     [RelayCommand]
@@ -171,6 +184,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IsTicketListVisible = false;
         IsTimeEntriesVisible = false;
         IsWeeklySummaryVisible = false;
+        IsSeriesBookingVisible = false;
         IsAboutVisible = false;
     }
 
@@ -196,6 +210,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         HideAllViews();
         IsWeeklySummaryVisible = true;
+    }
+
+    private void ShowSeriesBooking()
+    {
+        HideAllViews();
+        IsSeriesBookingVisible = true;
     }
 
     private void ShowAbout()
