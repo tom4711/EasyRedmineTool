@@ -189,6 +189,20 @@ public class TimeEntryServiceTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TimeEntryActivityDto>>([]);
 
+        public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetTimeEntryCustomFieldDefinitionsAsync(
+            string baseUrl,
+            string apiKey,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>>([]);
+
+        public Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentTimeEntryCustomFieldValuesAsync(
+            string baseUrl,
+            string apiKey,
+            int? issueId = null,
+            int? projectId = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TimeEntryCustomFieldValueDto>>([]);
+
         public Task<HttpResponseMessage> CreateTimeEntryAsync(
             string baseUrl,
             string apiKey,

@@ -32,7 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<TicketListViewModel>();
         services.AddTransient<TimeEntriesViewModel>();
         services.AddTransient<WeeklySummaryViewModel>();
-
+        services.AddTransient<SeriesBookingViewModel>();
 
         return services;
     }

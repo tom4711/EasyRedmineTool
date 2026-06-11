@@ -336,6 +336,64 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return [];
     }
 
+    public async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetTimeEntryCustomFieldDefinitionsAsync(
+        string baseUrl,
+        string apiKey,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "custom_fields.json");
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        return ParseTimeEntryCustomFieldDefinitions(json);
+    }
+
+    public async Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentTimeEntryCustomFieldValuesAsync(
+        string baseUrl,
+        string apiKey,
+        int? issueId = null,
+        int? projectId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var endpoints = new List<string>();
+
+        if (issueId.HasValue)
+        {
+            endpoints.Add($"time_entries.json?issue_id={issueId.Value}&user_id=me&limit=1");
+        }
+
+        if (projectId.HasValue)
+        {
+            endpoints.Add($"time_entries.json?project_id={projectId.Value}&user_id=me&limit=1");
+        }
+
+        endpoints.Add("time_entries.json?user_id=me&limit=1");
+
+        foreach (var endpoint in endpoints)
+        {
+            using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                continue;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<TimeEntriesListResponse>(RedmineJson.Options, cancellationToken);
+            var entry = result?.Time_Entries?.FirstOrDefault();
+            if (entry?.Custom_Fields is { Count: > 0 })
+            {
+                return entry.Custom_Fields;
+            }
+        }
+
+        return [];
+    }
+
     public async Task<HttpResponseMessage> CreateTimeEntryAsync(
         string baseUrl,
         string apiKey,
@@ -343,12 +401,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         CancellationToken cancellationToken = default)
     {
         using var message = CreateRequest(HttpMethod.Post, baseUrl, apiKey, "time_entries.json");
-        message.Content = JsonContent.Create(CreateTimeEntryPayload(
-            request.IssueId,
-            request.Hours,
-            request.SpentOn,
-            request.ActivityId,
-            request.Comments));
+        message.Content = JsonContent.Create(CreateTimeEntryPayload(request));
 
         return await _httpClient.SendAsync(message, cancellationToken);
     }
@@ -361,12 +414,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         CancellationToken cancellationToken = default)
     {
         using var message = CreateRequest(HttpMethod.Put, baseUrl, apiKey, $"time_entries/{timeEntryId}.json");
-        message.Content = JsonContent.Create(CreateTimeEntryPayload(
-            request.IssueId,
-            request.Hours,
-            request.SpentOn,
-            request.ActivityId,
-            request.Comments));
+        message.Content = JsonContent.Create(CreateTimeEntryPayload(request));
 
         return await _httpClient.SendAsync(message, cancellationToken);
     }
@@ -381,13 +429,48 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return _httpClient.SendAsync(message, cancellationToken);
     }
 
+    private static object CreateTimeEntryPayload(TimeEntryCreateRequest request) =>
+        CreateTimeEntryPayload(
+            request.IssueId,
+            request.Hours,
+            request.SpentOn,
+            request.ActivityId,
+            request.Comments,
+            request.CustomFields);
+
+    private static object CreateTimeEntryPayload(TimeEntryUpdateRequest request) =>
+        CreateTimeEntryPayload(
+            request.IssueId,
+            request.Hours,
+            request.SpentOn,
+            request.ActivityId,
+            request.Comments,
+            request.CustomFields);
+
     private static object CreateTimeEntryPayload(
         int issueId,
         double hours,
         string spentOn,
         int activityId,
-        string comments) =>
-        new
+        string comments,
+        IReadOnlyList<TimeEntryCustomFieldValue> customFields)
+    {
+        if (customFields.Count == 0)
+        {
+            return new
+            {
+                time_entry = new
+                {
+                    issue_id = issueId,
+                    hours,
+                    spent_on = spentOn,
+                    activity_id = activityId,
+                    comments
+                }
+            };
+        }
+
+        return new
         {
             time_entry = new
             {
@@ -395,9 +478,87 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
                 hours,
                 spent_on = spentOn,
                 activity_id = activityId,
-                comments
+                comments,
+                custom_fields = customFields.Select(field => new
+                {
+                    id = field.Id,
+                    value = field.Value
+                }).ToArray()
             }
         };
+    }
+
+    private static List<TimeEntryCustomFieldDefinitionDto> ParseTimeEntryCustomFieldDefinitions(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("custom_fields", out var fieldsElement) ||
+            fieldsElement.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var definitions = new List<TimeEntryCustomFieldDefinitionDto>();
+        foreach (var fieldElement in fieldsElement.EnumerateArray())
+        {
+            var customizedType = ReadString(fieldElement, "customized_type");
+            if (!string.Equals(customizedType, "time_entry", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            definitions.Add(new TimeEntryCustomFieldDefinitionDto
+            {
+                Id = ReadInt(fieldElement, "id"),
+                Name = ReadString(fieldElement, "name"),
+                Customized_Type = customizedType,
+                Field_Format = ReadString(fieldElement, "field_format"),
+                Is_Required = ReadBool(fieldElement, "is_required"),
+                Default_Value = ReadNullableString(fieldElement, "default_value"),
+                Possible_Values = ReadPossibleValues(fieldElement)
+            });
+        }
+
+        return definitions;
+    }
+
+    private static List<string> ReadPossibleValues(JsonElement fieldElement)
+    {
+        if (!fieldElement.TryGetProperty("possible_values", out var valuesElement) ||
+            valuesElement.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var values = new List<string>();
+        foreach (var valueElement in valuesElement.EnumerateArray())
+        {
+            switch (valueElement.ValueKind)
+            {
+                case JsonValueKind.String:
+                    values.Add(valueElement.GetString() ?? string.Empty);
+                    break;
+                case JsonValueKind.Object when valueElement.TryGetProperty("value", out var nestedValue):
+                    values.Add(nestedValue.GetString() ?? string.Empty);
+                    break;
+            }
+        }
+
+        return values.Where(value => !string.IsNullOrWhiteSpace(value)).ToList();
+    }
+
+    private static string ReadString(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value) ? value.GetString() ?? string.Empty : string.Empty;
+
+    private static string? ReadNullableString(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value) ? value.GetString() : null;
+
+    private static int ReadInt(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value) && value.TryGetInt32(out var parsed) ? parsed : 0;
+
+    private static bool ReadBool(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value) &&
+        value.ValueKind is JsonValueKind.True or JsonValueKind.False &&
+        value.GetBoolean();
 
     private static HttpRequestMessage CreateRequest(HttpMethod method, string baseUrl, string apiKey, string relativeOrAbsolutePath)
     {
