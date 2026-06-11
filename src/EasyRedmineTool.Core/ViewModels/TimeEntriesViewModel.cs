@@ -26,6 +26,12 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
     private string favoriteFilterText = string.Empty;
 
     [ObservableProperty]
+    private bool showFavoritesOnly = true;
+
+    [ObservableProperty]
+    private string listScopeSummary = string.Empty;
+
+    [ObservableProperty]
     private double todayBookedHours;
 
     [ObservableProperty]
@@ -46,9 +52,21 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
     public string TodayBookedHoursDisplay =>
         $"{TodayBookedHours.ToString("0.##", CultureInfo.GetCultureInfo("de-DE"))} h";
 
+    public string BookingSectionTitle => ShowFavoritesOnly ? "Favoriten buchen" : "Tickets buchen";
+
+    public string SearchPlaceholder => ShowFavoritesOnly
+        ? "In Favoriten suchen (Nr., Betreff, Projekt) …"
+        : "In allen Tickets suchen (Nr., Betreff, Projekt) …";
+
     partial void OnTodayBookedHoursChanged(double value)
     {
         OnPropertyChanged(nameof(TodayBookedHoursDisplay));
+    }
+
+    partial void OnShowFavoritesOnlyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(BookingSectionTitle));
+        OnPropertyChanged(nameof(SearchPlaceholder));
     }
 
     internal void SetStatusMessage(string message)
@@ -76,15 +94,16 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
             row => row.Ticket.Id,
             row => (row.Hours, row.Comments, row.SpentOn, SelectedActivityId: row.SelectedActivity?.Id));
 
-        var favorites = settings.CachedTickets
-            .Where(t => settings.FavoriteTicketIds.Contains(t.Id))
+        var tickets = (ShowFavoritesOnly
+                ? settings.CachedTickets.Where(t => settings.FavoriteTicketIds.Contains(t.Id))
+                : settings.CachedTickets)
             .OrderByDescending(t => t.LastTimeEntryOn.HasValue)
             .ThenByDescending(t => t.LastTimeEntryOn)
             .ThenBy(t => t.Id)
             .ToList();
 
         FavoriteRows.Clear();
-        foreach (var ticket in favorites)
+        foreach (var ticket in tickets)
         {
             var row = new FavoriteTimeEntryRowViewModel(this, ticket, _appSettingsService, _timeEntryService);
             int? selectedActivityId = null;
@@ -102,10 +121,44 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
 
         ApplyFavoriteFilter();
 
-        StatusMessage = FavoriteRows.Count == 0
-            ? "Keine Favoriten vorhanden. Bitte in der Ticketliste Favoriten markieren."
-            : string.Empty;
+        if (FavoriteRows.Count == 0)
+        {
+            StatusMessage = GetEmptyListMessage();
+        }
+        else if (string.IsNullOrWhiteSpace(FavoriteFilterText) && FocusedIssueId is null)
+        {
+            StatusMessage = string.Empty;
+        }
     }
+
+    [RelayCommand]
+    private void ShowFavoritesOnlyView()
+    {
+        if (ShowFavoritesOnly)
+        {
+            return;
+        }
+
+        ShowFavoritesOnly = true;
+        ReloadFavorites();
+    }
+
+    [RelayCommand]
+    private void ShowAllTicketsView()
+    {
+        if (!ShowFavoritesOnly)
+        {
+            return;
+        }
+
+        ShowFavoritesOnly = false;
+        ReloadFavorites();
+    }
+
+    private string GetEmptyListMessage() =>
+        ShowFavoritesOnly
+            ? "Keine Favoriten vorhanden. Auf „Alle“ umschalten oder in der Ticketliste Favoriten markieren."
+            : "Keine Tickets in der lokalen Liste. Bitte zuerst in der Ticketliste laden.";
 
     private async Task RestoreAndLoadRowAsync(
         FavoriteTimeEntryRowViewModel row,
@@ -192,22 +245,25 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
 
     public void PrepareForIssue(int issueId)
     {
-        ReloadFavorites();
-
         var settings = _appSettingsService.Load();
-        if (!settings.FavoriteTicketIds.Contains(issueId))
+        var ticket = settings.CachedTickets.FirstOrDefault(t => t.Id == issueId);
+
+        if (ticket is null)
         {
+            ReloadFavorites();
             FocusedIssueId = null;
             FavoriteFilterText = string.Empty;
             ApplyFavoriteFilter();
-
-            var ticket = settings.CachedTickets.FirstOrDefault(t => t.Id == issueId);
-            StatusMessage = ticket is not null
-                ? $"#{issueId} ist kein Favorit. Bitte in der Ticketliste als Favorit markieren."
-                : $"#{issueId} ist kein Favorit und nicht in der lokalen Ticketliste.";
+            StatusMessage = $"#{issueId} ist nicht in der lokalen Ticketliste.";
             return;
         }
 
+        if (!settings.FavoriteTicketIds.Contains(issueId))
+        {
+            ShowFavoritesOnly = false;
+        }
+
+        ReloadFavorites();
         FocusedIssueId = issueId;
         FavoriteFilterText = string.Empty;
         ApplyFavoriteFilter();
@@ -234,6 +290,23 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         }
 
         UpdateRowFocusStates();
+        UpdateListScopeSummary();
+    }
+
+    private void UpdateListScopeSummary()
+    {
+        var total = FavoriteRows.Count;
+        var filtered = FilteredFavoriteRows.Count;
+        var hasSearch = !string.IsNullOrWhiteSpace(FavoriteFilterText);
+        var scopeLabel = ShowFavoritesOnly ? "Favoriten" : "Tickets";
+
+        ListScopeSummary = total switch
+        {
+            0 => ShowFavoritesOnly ? "Keine Favoriten" : "Keine Tickets geladen",
+            _ when hasSearch && filtered != total => $"{filtered} von {total} {scopeLabel}",
+            1 => ShowFavoritesOnly ? "1 Favorit" : "1 Ticket",
+            _ => $"{total} {scopeLabel}"
+        };
     }
 
     private void UpdateRowFocusStates()

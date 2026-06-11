@@ -39,7 +39,33 @@ public class TimeEntriesViewModelTests
     }
 
     [Fact]
-    public void PrepareForIssue_shows_message_for_non_favorite()
+    public void PrepareForIssue_switches_to_all_tickets_for_non_favorite()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            FavoriteTicketIds = [100],
+            CachedTickets =
+            [
+                new IssueDto { Id = 100, Subject = "Alpha" },
+                new IssueDto { Id = 200, Subject = "Beta" }
+            ]
+        });
+
+        var viewModel = new TimeEntriesViewModel(context.SettingsService, context.TimeEntryService);
+        viewModel.PrepareForIssue(200);
+
+        Assert.False(viewModel.ShowFavoritesOnly);
+        Assert.Equal(200, viewModel.FocusedIssueId);
+        Assert.Single(viewModel.FilteredFavoriteRows);
+        Assert.Equal(200, viewModel.FilteredFavoriteRows[0].Ticket.Id);
+        Assert.True(viewModel.FilteredFavoriteRows[0].IsFocused);
+    }
+
+    [Fact]
+    public void PrepareForIssue_shows_message_for_missing_ticket()
     {
         using var context = TestContext.Create();
         context.SettingsService.Save(new AppSettings
@@ -54,7 +80,64 @@ public class TimeEntriesViewModelTests
         viewModel.PrepareForIssue(999);
 
         Assert.Null(viewModel.FocusedIssueId);
-        Assert.Contains("kein Favorit", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("nicht in der lokalen Ticketliste", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ShowAllTicketsView_lists_all_cached_tickets()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            FavoriteTicketIds = [100],
+            CachedTickets =
+            [
+                new IssueDto { Id = 100, Subject = "Alpha" },
+                new IssueDto { Id = 200, Subject = "Beta" },
+                new IssueDto { Id = 300, Subject = "Gamma" }
+            ]
+        });
+
+        var viewModel = new TimeEntriesViewModel(context.SettingsService, context.TimeEntryService);
+        Assert.Single(viewModel.FavoriteRows);
+
+        viewModel.ShowAllTicketsViewCommand.Execute(null);
+
+        Assert.False(viewModel.ShowFavoritesOnly);
+        Assert.Equal(3, viewModel.FavoriteRows.Count);
+        Assert.Equal(3, viewModel.FilteredFavoriteRows.Count);
+    }
+
+    [Fact]
+    public void FavoriteFilterText_searches_only_within_favorites_scope()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            FavoriteTicketIds = [100],
+            CachedTickets =
+            [
+                new IssueDto { Id = 100, Subject = "Alpha Task" },
+                new IssueDto { Id = 200, Subject = "Beta Task" }
+            ]
+        });
+
+        var viewModel = new TimeEntriesViewModel(context.SettingsService, context.TimeEntryService);
+        viewModel.FavoriteFilterText = "beta";
+
+        Assert.Empty(viewModel.FilteredFavoriteRows);
+        Assert.Equal("0 von 1 Favoriten", viewModel.ListScopeSummary);
+
+        viewModel.ShowAllTicketsViewCommand.Execute(null);
+        viewModel.FavoriteFilterText = "beta";
+
+        Assert.Single(viewModel.FilteredFavoriteRows);
+        Assert.Equal(200, viewModel.FilteredFavoriteRows[0].Ticket.Id);
+        Assert.Equal("1 von 2 Tickets", viewModel.ListScopeSummary);
     }
 
     [Fact]

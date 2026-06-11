@@ -174,4 +174,47 @@
   <Style Selector="ToggleButton.theme-toggle:checked">
     <Setter Property="Background" Value="{DynamicResource AppSecondaryHoverBackgroundBrush}" />
   </Style>
+
+  <Style Selector="Border.filter-segment-group">
+    <Setter Property="Background" Value="{DynamicResource AppSecondaryHoverBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppSecondaryBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="3" />
+  </Style>
+
+  <Style Selector="Button.filter-segment">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="14,6" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="MinWidth" Value="88" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource AppSecondaryForegroundBrush}" />
+    <Setter Property="Opacity" Value="0.7" />
+  </Style>
+
+  <Style Selector="Button.filter-segment:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppGhostHoverBackgroundBrush}" />
+    <Setter Property="Opacity" Value="0.9" />
+  </Style>
+
+  <Style Selector="Button.filter-segment.active">
+    <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentForegroundBrush}" />
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="Button.filter-segment.active:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppAccentHoverBrush}" />
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
+  <Style Selector="Button.filter-segment.active:pressed">
+    <Setter Property="Background" Value="{DynamicResource AppAccentPressedBrush}" />
+    <Setter Property="Opacity" Value="1" />
+  </Style>
 </Styles>

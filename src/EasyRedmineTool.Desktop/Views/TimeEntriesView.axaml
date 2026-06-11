@@ -119,21 +119,40 @@
               Classes="time-entry-card"
               HorizontalAlignment="Stretch">
         <StackPanel Spacing="16">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
             <TextBlock Grid.Column="0"
                        Classes="section-title"
-                       Text="Favoriten buchen"
+                       Text="{Binding BookingSectionTitle}"
                        VerticalAlignment="Center" />
-            <Button Grid.Column="1"
+            <Border Grid.Column="1"
+                    Classes="filter-segment-group"
+                    VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="2">
+                <Button Classes="filter-segment"
+                        Classes.active="{Binding ShowFavoritesOnly}"
+                        Content="Favoriten"
+                        Command="{Binding ShowFavoritesOnlyViewCommand}" />
+                <Button Classes="filter-segment"
+                        Classes.active="{Binding !ShowFavoritesOnly}"
+                        Content="Alle"
+                        Command="{Binding ShowAllTicketsViewCommand}" />
+              </StackPanel>
+            </Border>
+            <Button Grid.Column="2"
                     Classes="ghost compact"
-                    ToolTip.Tip="Favoriten neu laden"
+                    ToolTip.Tip="Liste neu laden"
                     Command="{Binding ReloadFavoritesCommand}">
               <materialIcons:MaterialIcon Kind="Refresh" Width="18" Height="18" />
             </Button>
           </Grid>
 
-          <TextBox Text="{Binding FavoriteFilterText}"
-                   PlaceholderText="Ticket suchen (Nr., Betreff, Projekt) …" />
+          <StackPanel Spacing="4">
+            <TextBox Text="{Binding FavoriteFilterText}"
+                     PlaceholderText="{Binding SearchPlaceholder}" />
+            <TextBlock Text="{Binding ListScopeSummary}"
+                       FontSize="12"
+                       Opacity="0.75" />
+          </StackPanel>
 
           <ItemsControl ItemsSource="{Binding FilteredFavoriteRows}">
             <ItemsControl.ItemTemplate>
