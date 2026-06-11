@@ -24,7 +24,7 @@ internal sealed class TimeEntryFormDataCache
 
         var loadTask = _activitiesInflight.GetOrAdd(
             cacheKey,
-            _ => loader(cancellationToken));
+            _ => loader(CancellationToken.None));
 
         try
         {
@@ -50,7 +50,7 @@ internal sealed class TimeEntryFormDataCache
 
         var loadTask = _definitionsInflight.GetOrAdd(
             cacheKey,
-            _ => loader(cancellationToken));
+            _ => loader(CancellationToken.None));
 
         try
         {

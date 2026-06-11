@@ -119,6 +119,11 @@ public partial class SeriesBookingViewModel : ViewModelBase
     {
         ReloadTickets();
         StatusMessage = string.Empty;
+
+        if (SelectedTicket is not null)
+        {
+            _ = LoadTicketDetailsAsync();
+        }
     }
 
     partial void OnSelectedTicketChanged(IssueDto? value)

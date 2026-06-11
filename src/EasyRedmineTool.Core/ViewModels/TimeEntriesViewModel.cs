@@ -48,9 +48,6 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
     {
         _appSettingsService = appSettingsService;
         _timeEntryService = timeEntryService;
-
-        ReloadFavorites();
-        _ = ReloadTodayBookedHoursAsync();
     }
 
     public string TodayBookedHoursDisplay =>
