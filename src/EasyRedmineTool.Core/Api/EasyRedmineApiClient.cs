@@ -336,20 +336,6 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return [];
     }
 
-    public async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetAllTimeEntryCustomFieldDefinitionsAsync(
-        string baseUrl,
-        string apiKey,
-        CancellationToken cancellationToken = default)
-    {
-        const string endpoint = "custom_fields.json";
-        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        await EnsureSuccessAsync(response, endpoint, cancellationToken);
-
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return ParseTimeEntryCustomFieldDefinitions(json);
-    }
-
     public async Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentTimeEntryCustomFieldValuesAsync(
         string baseUrl,
         string apiKey,
@@ -494,107 +480,6 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
             }
         };
     }
-
-    private static List<TimeEntryCustomFieldDefinitionDto> ParseTimeEntryCustomFieldDefinitions(string json)
-    {
-        using var doc = JsonDocument.Parse(json);
-        if (!doc.RootElement.TryGetProperty("custom_fields", out var fieldsElement) ||
-            fieldsElement.ValueKind != JsonValueKind.Array)
-        {
-            return [];
-        }
-
-        var definitions = new List<TimeEntryCustomFieldDefinitionDto>();
-        foreach (var fieldElement in fieldsElement.EnumerateArray())
-        {
-            var customizedType = ReadString(fieldElement, "customized_type");
-            if (!string.Equals(customizedType, "time_entry", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            definitions.Add(new TimeEntryCustomFieldDefinitionDto
-            {
-                Id = ReadInt(fieldElement, "id"),
-                Name = ReadString(fieldElement, "name"),
-                Customized_Type = customizedType,
-                Field_Format = ReadString(fieldElement, "field_format"),
-                Is_Required = ReadBool(fieldElement, "is_required"),
-                Default_Value = ReadNullableString(fieldElement, "default_value"),
-                Possible_Values = ReadPossibleValues(fieldElement),
-                Project_Ids = ReadProjectIds(fieldElement)
-            });
-        }
-
-        return definitions;
-    }
-
-    private static List<int> ReadProjectIds(JsonElement fieldElement)
-    {
-        if (!fieldElement.TryGetProperty("projects", out var projectsElement) ||
-            projectsElement.ValueKind != JsonValueKind.Array)
-        {
-            return [];
-        }
-
-        var projectIds = new List<int>();
-        foreach (var projectElement in projectsElement.EnumerateArray())
-        {
-            if (projectElement.ValueKind == JsonValueKind.Number && projectElement.TryGetInt32(out var projectId))
-            {
-                projectIds.Add(projectId);
-                continue;
-            }
-
-            if (projectElement.ValueKind == JsonValueKind.Object &&
-                projectElement.TryGetProperty("id", out var idElement) &&
-                idElement.TryGetInt32(out projectId))
-            {
-                projectIds.Add(projectId);
-            }
-        }
-
-        return projectIds;
-    }
-
-    private static List<string> ReadPossibleValues(JsonElement fieldElement)
-    {
-        if (!fieldElement.TryGetProperty("possible_values", out var valuesElement) ||
-            valuesElement.ValueKind != JsonValueKind.Array)
-        {
-            return [];
-        }
-
-        var values = new List<string>();
-        foreach (var valueElement in valuesElement.EnumerateArray())
-        {
-            switch (valueElement.ValueKind)
-            {
-                case JsonValueKind.String:
-                    values.Add(valueElement.GetString() ?? string.Empty);
-                    break;
-                case JsonValueKind.Object when valueElement.TryGetProperty("value", out var nestedValue):
-                    values.Add(nestedValue.GetString() ?? string.Empty);
-                    break;
-            }
-        }
-
-        return values.Where(value => !string.IsNullOrWhiteSpace(value)).ToList();
-    }
-
-    private static string ReadString(JsonElement element, string propertyName) =>
-        element.TryGetProperty(propertyName, out var value) ? value.GetString() ?? string.Empty : string.Empty;
-
-    private static string? ReadNullableString(JsonElement element, string propertyName) =>
-        element.TryGetProperty(propertyName, out var value) ? value.GetString() : null;
-
-    private static int ReadInt(JsonElement element, string propertyName) =>
-        element.TryGetProperty(propertyName, out var value) && value.TryGetInt32(out var parsed) ? parsed : 0;
-
-    private static bool ReadBool(JsonElement element, string propertyName) =>
-        element.TryGetProperty(propertyName, out var value) &&
-        value.ValueKind is JsonValueKind.True or JsonValueKind.False &&
-        value.GetBoolean();
 
     private async Task EnsureSuccessAsync(
         HttpResponseMessage response,

@@ -266,11 +266,6 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             ?? Activities.FirstOrDefault(activity => activity.Id == _entry.Activity?.Id)
             ?? Activities.FirstOrDefault();
 
-        var definitions = await _timeEntryService.GetCustomFieldDefinitionsAsync(
-            settings.BaseUrl,
-            settings.ApiKey,
-            projectId);
-
         var recentValues = await _timeEntryService.GetRecentCustomFieldValuesAsync(
             settings.BaseUrl,
             settings.ApiKey,
@@ -279,7 +274,6 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
 
         CustomFields.Clear();
         foreach (var row in TimeEntryCustomFieldSupport.CreateRows(
-                     definitions,
                      recentValues,
                      settings,
                      _entry.Custom_Fields))

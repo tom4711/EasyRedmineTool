@@ -79,12 +79,6 @@ public class TicketServiceCacheTests
             CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
-        public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetAllTimeEntryCustomFieldDefinitionsAsync(
-            string baseUrl,
-            string apiKey,
-            CancellationToken cancellationToken = default) =>
-            throw new NotImplementedException();
-
         public Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentTimeEntryCustomFieldValuesAsync(
             string baseUrl,
             string apiKey,

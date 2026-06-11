@@ -11,12 +11,6 @@ public interface ITimeEntryService
         int? projectId = null,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
-        string baseUrl,
-        string apiKey,
-        int? projectId = null,
-        CancellationToken cancellationToken = default);
-
     Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentCustomFieldValuesAsync(
         string baseUrl,
         string apiKey,

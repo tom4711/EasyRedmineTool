@@ -56,11 +56,6 @@ public interface IEasyRedmineApiClient
         int? projectId = null,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetAllTimeEntryCustomFieldDefinitionsAsync(
-        string baseUrl,
-        string apiKey,
-        CancellationToken cancellationToken = default);
-
     Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentTimeEntryCustomFieldValuesAsync(
         string baseUrl,
         string apiKey,
