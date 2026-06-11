@@ -108,6 +108,38 @@ public class SeriesBookingViewModelTests
         Assert.Contains("1 Zeiteinträge wurden erstellt", viewModel.StatusMessage, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task SelectedTicket_change_ignores_stale_activity_load()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            CachedTickets =
+            [
+                new IssueDto { Id = 100, Subject = "Alpha" },
+                new IssueDto { Id = 200, Subject = "Beta" }
+            ]
+        });
+
+        context.TimeEntryService.ActivitiesDelay = TimeSpan.FromMilliseconds(150);
+        context.TimeEntryService.ActivityFactory = issueId =>
+        [
+            new TimeEntryActivityDto { Id = issueId ?? 0, Name = $"Activity-{issueId}" }
+        ];
+
+        var viewModel = new SeriesBookingViewModel(context.SettingsService, context.TimeEntryService);
+        viewModel.PrepareView();
+        viewModel.SelectedTicket = viewModel.Tickets.First(ticket => ticket.Id == 100);
+        viewModel.SelectedTicket = viewModel.Tickets.First(ticket => ticket.Id == 200);
+
+        await Task.Delay(300);
+
+        Assert.Equal(200, viewModel.SelectedActivity?.Id);
+        Assert.Equal("Activity-200", viewModel.SelectedActivity?.Name);
+    }
+
     private static DateTime GetPreviousMonday(DateTime date)
     {
         var offset = ((int)date.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
@@ -156,13 +188,25 @@ public class SeriesBookingViewModelTests
 
         public List<TimeEntryCreateRequest> CreatedRequests { get; } = [];
 
-        public Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
+        public TimeSpan ActivitiesDelay { get; set; }
+
+        public Func<int?, IReadOnlyList<TimeEntryActivityDto>> ActivityFactory { get; set; } = _ => [];
+
+        public async Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
             string baseUrl,
             string apiKey,
             int? issueId = null,
             int? projectId = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<TimeEntryActivityDto>>([]);
+            CancellationToken cancellationToken = default)
+        {
+            if (ActivitiesDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(ActivitiesDelay, cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return ActivityFactory(issueId);
+        }
 
         public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
             string baseUrl,

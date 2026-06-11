@@ -61,6 +61,17 @@ public class EasyRedmineApiClientTests
         Assert.Equal(10_000, issues.Count);
     }
 
+    [Fact]
+    public async Task DeleteTimeEntryAsync_completes_successfully()
+    {
+        var handler = new CountingHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+
+        using var response = await client.DeleteTimeEntryAsync("https://redmine.example/", "secret", 42);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     [Theory]
     [InlineData(TicketAssigneeFilter.Me, TicketStatusFilterKind.Open, null, "assigned_to_id=me", "status_id=open")]
     [InlineData(TicketAssigneeFilter.Unassigned, TicketStatusFilterKind.Closed, null, "assigned_to_id=!*", "status_id=closed")]
