@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core;
+using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
@@ -12,7 +13,7 @@ using EasyRedmineTool.Core.Services.Interfaces;
 using System.Collections.ObjectModel;
 using System.Globalization;
 
-public partial class SeriesBookingViewModel : ViewModelBase
+public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 {
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
@@ -553,6 +554,10 @@ public partial class SeriesBookingViewModel : ViewModelBase
         catch (OperationCanceledException) when (loadToken.IsCancellationRequested)
         {
         }
+        catch (RedmineApiException ex)
+        {
+            StatusMessage = ex.Message;
+        }
     }
 
     private bool ShouldIgnoreTicketDetailsResult(CancellationToken loadToken, int ticketId) =>
@@ -569,6 +574,12 @@ public partial class SeriesBookingViewModel : ViewModelBase
     {
         _ticketDetailsCts = new CancellationTokenSource();
         return _ticketDetailsCts.Token;
+    }
+
+    public void Dispose()
+    {
+        CancelTicketDetailsLoad();
+        GC.SuppressFinalize(this);
     }
 
     private IReadOnlySet<DayOfWeek> GetSelectedWeekdays() =>

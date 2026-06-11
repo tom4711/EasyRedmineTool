@@ -62,6 +62,35 @@ public class EasyRedmineApiClientTests
     }
 
     [Fact]
+    public async Task GetIssuesAsync_throws_redmine_api_exception_on_http_error()
+    {
+        var handler = new CountingHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+
+        var exception = await Assert.ThrowsAsync<RedmineApiException>(() =>
+            client.GetIssuesAsync(
+                "https://redmine.example/",
+                "secret",
+                TicketAssigneeFilter.Me,
+                TicketStatusFilterKind.Open));
+
+        Assert.Equal(401, exception.StatusCode);
+        Assert.Contains("issues.json", exception.Endpoint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetTimeEntryActivitiesAsync_throws_when_all_endpoints_fail()
+    {
+        var handler = new CountingHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden));
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+
+        var exception = await Assert.ThrowsAsync<RedmineApiException>(() =>
+            client.GetTimeEntryActivitiesAsync("https://redmine.example/", "secret"));
+
+        Assert.Equal(403, exception.StatusCode);
+    }
+
+    [Fact]
     public async Task DeleteTimeEntryAsync_completes_successfully()
     {
         var handler = new CountingHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));

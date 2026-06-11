@@ -59,6 +59,10 @@ public class TimeEntryService(
         {
             throw;
         }
+        catch (RedmineApiException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Zeiteintrag-Aktivitäten konnten nicht geladen werden (Issue {IssueId}, Projekt {ProjectId}).", issueId, projectId);
