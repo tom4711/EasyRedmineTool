@@ -46,6 +46,16 @@ public partial class App : Application
             {
                 DataContext = mainWindowViewModel
             };
+
+            desktop.Exit += (_, _) =>
+            {
+                mainWindowViewModel.Dispose();
+
+                if (Services is IDisposable disposableServices)
+                {
+                    disposableServices.Dispose();
+                }
+            };
         }
 
         ApplyMacOsDockIcon();

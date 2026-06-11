@@ -7,6 +7,7 @@ using EasyRedmineTool.Core.Models.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -27,11 +28,9 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
 
     public async Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default)
     {
+        const string endpoint = "users/current.json";
         using var response = await GetCurrentUserAsync(baseUrl, apiKey, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
-        }
+        await EnsureSuccessAsync(response, endpoint, cancellationToken);
 
         var result = await response.Content.ReadFromJsonAsync<UserResponse>(RedmineJson.Options, cancellationToken);
         return result?.User.Id;
@@ -48,13 +47,10 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         string apiKey,
         CancellationToken cancellationToken = default)
     {
-        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "issue_statuses.json");
+        const string endpoint = "issue_statuses.json";
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            return [];
-        }
+        await EnsureSuccessAsync(response, endpoint, cancellationToken);
 
         var result = await response.Content.ReadFromJsonAsync<IssueStatusListResponse>(RedmineJson.Options, cancellationToken);
         return result?.Issue_Statuses ?? [];
@@ -111,11 +107,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, query);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
-        }
-
+        await EnsureSuccessAsync(response, query, cancellationToken);
         return await response.Content.ReadFromJsonAsync<IssueListResponse>(RedmineJson.Options, cancellationToken);
     }
 
@@ -155,13 +147,15 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
 
     public async Task<IssueResponse?> GetIssueByIdAsync(string baseUrl, string apiKey, int issueId, CancellationToken cancellationToken = default)
     {
-        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, $"issues/{issueId}.json");
+        var endpoint = $"issues/{issueId}.json";
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
+
+        await EnsureSuccessAsync(response, endpoint, cancellationToken);
 
         return await response.Content.ReadFromJsonAsync<IssueResponse>(RedmineJson.Options, cancellationToken);
     }
@@ -290,11 +284,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
-        }
-
+        await EnsureSuccessAsync(response, endpoint, cancellationToken);
         return await response.Content.ReadFromJsonAsync<TimeEntriesListResponse>(RedmineJson.Options, cancellationToken);
     }
 
@@ -316,21 +306,31 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
 
         endpoints.Add("enumerations/time_entry_activities.json");
 
+        RedmineApiException? lastFailure = null;
+        var hadSuccessfulResponse = false;
+
         foreach (var endpoint in endpoints)
         {
             using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
             using var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
+                lastFailure = await CreateApiExceptionAsync(response, endpoint, cancellationToken);
                 continue;
             }
 
+            hadSuccessfulResponse = true;
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var parsed = ParseActivities(json);
             if (parsed.Count > 0)
             {
                 return parsed;
             }
+        }
+
+        if (!hadSuccessfulResponse && lastFailure is not null)
+        {
+            throw lastFailure;
         }
 
         return [];
@@ -341,13 +341,10 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         string apiKey,
         CancellationToken cancellationToken = default)
     {
-        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "custom_fields.json");
+        const string endpoint = "custom_fields.json";
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            return [];
-        }
+        await EnsureSuccessAsync(response, endpoint, cancellationToken);
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return ParseTimeEntryCustomFieldDefinitions(json);
@@ -374,21 +371,31 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
 
         endpoints.Add("time_entries.json?user_id=me&limit=1");
 
+        RedmineApiException? lastFailure = null;
+        var hadSuccessfulResponse = false;
+
         foreach (var endpoint in endpoints)
         {
             using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
             using var response = await _httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
+                lastFailure = await CreateApiExceptionAsync(response, endpoint, cancellationToken);
                 continue;
             }
 
+            hadSuccessfulResponse = true;
             var result = await response.Content.ReadFromJsonAsync<TimeEntriesListResponse>(RedmineJson.Options, cancellationToken);
             var entry = result?.Time_Entries?.FirstOrDefault();
             if (entry?.Custom_Fields is { Count: > 0 })
             {
                 return entry.Custom_Fields;
             }
+        }
+
+        if (!hadSuccessfulResponse && lastFailure is not null)
+        {
+            throw lastFailure;
         }
 
         return [];
@@ -588,6 +595,34 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         element.TryGetProperty(propertyName, out var value) &&
         value.ValueKind is JsonValueKind.True or JsonValueKind.False &&
         value.GetBoolean();
+
+    private async Task EnsureSuccessAsync(
+        HttpResponseMessage response,
+        string endpoint,
+        CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        throw await CreateApiExceptionAsync(response, endpoint, cancellationToken);
+    }
+
+    private async Task<RedmineApiException> CreateApiExceptionAsync(
+        HttpResponseMessage response,
+        string endpoint,
+        CancellationToken cancellationToken)
+    {
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        _logger.LogWarning(
+            "Redmine API request failed: {Endpoint} {StatusCode} {ReasonPhrase}",
+            endpoint,
+            (int)response.StatusCode,
+            response.ReasonPhrase);
+
+        return new RedmineApiException(endpoint, (int)response.StatusCode, response.ReasonPhrase, body);
+    }
 
     private static HttpRequestMessage CreateRequest(HttpMethod method, string baseUrl, string apiKey, string relativeOrAbsolutePath)
     {

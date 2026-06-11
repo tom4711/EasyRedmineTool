@@ -14,10 +14,11 @@ using EasyRedmineTool.Core.ViewModels;
 using System;
 using System.Linq;
 
-public partial class MainWindowViewModel : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly IAppSettingsService _appSettingsService;
     private bool _isApplyingThemeFromSettings;
+    private bool _disposed;
 
     [ObservableProperty]
     private bool isSettingsVisible;
@@ -222,5 +223,23 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         HideAllViews();
         IsAboutVisible = true;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        SettingsViewModel.SettingsSaved -= OnSettingsSaved;
+        WeeklySummaryViewModel.OpenTimeEntryRequested -= OnOpenTimeEntryFromSummary;
+
+        SettingsViewModel.Dispose();
+        TicketListViewModel.Dispose();
+        TimeEntriesViewModel.Dispose();
+        WeeklySummaryViewModel.Dispose();
+        SeriesBookingViewModel.Dispose();
     }
 }

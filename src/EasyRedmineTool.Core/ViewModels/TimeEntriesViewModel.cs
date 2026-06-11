@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core;
+using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
@@ -198,6 +199,13 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         catch (OperationCanceledException)
         {
             // A newer ReloadFavorites call superseded this load.
+        }
+        catch (RedmineApiException ex)
+        {
+            if (string.IsNullOrWhiteSpace(StatusMessage))
+            {
+                StatusMessage = ex.Message;
+            }
         }
     }
 
