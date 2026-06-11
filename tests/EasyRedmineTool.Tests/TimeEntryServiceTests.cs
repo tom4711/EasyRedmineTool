@@ -93,6 +93,24 @@ public class TimeEntryServiceTests
         public Task<HttpResponseMessage> GetCurrentUserAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
+        public Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<IReadOnlyList<StatusDto>> GetIssueStatusesAsync(
+            string baseUrl,
+            string apiKey,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<IReadOnlyList<IssueDto>> GetIssuesAsync(
+            string baseUrl,
+            string apiKey,
+            TicketAssigneeFilter assigneeFilter,
+            TicketStatusFilterKind statusKind,
+            int? statusId = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
         public Task<IReadOnlyList<IssueDto>> GetAllMyOpenIssuesAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
@@ -146,7 +164,17 @@ public class TimeEntryServiceTests
         public Task<IReadOnlyList<IssueDto>> GetMyOpenIssuesAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
-        public Task<TicketListLoadResult> GetTicketsForListAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyList<StatusDto>> GetIssueStatusesAsync(
+            string baseUrl,
+            string apiKey,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<TicketListLoadResult> GetTicketsForListAsync(
+            string baseUrl,
+            string apiKey,
+            TicketLoadFilter filter,
+            CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
         public Task<IssueDto?> GetIssueByIdAsync(string baseUrl, string apiKey, int issueId, CancellationToken cancellationToken = default) =>

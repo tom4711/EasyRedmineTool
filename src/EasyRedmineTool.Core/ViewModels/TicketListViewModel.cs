@@ -9,6 +9,7 @@ using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
+using System.Globalization;
 
 public partial class TicketListViewModel : ViewModelBase, IDisposable
 {
@@ -16,6 +17,10 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     private readonly IAppSettingsService _appSettingsService;
     private readonly HashSet<int> _favoriteTicketIds = [];
     private CancellationTokenSource? _operationCts;
+    private TicketStatusFilterKind _pendingStatusFilterKind = TicketStatusFilterKind.Open;
+    private int? _pendingStatusId;
+    private string? _pendingStatusName;
+    private bool _isRestoringStatusFilter;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -29,7 +34,28 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private TicketListItemViewModel? selectedTicket;
 
+    [ObservableProperty]
+    private TicketFilterOption<TicketAssigneeFilter>? selectedAssigneeFilter;
+
+    [ObservableProperty]
+    private TicketFilterOption<TicketStatusFilterSelection>? selectedStatusFilter;
+
+    [ObservableProperty]
+    private DateTime? lastBookedUntil;
+
+    [ObservableProperty]
+    private DateTime calendarDisplayDate = DateTime.Today;
+
     public ObservableCollection<TicketListItemViewModel> Tickets { get; } = [];
+
+    public ObservableCollection<TicketFilterOption<TicketStatusFilterSelection>> StatusFilterOptions { get; } = [];
+
+    public IReadOnlyList<TicketFilterOption<TicketAssigneeFilter>> AssigneeFilterOptions { get; } =
+    [
+        new("Mir zugewiesen", TicketAssigneeFilter.Me),
+        new("Nicht zugewiesen", TicketAssigneeFilter.Unassigned),
+        new("Alle", TicketAssigneeFilter.All)
+    ];
 
     public TicketListViewModel(ITicketService ticketService, IAppSettingsService appSettingsService)
     {
@@ -37,6 +63,34 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         _appSettingsService = appSettingsService;
 
         ReloadSettings();
+        _ = ReloadStatusFilterOptionsAsync();
+    }
+
+    public string LastBookedUntilLabel =>
+        LastBookedUntil.HasValue
+            ? LastBookedUntil.Value.ToString("dddd, dd.MM.yyyy", CultureInfo.GetCultureInfo("de-DE"))
+            : "Kein Filter";
+
+    public bool HasLastBookedUntilFilter => LastBookedUntil.HasValue;
+
+    partial void OnLastBookedUntilChanged(DateTime? value)
+    {
+        OnPropertyChanged(nameof(LastBookedUntilLabel));
+        OnPropertyChanged(nameof(HasLastBookedUntilFilter));
+        PersistFilterSettings();
+    }
+
+    partial void OnSelectedAssigneeFilterChanged(TicketFilterOption<TicketAssigneeFilter>? value) =>
+        PersistFilterSettings();
+
+    partial void OnSelectedStatusFilterChanged(TicketFilterOption<TicketStatusFilterSelection>? value)
+    {
+        if (_isRestoringStatusFilter || value is null)
+        {
+            return;
+        }
+
+        PersistFilterSettings();
     }
 
     public void ReloadSettings()
@@ -49,8 +103,19 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             _favoriteTicketIds.Add(id);
         }
 
+        SelectedAssigneeFilter = AssigneeFilterOptions.First(option => option.Value == settings.TicketLoadAssigneeFilter);
+        _pendingStatusFilterKind = settings.TicketLoadStatusFilterKind;
+        _pendingStatusId = settings.TicketLoadStatusId;
+        _pendingStatusName = settings.TicketLoadStatusName;
+        LastBookedUntil = RedmineDates.TryParseSpentOn(settings.TicketLoadLastBookedUntil);
+        RestoreSelectedStatusFilter();
+
         Tickets.Clear();
-        foreach (var ticket in settings.CachedTickets)
+        var lastLoadedIds = settings.LastLoadedTicketIds.Count > 0
+            ? settings.LastLoadedTicketIds.ToHashSet()
+            : settings.CachedTickets.Select(ticket => ticket.Id).ToHashSet();
+
+        foreach (var ticket in settings.CachedTickets.Where(ticket => lastLoadedIds.Contains(ticket.Id)))
         {
             Tickets.Add(CreateTicketItem(ticket));
         }
@@ -68,8 +133,10 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             StatusMessage = "Tickets werden geladen ...";
             Tickets.Clear();
 
+            SyncPendingFromSelection();
+            var filter = BuildCurrentFilter();
             var (baseUrl, apiKey) = LoadCredentials();
-            var result = await _ticketService.GetTicketsForListAsync(baseUrl, apiKey, cancellationToken);
+            var result = await _ticketService.GetTicketsForListAsync(baseUrl, apiKey, filter, cancellationToken);
 
             if (cancellationToken.IsCancellationRequested)
             {
@@ -82,9 +149,8 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             }
 
             PersistCurrentState();
-            StatusMessage = result.TimeEntryTicketCount == 0
-                ? $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} offen zugewiesen)."
-                : $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} offen zugewiesen, {result.TimeEntryTicketCount} mit Zeiteinträgen im letzten Jahr).";
+            RestoreSelectedStatusFilter(SelectedStatusFilter?.Value);
+            StatusMessage = BuildLoadStatusMessage(result, filter, SelectedStatusFilter?.Value);
         }
         catch (OperationCanceledException)
         {
@@ -98,6 +164,12 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         {
             CompleteOperation(operationCts);
         }
+    }
+
+    [RelayCommand]
+    private void ClearLastBookedUntilFilter()
+    {
+        LastBookedUntil = null;
     }
 
     [RelayCommand]
@@ -180,6 +252,123 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         RedmineLinks.OpenIssueInBrowser(baseUrl, ticketItem.Ticket.Id);
     }
 
+    private async Task ReloadStatusFilterOptionsAsync(CancellationToken cancellationToken = default)
+    {
+        var (baseUrl, apiKey) = LoadCredentials();
+        if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            ApplyDefaultStatusFilterOptions();
+            RestoreSelectedStatusFilter();
+            return;
+        }
+
+        try
+        {
+            var statuses = await _ticketService.GetIssueStatusesAsync(baseUrl, apiKey, cancellationToken);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            RebuildStatusFilterOptions(statuses);
+            RestoreSelectedStatusFilter();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            ApplyDefaultStatusFilterOptions();
+            RestoreSelectedStatusFilter();
+        }
+    }
+
+    private void RebuildStatusFilterOptions(IReadOnlyList<StatusDto> statuses)
+    {
+        var preservedSelection = SelectedStatusFilter?.Value;
+        PopulateStatusFilterOptions(statuses);
+        RestoreSelectedStatusFilter(preservedSelection);
+    }
+
+    private void ApplyDefaultStatusFilterOptions()
+    {
+        var preservedSelection = SelectedStatusFilter?.Value;
+        PopulateStatusFilterOptions([]);
+        RestoreSelectedStatusFilter(preservedSelection);
+    }
+
+    private void PopulateStatusFilterOptions(IReadOnlyList<StatusDto> statuses)
+    {
+        _isRestoringStatusFilter = true;
+        try
+        {
+            StatusFilterOptions.Clear();
+            StatusFilterOptions.Add(new TicketFilterOption<TicketStatusFilterSelection>(
+                TicketStatusFilterSelection.All.Label,
+                TicketStatusFilterSelection.All));
+            StatusFilterOptions.Add(new TicketFilterOption<TicketStatusFilterSelection>(
+                TicketStatusFilterSelection.Open.Label,
+                TicketStatusFilterSelection.Open));
+            StatusFilterOptions.Add(new TicketFilterOption<TicketStatusFilterSelection>(
+                TicketStatusFilterSelection.Closed.Label,
+                TicketStatusFilterSelection.Closed));
+
+            foreach (var status in statuses.OrderBy(status => status.Is_Closed).ThenBy(status => status.Name))
+            {
+                StatusFilterOptions.Add(new TicketFilterOption<TicketStatusFilterSelection>(
+                    status.Name,
+                    TicketStatusFilterSelection.FromStatus(status)));
+            }
+        }
+        finally
+        {
+            _isRestoringStatusFilter = false;
+        }
+    }
+
+    private void RestoreSelectedStatusFilter(TicketStatusFilterSelection? preservedSelection = null)
+    {
+        var selection = preservedSelection
+            ?? TicketStatusFilterSelection.TryCreate(_pendingStatusFilterKind, _pendingStatusId, _pendingStatusName);
+
+        _isRestoringStatusFilter = true;
+        try
+        {
+            SelectedStatusFilter = selection is null
+                ? FindStatusFilterOption(TicketStatusFilterSelection.Open)
+                : FindStatusFilterOption(selection)
+                  ?? FindStatusFilterOption(TicketStatusFilterSelection.Open)
+                  ?? StatusFilterOptions.FirstOrDefault();
+        }
+        finally
+        {
+            _isRestoringStatusFilter = false;
+        }
+    }
+
+    private TicketFilterOption<TicketStatusFilterSelection>? FindStatusFilterOption(TicketStatusFilterSelection selection) =>
+        StatusFilterOptions.FirstOrDefault(option => MatchesStatusSelection(option.Value, selection));
+
+    private static bool MatchesStatusSelection(
+        TicketStatusFilterSelection left,
+        TicketStatusFilterSelection right) =>
+        left.Kind == right.Kind
+        && left.StatusId == right.StatusId;
+
+    private void SyncPendingFromSelection()
+    {
+        var selection = SelectedStatusFilter?.Value;
+        if (selection is null)
+        {
+            return;
+        }
+
+        _pendingStatusFilterKind = selection.Kind;
+        _pendingStatusId = selection.StatusId;
+        _pendingStatusName = selection.Kind == TicketStatusFilterKind.Specific ? selection.Label : null;
+    }
+
     private void ToggleFavorite(TicketListItemViewModel ticketItem)
     {
         if (ticketItem.IsFavorite)
@@ -201,6 +390,72 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     private TicketListItemViewModel CreateTicketItem(IssueDto ticket) =>
         new(ticket, _favoriteTicketIds.Contains(ticket.Id));
 
+    private TicketLoadFilter BuildCurrentFilter()
+    {
+        var statusSelection = SelectedStatusFilter?.Value
+            ?? TicketStatusFilterSelection.TryCreate(_pendingStatusFilterKind, _pendingStatusId, _pendingStatusName)
+            ?? TicketStatusFilterSelection.Open;
+        return new TicketLoadFilter
+        {
+            Assignee = SelectedAssigneeFilter?.Value ?? TicketAssigneeFilter.Me,
+            StatusKind = statusSelection.Kind,
+            StatusId = statusSelection.StatusId,
+            LastBookedUntil = LastBookedUntil
+        };
+    }
+
+    private static string BuildLoadStatusMessage(
+        TicketListLoadResult result,
+        TicketLoadFilter filter,
+        TicketStatusFilterSelection? statusSelection)
+    {
+        var filterSummary = BuildFilterSummary(filter, statusSelection);
+        if (result.TimeEntryTicketCount == 0)
+        {
+            return $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} aus Filter{filterSummary}).";
+        }
+
+        return $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} aus Filter, {result.TimeEntryTicketCount} mit Zeiteinträgen im letzten Jahr{filterSummary}).";
+    }
+
+    private static string BuildFilterSummary(
+        TicketLoadFilter filter,
+        TicketStatusFilterSelection? statusSelection)
+    {
+        var parts = new List<string>
+        {
+            DescribeAssigneeFilter(filter.Assignee),
+            DescribeStatusFilter(filter, statusSelection)
+        };
+
+        if (filter.LastBookedUntil.HasValue)
+        {
+            parts.Add($"zuletzt gebucht bis {filter.LastBookedUntil:dd.MM.yyyy}");
+        }
+
+        return $"; Filter: {string.Join(", ", parts)}";
+    }
+
+    private static string DescribeAssigneeFilter(TicketAssigneeFilter filter) =>
+        filter switch
+        {
+            TicketAssigneeFilter.Me => "mir zugewiesen",
+            TicketAssigneeFilter.Unassigned => "nicht zugewiesen",
+            TicketAssigneeFilter.All => "alle Zuweisungen",
+            _ => filter.ToString()
+        };
+
+    private static string DescribeStatusFilter(
+        TicketLoadFilter filter,
+        TicketStatusFilterSelection? statusSelection) =>
+        filter.StatusKind switch
+        {
+            TicketStatusFilterKind.Open => "alle offenen Status",
+            TicketStatusFilterKind.Closed => "alle geschlossenen Status",
+            TicketStatusFilterKind.Specific => statusSelection?.Label ?? $"Status #{filter.StatusId}",
+            _ => "alle Status"
+        };
+
     private (string BaseUrl, string ApiKey) LoadCredentials()
     {
         var settings = _appSettingsService.Load();
@@ -211,8 +466,32 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     {
         _appSettingsService.Update(settings =>
         {
-            settings.CachedTickets = Tickets.Select(t => t.Ticket).ToList();
+            var loadedTickets = Tickets.Select(ticket => ticket.Ticket).ToList();
+            settings.CachedTickets = TicketCacheMerger.Merge(
+                loadedTickets,
+                settings.CachedTickets,
+                _favoriteTicketIds);
             settings.FavoriteTicketIds = _favoriteTicketIds.ToList();
+            settings.LastLoadedTicketIds = loadedTickets.Select(ticket => ticket.Id).ToList();
+        });
+    }
+
+    private void PersistFilterSettings()
+    {
+        var statusSelection = SelectedStatusFilter?.Value ?? TicketStatusFilterSelection.Open;
+        _pendingStatusFilterKind = statusSelection.Kind;
+        _pendingStatusId = statusSelection.StatusId;
+        _pendingStatusName = statusSelection.Kind == TicketStatusFilterKind.Specific ? statusSelection.Label : null;
+
+        _appSettingsService.Update(settings =>
+        {
+            settings.TicketLoadAssigneeFilter = SelectedAssigneeFilter?.Value ?? TicketAssigneeFilter.Me;
+            settings.TicketLoadStatusFilterKind = statusSelection.Kind;
+            settings.TicketLoadStatusId = statusSelection.StatusId;
+            settings.TicketLoadStatusName = _pendingStatusName;
+            settings.TicketLoadLastBookedUntil = LastBookedUntil.HasValue
+                ? RedmineDates.FormatSpentOn(LastBookedUntil.Value)
+                : null;
         });
     }
 
