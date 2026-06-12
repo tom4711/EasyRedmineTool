@@ -26,6 +26,9 @@
                   Command="{Binding OpenTimeEntriesCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=ClockOutline, Text=Zeiteinträge}" />
           <Button Classes="nav"
+                  Command="{Binding OpenSeriesBookingCommand}"
+                  Content="{materialIcons:MaterialIconTextExt Kind=CalendarSync, Text=Serienbuchung}" />
+          <Button Classes="nav"
                   Command="{Binding OpenWeeklySummaryCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=ChartTimelineVariant, Text=Auswertung}" />
           <Button Classes="nav"
@@ -67,6 +70,10 @@
 
       <Grid IsVisible="{Binding IsWeeklySummaryVisible}">
         <views:WeeklySummaryView DataContext="{Binding WeeklySummaryViewModel}" />
+      </Grid>
+
+      <Grid IsVisible="{Binding IsSeriesBookingVisible}">
+        <views:SeriesBookingView DataContext="{Binding SeriesBookingViewModel}" />
       </Grid>
 
       <Grid IsVisible="{Binding IsAboutVisible}">

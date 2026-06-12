@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core;
+using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
@@ -39,6 +40,9 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
     private double todayBookedHours;
 
     [ObservableProperty]
+    private bool isTodayOverviewExpanded;
+
+    [ObservableProperty]
     private int? focusedIssueId;
 
     [ObservableProperty]
@@ -46,18 +50,25 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<FavoriteTimeEntryRowViewModel> FavoriteRows { get; } = [];
     public ObservableCollection<FavoriteTimeEntryRowViewModel> FilteredFavoriteRows { get; } = [];
+    public ObservableCollection<TodayTimeEntryRowViewModel> TodayTimeEntries { get; } = [];
 
     public TimeEntriesViewModel(IAppSettingsService appSettingsService, ITimeEntryService timeEntryService)
     {
         _appSettingsService = appSettingsService;
         _timeEntryService = timeEntryService;
-
-        ReloadFavorites();
-        _ = ReloadTodayBookedHoursAsync();
     }
 
     public string TodayBookedHoursDisplay =>
         $"{TodayBookedHours.ToString("0.##", CultureInfo.GetCultureInfo("de-DE"))} h";
+
+    public bool HasTodayTimeEntries => TodayTimeEntries.Count > 0;
+
+    public string TodayEntriesSummary => TodayTimeEntries.Count switch
+    {
+        0 => "Keine Einträge",
+        1 => "1 Eintrag",
+        _ => $"{TodayTimeEntries.Count} Einträge"
+    };
 
     public string BookingSectionTitle => ShowFavoritesOnly ? "Favoriten buchen" : "Tickets buchen";
 
@@ -79,6 +90,11 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
     internal void SetStatusMessage(string message)
     {
         StatusMessage = message;
+    }
+
+    internal void EnsureTodayOverviewExpanded()
+    {
+        IsTodayOverviewExpanded = true;
     }
 
     internal async Task HandleEntryCreatedAsync(
@@ -192,6 +208,13 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         {
             // A newer ReloadFavorites call superseded this load.
         }
+        catch (RedmineApiException ex)
+        {
+            if (string.IsNullOrWhiteSpace(StatusMessage))
+            {
+                StatusMessage = ex.Message;
+            }
+        }
     }
 
     [RelayCommand]
@@ -206,6 +229,9 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
             if (string.IsNullOrWhiteSpace(settings.ApiKey))
             {
                 TodayBookedHours = 0;
+                TodayTimeEntries.Clear();
+                OnPropertyChanged(nameof(HasTodayTimeEntries));
+                OnPropertyChanged(nameof(TodayEntriesSummary));
                 return;
             }
 
@@ -225,15 +251,34 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
             if (!result.Success)
             {
                 StatusMessage = result.Message;
+                TodayTimeEntries.Clear();
+                OnPropertyChanged(nameof(HasTodayTimeEntries));
+                OnPropertyChanged(nameof(TodayEntriesSummary));
                 return;
             }
 
             var todayKey = RedmineDates.TodayKey();
-            TodayBookedHours = Math.Round(
-                result.Entries
-                    .Where(entry => string.Equals(entry.Spent_On, todayKey, StringComparison.Ordinal))
-                    .Sum(entry => entry.Hours),
-                2);
+            var todayEntries = result.Entries
+                .Where(entry => string.Equals(entry.Spent_On, todayKey, StringComparison.Ordinal))
+                .OrderByDescending(entry => entry.Hours)
+                .ThenBy(entry => entry.GetIssueId())
+                .ToList();
+
+            TodayTimeEntries.Clear();
+            foreach (var entry in todayEntries)
+            {
+                var cachedTicket = settings.CachedTickets.FirstOrDefault(ticket => ticket.Id == entry.GetIssueId());
+                TodayTimeEntries.Add(new TodayTimeEntryRowViewModel(
+                    this,
+                    entry,
+                    cachedTicket,
+                    _appSettingsService,
+                    _timeEntryService));
+            }
+
+            TodayBookedHours = Math.Round(todayEntries.Sum(entry => entry.Hours), 2);
+            OnPropertyChanged(nameof(HasTodayTimeEntries));
+            OnPropertyChanged(nameof(TodayEntriesSummary));
         }
         catch (OperationCanceledException)
         {

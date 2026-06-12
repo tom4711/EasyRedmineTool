@@ -7,4 +7,6 @@ public class TimeEntryCreateRequest
     public string SpentOn { get; set; } = string.Empty;
     public int ActivityId { get; set; }
     public string Comments { get; set; } = string.Empty;
+
+    public List<TimeEntryCustomFieldValue> CustomFields { get; set; } = [];
 }

@@ -67,9 +67,8 @@
       <Setter Property="HorizontalAlignment" Value="Center" />
     </Style>
     <Style Selector="TextBlock.today-booked-value">
-      <Setter Property="FontSize" Value="36" />
+      <Setter Property="FontSize" Value="28" />
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
     </Style>
     <Style Selector="TextBlock.inline-field-label">
       <Setter Property="FontSize" Value="11" />
@@ -112,6 +111,31 @@
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="MinHeight" Value="34" />
     </Style>
+    <Style Selector="Border.today-entry-row">
+      <Setter Property="Background" Value="{DynamicResource FavoriteRowBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource FavoriteRowBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="12" />
+    </Style>
+    <Style Selector="Border.today-entry-delete-warning">
+      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="12" />
+    </Style>
+    <Style Selector="TextBlock.today-entry-meta">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Opacity" Value="0.8" />
+    </Style>
+    <Style Selector="Expander.today-overview">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Expander.today-overview /template/ ToggleButton#PART_toggle">
+      <Setter Property="Padding" Value="0" />
+    </Style>
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,*">
@@ -142,6 +166,200 @@
                      VerticalAlignment="Center"
                      TextWrapping="Wrap" />
         </StackPanel>
+      <Border Classes="time-entry-card"
+              Margin="0,8,0,0"
+              Padding="16"
+              HorizontalAlignment="Stretch">
+        <Expander Classes="today-overview"
+                  IsExpanded="{Binding IsTodayOverviewExpanded}"
+                  HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Stretch">
+          <Expander.Header>
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto"
+                  VerticalAlignment="Center"
+                  ColumnSpacing="12">
+              <TextBlock Grid.Column="0"
+                         Classes="today-booked-caption"
+                         Text="Heute gebucht"
+                         VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1"
+                         Classes="today-booked-value"
+                         Text="{Binding TodayBookedHoursDisplay}"
+                         VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2"
+                         Text="{Binding TodayEntriesSummary}"
+                         FontSize="12"
+                         Opacity="0.7"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Right"
+                         Margin="0,0,8,0" />
+            </Grid>
+          </Expander.Header>
+
+          <StackPanel Spacing="8" Margin="0,8,0,0">
+            <TextBlock Text="Einträge können bearbeitet oder mit Bestätigung gelöscht werden."
+                       FontSize="12"
+                       Opacity="0.75"
+                       TextWrapping="Wrap" />
+
+            <ItemsControl ItemsSource="{Binding TodayTimeEntries}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TodayTimeEntryRowViewModel">
+                  <Border Classes="today-entry-row"
+                          Margin="0,0,0,8">
+                    <StackPanel Spacing="10">
+                      <Grid ColumnDefinitions="*,Auto"
+                            IsVisible="{Binding !IsDeleteConfirmationVisible}">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                          <TextBlock Text="{Binding TicketLabel}"
+                                     FontWeight="SemiBold"
+                                     FontSize="13"
+                                     TextWrapping="Wrap" />
+                          <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Classes="today-entry-meta"
+                                       Text="{Binding HoursDisplay}" />
+                            <TextBlock Classes="today-entry-meta"
+                                       Text="{Binding ActivityName}" />
+                          </StackPanel>
+                          <TextBlock Classes="today-entry-meta"
+                                     Text="{Binding CommentsDisplay}"
+                                     TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    Spacing="4"
+                                    VerticalAlignment="Top"
+                                    IsVisible="{Binding !IsEditing}">
+                          <Button Classes="ghost compact"
+                                  ToolTip.Tip="Bearbeiten"
+                                  Command="{Binding BeginEditCommand}"
+                                  IsEnabled="{Binding !IsBusy}">
+                            <materialIcons:MaterialIcon Kind="Pencil" Width="16" Height="16" />
+                          </Button>
+                          <Button Classes="ghost compact"
+                                  ToolTip.Tip="Löschen"
+                                  Command="{Binding RequestDeleteCommand}"
+                                  IsEnabled="{Binding !IsBusy}">
+                            <materialIcons:MaterialIcon Kind="Delete" Width="16" Height="16" />
+                          </Button>
+                        </StackPanel>
+                      </Grid>
+
+                      <StackPanel Spacing="10"
+                                  IsVisible="{Binding IsEditing}">
+                        <Grid ColumnDefinitions="72,12,*,12,Auto"
+                              RowDefinitions="Auto,Auto"
+                              RowSpacing="4">
+                          <TextBlock Grid.Row="0"
+                                     Grid.Column="0"
+                                     Classes="inline-field-label"
+                                     Text="Stunden" />
+                          <TextBox Grid.Row="1"
+                                   Grid.Column="0"
+                                   Classes="hours-input"
+                                   Text="{Binding Hours}" />
+
+                          <TextBlock Grid.Row="0"
+                                     Grid.Column="2"
+                                     Classes="inline-field-label"
+                                     Text="Aktivität" />
+                          <ComboBox Grid.Row="1"
+                                    Grid.Column="2"
+                                    Classes="row-field"
+                                    HorizontalAlignment="Stretch"
+                                    ItemsSource="{Binding Activities}"
+                                    SelectedItem="{Binding SelectedActivity}">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate>
+                                <TextBlock Text="{Binding Name}" />
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+
+                          <StackPanel Grid.Row="0"
+                                      Grid.RowSpan="2"
+                                      Grid.Column="4"
+                                      Orientation="Horizontal"
+                                      Spacing="4"
+                                      VerticalAlignment="Center">
+                            <Button Classes="secondary compact"
+                                    Command="{Binding CancelEditCommand}"
+                                    Content="Abbrechen" />
+                            <Button Classes="primary compact"
+                                    Command="{Binding SaveEditCommand}"
+                                    IsEnabled="{Binding !IsBusy}"
+                                    Content="Speichern" />
+                          </StackPanel>
+                        </Grid>
+
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="inline-field-label" Text="Kommentar" />
+                          <TextBox Classes="row-field"
+                                   Text="{Binding Comments}"
+                                   PlaceholderText="optional" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="8" IsVisible="{Binding HasCustomFields}">
+                          <ItemsControl ItemsSource="{Binding CustomFields}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate DataType="vm:TimeEntryCustomFieldRowViewModel">
+                                <Grid ColumnDefinitions="140,*" ColumnSpacing="12" Margin="0,0,0,8">
+                                  <TextBlock Grid.Column="0"
+                                             Classes="inline-field-label"
+                                             Text="{Binding Name}"
+                                             TextWrapping="Wrap" />
+                                  <ComboBox Grid.Column="1"
+                                            IsVisible="{Binding HasPossibleValues}"
+                                            ItemsSource="{Binding PossibleValues}"
+                                            SelectedItem="{Binding SelectedValue}"
+                                            HorizontalAlignment="Stretch"
+                                            PlaceholderText="Bitte wählen …" />
+                                  <TextBox Grid.Column="1"
+                                           IsVisible="{Binding !HasPossibleValues}"
+                                           Text="{Binding Value}"
+                                           Classes="row-field"
+                                           HorizontalAlignment="Stretch"
+                                           PlaceholderText="Wert eingeben …" />
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </StackPanel>
+
+                      <Border Classes="today-entry-delete-warning"
+                              IsVisible="{Binding IsDeleteConfirmationVisible}">
+                        <StackPanel Spacing="10">
+                          <TextBlock Text="Diesen Zeiteintrag wirklich löschen?"
+                                     FontWeight="SemiBold"
+                                     TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding TicketLabel}"
+                                     FontSize="12"
+                                     Opacity="0.85"
+                                     TextWrapping="Wrap" />
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Classes="secondary compact"
+                                    Command="{Binding CancelDeleteCommand}"
+                                    Content="Abbrechen" />
+                            <Button Classes="primary compact"
+                                    Command="{Binding ConfirmDeleteCommand}"
+                                    IsEnabled="{Binding !IsBusy}"
+                                    Content="Löschen" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="Keine Zeiteinträge für heute."
+                       FontSize="12"
+                       Opacity="0.7"
+                       IsVisible="{Binding !HasTodayTimeEntries}" />
+          </StackPanel>
+        </Expander>
       </Border>
     </StackPanel>
 
@@ -314,6 +532,33 @@
                               Command="{Binding CreateTimeEntryCommand}"
                               Content="{materialIcons:MaterialIconTextExt Kind=Plus, Text=Buchen}" />
                     </Grid>
+
+                    <StackPanel Spacing="8" IsVisible="{Binding HasCustomFields}">
+                      <ItemsControl ItemsSource="{Binding CustomFields}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="vm:TimeEntryCustomFieldRowViewModel">
+                            <Grid ColumnDefinitions="140,*" ColumnSpacing="12" Margin="0,0,0,8">
+                              <TextBlock Grid.Column="0"
+                                         Classes="inline-field-label"
+                                         Text="{Binding Name}"
+                                         TextWrapping="Wrap" />
+                              <ComboBox Grid.Column="1"
+                                        IsVisible="{Binding HasPossibleValues}"
+                                        ItemsSource="{Binding PossibleValues}"
+                                        SelectedItem="{Binding SelectedValue}"
+                                        HorizontalAlignment="Stretch"
+                                        PlaceholderText="Bitte wählen …" />
+                              <TextBox Grid.Column="1"
+                                       IsVisible="{Binding !HasPossibleValues}"
+                                       Text="{Binding Value}"
+                                       Classes="row-field"
+                                       HorizontalAlignment="Stretch"
+                                       PlaceholderText="Wert eingeben …" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
                   </StackPanel>
                 </Border>
               </DataTemplate>

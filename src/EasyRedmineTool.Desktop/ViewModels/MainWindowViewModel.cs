@@ -14,10 +14,11 @@ using EasyRedmineTool.Core.ViewModels;
 using System;
 using System.Linq;
 
-public partial class MainWindowViewModel : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly IAppSettingsService _appSettingsService;
     private bool _isApplyingThemeFromSettings;
+    private bool _disposed;
 
     [ObservableProperty]
     private bool isSettingsVisible;
@@ -34,6 +35,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool isWeeklySummaryVisible;
 
+    [ObservableProperty]
+    private bool isSeriesBookingVisible;
+
     public string WindowTitle => AppInfo.WindowTitle;
 
     public MainWindowViewModel(
@@ -41,6 +45,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TicketListViewModel ticketListViewModel,
         TimeEntriesViewModel timeEntriesViewModel,
         WeeklySummaryViewModel weeklySummaryViewModel,
+        SeriesBookingViewModel seriesBookingViewModel,
         AboutViewModel aboutViewModel,
         IAppSettingsService appSettingsService)
     {
@@ -48,6 +53,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TicketListViewModel = ticketListViewModel;
         TimeEntriesViewModel = timeEntriesViewModel;
         WeeklySummaryViewModel = weeklySummaryViewModel;
+        SeriesBookingViewModel = seriesBookingViewModel;
         AboutViewModel = aboutViewModel;
         _appSettingsService = appSettingsService;
 
@@ -62,6 +68,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public TicketListViewModel TicketListViewModel { get; }
     public TimeEntriesViewModel TimeEntriesViewModel { get; }
     public WeeklySummaryViewModel WeeklySummaryViewModel { get; }
+    public SeriesBookingViewModel SeriesBookingViewModel { get; }
     public AboutViewModel AboutViewModel { get; }
 
     [ObservableProperty]
@@ -106,8 +113,15 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void OpenWeeklySummary()
     {
-        _ = WeeklySummaryViewModel.ReloadWeeklySummaryAsync();
+        WeeklySummaryViewModel.PrepareView();
         ShowWeeklySummary();
+    }
+
+    [RelayCommand]
+    private void OpenSeriesBooking()
+    {
+        SeriesBookingViewModel.PrepareView();
+        ShowSeriesBooking();
     }
 
     [RelayCommand]
@@ -171,6 +185,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IsTicketListVisible = false;
         IsTimeEntriesVisible = false;
         IsWeeklySummaryVisible = false;
+        IsSeriesBookingVisible = false;
         IsAboutVisible = false;
     }
 
@@ -198,9 +213,33 @@ public partial class MainWindowViewModel : ViewModelBase
         IsWeeklySummaryVisible = true;
     }
 
+    private void ShowSeriesBooking()
+    {
+        HideAllViews();
+        IsSeriesBookingVisible = true;
+    }
+
     private void ShowAbout()
     {
         HideAllViews();
         IsAboutVisible = true;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        SettingsViewModel.SettingsSaved -= OnSettingsSaved;
+        WeeklySummaryViewModel.OpenTimeEntryRequested -= OnOpenTimeEntryFromSummary;
+
+        SettingsViewModel.Dispose();
+        TicketListViewModel.Dispose();
+        TimeEntriesViewModel.Dispose();
+        WeeklySummaryViewModel.Dispose();
+        SeriesBookingViewModel.Dispose();
     }
 }

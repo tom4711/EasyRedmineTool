@@ -46,11 +46,112 @@
       <Setter Property="FontSize" Value="11" />
       <Setter Property="Opacity" Value="0.7" />
     </Style>
+    <Style Selector="Border.filter-card">
+      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="TextBlock.filter-label">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Opacity" Value="0.7" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+    <Style Selector="ComboBox.filter-field">
+      <Setter Property="MinWidth" Value="180" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.filter-date-picker">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="MinWidth" Value="180" />
+    </Style>
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,*">
     <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="12">
       <TextBlock Text="Meine Tickets" FontSize="22" FontWeight="Bold" />
+
+      <Border Classes="filter-card"
+              Padding="16"
+              HorizontalAlignment="Stretch">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Lade-Filter"
+                     FontSize="14"
+                     FontWeight="SemiBold" />
+          <TextBlock Text="Filter lassen sich kombinieren und werden für den nächsten Ladevorgang gespeichert. Status werden aus Redmine geladen."
+                     FontSize="12"
+                     Opacity="0.75"
+                     TextWrapping="Wrap" />
+
+          <Grid ColumnDefinitions="*,*,*"
+                ColumnSpacing="12"
+                RowDefinitions="Auto,Auto">
+            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+              <TextBlock Classes="filter-label" Text="Zugewiesen" />
+              <ComboBox Classes="filter-field"
+                        ItemsSource="{Binding AssigneeFilterOptions}"
+                        SelectedItem="{Binding SelectedAssigneeFilter}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
+              <TextBlock Classes="filter-label" Text="Status" />
+              <ComboBox Classes="filter-field"
+                        ItemsSource="{Binding StatusFilterOptions}"
+                        SelectedItem="{Binding SelectedStatusFilter}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4">
+              <TextBlock Classes="filter-label" Text="Zuletzt gebucht bis" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Button Grid.Column="0"
+                        Classes="secondary filter-date-picker">
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <materialIcons:MaterialIcon Grid.Column="0"
+                                              Kind="CalendarMonth"
+                                              Width="16"
+                                              Height="16"
+                                              VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding LastBookedUntilLabel}"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                  <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                      <Calendar SelectedDate="{Binding LastBookedUntil}"
+                                DisplayDate="{Binding CalendarDisplayDate, Mode=TwoWay}"
+                                IsTodayHighlighted="True"
+                                FirstDayOfWeek="Monday"
+                                SelectedDatesChanged="OnLastBookedUntilCalendarSelectedDatesChanged" />
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+                <Button Grid.Column="1"
+                        Classes="ghost compact"
+                        ToolTip.Tip="Filter zurücksetzen"
+                        IsVisible="{Binding HasLastBookedUntilFilter}"
+                        Command="{Binding ClearLastBookedUntilFilterCommand}">
+                  <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" />
+                </Button>
+              </Grid>
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
 
       <Button Classes="primary"
               Command="{Binding LoadTicketsCommand}"

@@ -62,6 +62,69 @@ public class EasyRedmineApiClientTests
     }
 
     [Fact]
+    public async Task GetIssuesAsync_throws_redmine_api_exception_on_http_error()
+    {
+        var handler = new CountingHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+
+        var exception = await Assert.ThrowsAsync<RedmineApiException>(() =>
+            client.GetIssuesAsync(
+                "https://redmine.example/",
+                "secret",
+                TicketAssigneeFilter.Me,
+                TicketStatusFilterKind.Open));
+
+        Assert.Equal(401, exception.StatusCode);
+        Assert.Contains("issues.json", exception.Endpoint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetTimeEntryActivitiesAsync_throws_when_all_endpoints_fail()
+    {
+        var handler = new CountingHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden));
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+
+        var exception = await Assert.ThrowsAsync<RedmineApiException>(() =>
+            client.GetTimeEntryActivitiesAsync("https://redmine.example/", "secret"));
+
+        Assert.Equal(403, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteTimeEntryAsync_completes_successfully()
+    {
+        var handler = new CountingHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+
+        using var response = await client.DeleteTimeEntryAsync("https://redmine.example/", "secret", 42);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(TicketAssigneeFilter.Me, TicketStatusFilterKind.Open, null, "assigned_to_id=me", "status_id=open")]
+    [InlineData(TicketAssigneeFilter.Unassigned, TicketStatusFilterKind.Closed, null, "assigned_to_id=!*", "status_id=closed")]
+    [InlineData(TicketAssigneeFilter.All, TicketStatusFilterKind.All, null, "status_id=*")]
+    [InlineData(TicketAssigneeFilter.Me, TicketStatusFilterKind.Specific, 3, "assigned_to_id=me", "status_id=3")]
+    public void BuildIssuesQuery_includes_selected_assignee_and_status_filters(
+        TicketAssigneeFilter assigneeFilter,
+        TicketStatusFilterKind statusKind,
+        int? statusId,
+        params string[] expectedParts)
+    {
+        var query = EasyRedmineApiClient.BuildIssuesQuery(assigneeFilter, statusKind, statusId, limit: 25, offset: 50);
+
+        Assert.StartsWith("issues.json?", query, StringComparison.Ordinal);
+        Assert.Contains("limit=25", query, StringComparison.Ordinal);
+        Assert.Contains("offset=50", query, StringComparison.Ordinal);
+
+        foreach (var expectedPart in expectedParts)
+        {
+            Assert.Contains(expectedPart, query, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public async Task GetIssuesByIdsAsync_falls_back_to_single_issue_requests_when_batch_fails()
     {
         var handler = new CountingHandler(request =>

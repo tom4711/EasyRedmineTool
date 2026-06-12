@@ -118,6 +118,24 @@ public class ConnectionTestServiceTests
             return Task.FromResult(CurrentUserResponse);
         }
 
+        public Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<IReadOnlyList<StatusDto>> GetIssueStatusesAsync(
+            string baseUrl,
+            string apiKey,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<IReadOnlyList<IssueDto>> GetIssuesAsync(
+            string baseUrl,
+            string apiKey,
+            TicketAssigneeFilter assigneeFilter,
+            TicketStatusFilterKind statusKind,
+            int? statusId = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
         public Task<IReadOnlyList<IssueDto>> GetAllMyOpenIssuesAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
@@ -147,10 +165,33 @@ public class ConnectionTestServiceTests
             CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
+        public Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentTimeEntryCustomFieldValuesAsync(
+            string baseUrl,
+            string apiKey,
+            int? issueId = null,
+            int? projectId = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
         public Task<HttpResponseMessage> CreateTimeEntryAsync(
             string baseUrl,
             string apiKey,
             TimeEntryCreateRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<HttpResponseMessage> UpdateTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
+            TimeEntryUpdateRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<HttpResponseMessage> DeleteTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
             CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
     }

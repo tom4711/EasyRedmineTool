@@ -31,13 +31,30 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<WeeklyHoursRowViewModel> WeeklyHours { get; } = [];
 
+    public bool HasLoadedData { get; private set; }
+
+    public string LoadActionLabel => HasLoadedData ? "Aktualisieren" : "Daten laden";
+
     public WeeklySummaryViewModel(IAppSettingsService appSettingsService, ITimeEntryService timeEntryService)
     {
         _appSettingsService = appSettingsService;
         _timeEntryService = timeEntryService;
+
+        PrepareView();
     }
 
     public event EventHandler<int>? OpenTimeEntryRequested;
+
+    public void PrepareView()
+    {
+        var (_, _, label) = GetCurrentQuarterRange();
+        CurrentQuarterLabel = label;
+
+        if (!HasLoadedData)
+        {
+            StatusMessage = "Klicke auf „Daten laden“, um die Auswertung abzurufen.";
+        }
+    }
 
     [RelayCommand]
     public async Task ReloadWeeklySummaryAsync()
@@ -100,6 +117,8 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
 
             WeeklyTotalHours = grouped.Sum(x => x.Hours);
             MaxWeeklyHours = grouped.Count == 0 ? 1 : Math.Max(1, grouped.Max(x => x.Hours));
+            HasLoadedData = true;
+            OnPropertyChanged(nameof(LoadActionLabel));
             StatusMessage = grouped.Count == 0
                 ? "Keine Zeiteinträge im aktuellen Quartal."
                 : string.Empty;

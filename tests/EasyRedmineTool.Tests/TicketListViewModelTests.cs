@@ -60,6 +60,98 @@ public class TicketListViewModelTests
     }
 
     [Fact]
+    public async Task LoadTicketsAsync_preserves_favorited_tickets_in_settings_cache()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            CachedTickets = [new IssueDto { Id = 1, Subject = "Favorite" }],
+            FavoriteTicketIds = [1],
+            LastLoadedTicketIds = [1]
+        });
+
+        context.TicketService.NextLoadResult = new TicketListLoadResult
+        {
+            Tickets = [new IssueDto { Id = 2, Subject = "New load" }],
+            OpenTicketCount = 1,
+            TimeEntryTicketCount = 0
+        };
+
+        var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
+
+        await viewModel.LoadTicketsCommand.ExecuteAsync(null);
+
+        var settings = context.SettingsService.Load();
+        Assert.Equal([2], settings.LastLoadedTicketIds);
+        Assert.Equal(2, settings.CachedTickets.Count);
+        Assert.Contains(settings.CachedTickets, ticket => ticket.Id == 1);
+        Assert.Contains(settings.CachedTickets, ticket => ticket.Id == 2);
+        Assert.Single(viewModel.Tickets);
+        Assert.Equal(2, viewModel.Tickets[0].Ticket.Id);
+    }
+
+    [Fact]
+    public async Task LoadTicketsAsync_passes_selected_filters_to_service()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret"
+        });
+        context.TicketService.NextLoadResult = new TicketListLoadResult
+        {
+            Tickets = [],
+            OpenTicketCount = 0,
+            TimeEntryTicketCount = 0
+        };
+
+        var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
+        viewModel.SelectedAssigneeFilter = viewModel.AssigneeFilterOptions.First(option => option.Value == TicketAssigneeFilter.Unassigned);
+        viewModel.SelectedStatusFilter = viewModel.StatusFilterOptions.First(option => option.Value.Kind == TicketStatusFilterKind.Specific);
+        viewModel.LastBookedUntil = new DateTime(2025, 6, 1);
+
+        await viewModel.LoadTicketsCommand.ExecuteAsync(null);
+
+        Assert.NotNull(context.TicketService.LastFilter);
+        Assert.Equal(TicketAssigneeFilter.Unassigned, context.TicketService.LastFilter!.Assignee);
+        Assert.Equal(TicketStatusFilterKind.Specific, context.TicketService.LastFilter.StatusKind);
+        Assert.Equal(3, context.TicketService.LastFilter.StatusId);
+        Assert.Equal(new DateTime(2025, 6, 1), context.TicketService.LastFilter.LastBookedUntil);
+    }
+
+    [Fact]
+    public async Task LoadTicketsAsync_keeps_selected_status_filter_after_loading()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret"
+        });
+        context.TicketService.NextLoadResult = new TicketListLoadResult
+        {
+            Tickets = [],
+            OpenTicketCount = 0,
+            TimeEntryTicketCount = 0
+        };
+
+        var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
+        await Task.Delay(50);
+
+        var selected = viewModel.StatusFilterOptions.First(option => option.Value.StatusId == 3);
+        viewModel.SelectedStatusFilter = selected;
+
+        await viewModel.LoadTicketsCommand.ExecuteAsync(null);
+
+        Assert.Equal(TicketStatusFilterKind.Specific, viewModel.SelectedStatusFilter?.Value.Kind);
+        Assert.Equal(3, viewModel.SelectedStatusFilter?.Value.StatusId);
+        Assert.Same(selected, viewModel.SelectedStatusFilter);
+    }
+
+    [Fact]
     public async Task LoadTicketsAsync_uses_latest_request_when_called_twice()
     {
         using var context = TestContext.Create();
@@ -134,15 +226,31 @@ public class TicketListViewModelTests
         {
         }
 
+        public IReadOnlyList<StatusDto> NextStatuses { get; set; } =
+        [
+            new StatusDto { Id = 1, Name = "Neu", Is_Closed = false },
+            new StatusDto { Id = 3, Name = "In Arbeit", Is_Closed = false },
+            new StatusDto { Id = 5, Name = "Erledigt", Is_Closed = true }
+        ];
+
         public Task<IReadOnlyList<IssueDto>> GetMyOpenIssuesAsync(
             string baseUrl,
             string apiKey,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<IssueDto>>([]);
 
+        public Task<IReadOnlyList<StatusDto>> GetIssueStatusesAsync(
+            string baseUrl,
+            string apiKey,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(NextStatuses);
+
+        public TicketLoadFilter? LastFilter { get; private set; }
+
         public async Task<TicketListLoadResult> GetTicketsForListAsync(
             string baseUrl,
             string apiKey,
+            TicketLoadFilter filter,
             CancellationToken cancellationToken = default)
         {
             _loadCallCount++;
@@ -151,6 +259,7 @@ public class TicketListViewModelTests
                 await Task.Delay(FirstCallDelay, cancellationToken);
             }
 
+            LastFilter = filter;
             cancellationToken.ThrowIfCancellationRequested();
             return _loadCallCount == 1 ? NextLoadResult : LatestLoadResult;
         }

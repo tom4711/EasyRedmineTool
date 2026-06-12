@@ -98,6 +98,13 @@ public sealed class AppSettingsService : IAppSettingsService
         IsDarkMode = settings.IsDarkMode,
         CachedTickets = settings.CachedTickets ?? [],
         FavoriteTicketIds = settings.FavoriteTicketIds ?? [],
+        LastLoadedTicketIds = settings.LastLoadedTicketIds ?? [],
+        TicketLoadAssigneeFilter = settings.TicketLoadAssigneeFilter,
+        TicketLoadStatusFilterKind = settings.TicketLoadStatusFilterKind,
+        TicketLoadStatusId = settings.TicketLoadStatusId,
+        TicketLoadStatusName = settings.TicketLoadStatusName,
+        TicketLoadLastBookedUntil = settings.TicketLoadLastBookedUntil,
+        TimeEntryCustomFieldDefaults = settings.TimeEntryCustomFieldDefaults ?? [],
     };
 
     private static AppSettings CreateDefault() => new()
@@ -106,7 +113,8 @@ public sealed class AppSettingsService : IAppSettingsService
         ApiKey = string.Empty,
         IsDarkMode = false,
         CachedTickets = [],
-        FavoriteTicketIds = []
+        FavoriteTicketIds = [],
+        LastLoadedTicketIds = []
     };
 
     private sealed class AppSettingsWrapper

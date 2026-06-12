@@ -13,10 +13,11 @@ public class TicketServiceCacheTests
         var apiClient = new CountingTimeEntryApiClient();
         var service = new TicketService(apiClient);
 
-        await service.GetTicketsForListAsync("https://redmine.example/", "secret");
-        await service.GetTicketsForListAsync("https://redmine.example/", "secret");
+        var filter = new TicketLoadFilter();
+        await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
+        await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
         service.InvalidateTimeEntryCache();
-        await service.GetTicketsForListAsync("https://redmine.example/", "secret");
+        await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
 
         Assert.Equal(2, apiClient.TimeEntryRequestCount);
     }
@@ -27,6 +28,24 @@ public class TicketServiceCacheTests
 
         public Task<HttpResponseMessage> GetCurrentUserAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
+
+        public Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult<int?>(1);
+
+        public Task<IReadOnlyList<StatusDto>> GetIssueStatusesAsync(
+            string baseUrl,
+            string apiKey,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<StatusDto>>([]);
+
+        public Task<IReadOnlyList<IssueDto>> GetIssuesAsync(
+            string baseUrl,
+            string apiKey,
+            TicketAssigneeFilter assigneeFilter,
+            TicketStatusFilterKind statusKind,
+            int? statusId = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<IssueDto>>([]);
 
         public Task<IReadOnlyList<IssueDto>> GetAllMyOpenIssuesAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<IssueDto>>([]);
@@ -60,10 +79,33 @@ public class TicketServiceCacheTests
             CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
+        public Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentTimeEntryCustomFieldValuesAsync(
+            string baseUrl,
+            string apiKey,
+            int? issueId = null,
+            int? projectId = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
         public Task<HttpResponseMessage> CreateTimeEntryAsync(
             string baseUrl,
             string apiKey,
             TimeEntryCreateRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<HttpResponseMessage> UpdateTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
+            TimeEntryUpdateRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<HttpResponseMessage> DeleteTimeEntryAsync(
+            string baseUrl,
+            string apiKey,
+            int timeEntryId,
             CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
     }
