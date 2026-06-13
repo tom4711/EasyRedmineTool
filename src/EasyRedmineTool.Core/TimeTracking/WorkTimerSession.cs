@@ -35,12 +35,30 @@ public sealed class WorkTimerSession
             return;
         }
 
+        if (now < SegmentStartedAt.Value)
+        {
+            throw new ArgumentException("Pause time cannot be earlier than segment start time.", nameof(now));
+        }
+
         Accumulated += now - SegmentStartedAt.Value;
         SegmentStartedAt = null;
     }
 
-    public TimeSpan GetElapsed(DateTime now) =>
-        Accumulated + (SegmentStartedAt.HasValue ? now - SegmentStartedAt.Value : TimeSpan.Zero);
+    public TimeSpan GetElapsed(DateTime now)
+    {
+        if (!SegmentStartedAt.HasValue)
+        {
+            return Accumulated;
+        }
+
+        var delta = now - SegmentStartedAt.Value;
+        if (delta < TimeSpan.Zero)
+        {
+            delta = TimeSpan.Zero;
+        }
+
+        return Accumulated + delta;
+    }
 
     public bool HasTrackedTime(DateTime now) => GetElapsed(now) > TimeSpan.Zero;
 }

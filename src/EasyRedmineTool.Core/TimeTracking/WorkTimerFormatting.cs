@@ -8,8 +8,11 @@ public static class WorkTimerFormatting
 
     public static string FormatElapsed(TimeSpan elapsed)
     {
-        var totalHours = (int)Math.Floor(elapsed.TotalHours);
-        return $"{totalHours}:{elapsed.Minutes:D2}:{elapsed.Seconds:D2}";
+        var isNegative = elapsed < TimeSpan.Zero;
+        var absoluteElapsed = isNegative ? elapsed.Negate() : elapsed;
+        var totalHours = (int)Math.Floor(absoluteElapsed.TotalHours);
+        var formatted = $"{totalHours}:{absoluteElapsed.Minutes:D2}:{absoluteElapsed.Seconds:D2}";
+        return isNegative ? $"-{formatted}" : formatted;
     }
 
     public static double ToBookableHours(TimeSpan elapsed)

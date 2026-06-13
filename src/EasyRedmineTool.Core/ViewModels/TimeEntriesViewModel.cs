@@ -1,5 +1,7 @@
 namespace EasyRedmineTool.Core.ViewModels;
 
+using Avalonia.Threading;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -452,7 +454,10 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         _workTimerTick.Start();
     }
 
-    private void OnWorkTimerTick(object? sender, ElapsedEventArgs e) => SyncAllRowTimerStates();
+    private void OnWorkTimerTick(object? sender, ElapsedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(SyncAllRowTimerStates);
+    }
 
     private void StopWorkTimerTickIfIdle()
     {
