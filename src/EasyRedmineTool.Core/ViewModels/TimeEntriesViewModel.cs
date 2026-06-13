@@ -1,5 +1,7 @@
 namespace EasyRedmineTool.Core.ViewModels;
 
+using Avalonia.Threading;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -9,16 +11,20 @@ using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
+using EasyRedmineTool.Core.TimeTracking;
 
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Timers;
 
 public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
 {
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
+    private readonly WorkTimerManager _workTimer = new();
     private CancellationTokenSource? _todayHoursCts;
     private CancellationTokenSource? _rowLoadCts;
+    private System.Timers.Timer? _workTimerTick;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -40,6 +46,9 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private int? focusedIssueId;
+
+    [ObservableProperty]
+    private string activeWorkTimerLabel = string.Empty;
 
     public ObservableCollection<FavoriteTimeEntryRowViewModel> FavoriteRows { get; } = [];
     public ObservableCollection<FavoriteTimeEntryRowViewModel> FilteredFavoriteRows { get; } = [];
@@ -136,6 +145,7 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         }
 
         ApplyFavoriteFilter();
+        SyncAllRowTimerStates();
 
         if (FavoriteRows.Count == 0)
         {
@@ -380,6 +390,128 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
             || (ticket.Project?.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
     }
 
+    internal void StartWork(FavoriteTimeEntryRowViewModel row)
+    {
+        if (row.SpentOn is null)
+        {
+            SetStatusMessage($"Ticket #{row.Ticket.Id}: Bitte ein Datum auswählen.");
+            return;
+        }
+
+        _workTimer.Start(row.Ticket.Id, row.SpentOn.Value, DateTime.UtcNow);
+        EnsureWorkTimerTick();
+        SyncAllRowTimerStates();
+
+        var pausedIssueId = _workTimer.Sessions
+            .FirstOrDefault(session => session.IssueId != row.Ticket.Id && !session.IsRunning && session.HasTrackedTime(DateTime.UtcNow))
+            ?.IssueId;
+
+        StatusMessage = pausedIssueId.HasValue
+            ? $"Arbeit auf #{row.Ticket.Id} gestartet. Ticket #{pausedIssueId.Value} pausiert."
+            : $"Arbeit auf #{row.Ticket.Id} gestartet.";
+    }
+
+    internal void PauseWork(FavoriteTimeEntryRowViewModel row)
+    {
+        if (!_workTimer.IsRunning(row.Ticket.Id))
+        {
+            return;
+        }
+
+        _workTimer.Pause(row.Ticket.Id, DateTime.UtcNow);
+        StopWorkTimerTickIfIdle();
+        SyncAllRowTimerStates();
+        StatusMessage = $"Arbeit auf #{row.Ticket.Id} pausiert.";
+    }
+
+    internal async Task<bool> StopWorkAndBookAsync(FavoriteTimeEntryRowViewModel row)
+    {
+        var elapsed = _workTimer.Stop(row.Ticket.Id, DateTime.UtcNow);
+        StopWorkTimerTickIfIdle();
+        SyncAllRowTimerStates();
+
+        if (elapsed is null || elapsed.Value <= TimeSpan.Zero)
+        {
+            SetStatusMessage($"Ticket #{row.Ticket.Id}: Keine gemessene Zeit zum Buchen.");
+            return false;
+        }
+
+        row.Hours = WorkTimerFormatting.FormatHoursForInput(WorkTimerFormatting.ToBookableHours(elapsed.Value));
+        await row.SubmitTimeEntryAsync();
+        return true;
+    }
+
+    private void EnsureWorkTimerTick()
+    {
+        if (_workTimerTick is not null)
+        {
+            return;
+        }
+
+        _workTimerTick = new System.Timers.Timer(1000);
+        _workTimerTick.Elapsed += OnWorkTimerTick;
+        _workTimerTick.AutoReset = true;
+        _workTimerTick.Start();
+    }
+
+    private void OnWorkTimerTick(object? sender, ElapsedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(SyncAllRowTimerStates);
+    }
+
+    private void StopWorkTimerTickIfIdle()
+    {
+        if (_workTimer.RunningIssueId.HasValue || _workTimerTick is null)
+        {
+            return;
+        }
+
+        _workTimerTick.Stop();
+        _workTimerTick.Elapsed -= OnWorkTimerTick;
+        _workTimerTick.Dispose();
+        _workTimerTick = null;
+    }
+
+    private void SyncAllRowTimerStates()
+    {
+        var now = DateTime.UtcNow;
+
+        foreach (var row in FavoriteRows)
+        {
+            var session = _workTimer.GetSession(row.Ticket.Id);
+            row.UpdateWorkTimerState(session, _workTimer.IsRunning(row.Ticket.Id), now);
+        }
+
+        UpdateActiveWorkTimerLabel(now);
+    }
+
+    private void UpdateActiveWorkTimerLabel(DateTime now)
+    {
+        if (!_workTimer.RunningIssueId.HasValue)
+        {
+            ActiveWorkTimerLabel = string.Empty;
+            return;
+        }
+
+        var issueId = _workTimer.RunningIssueId.Value;
+        var session = _workTimer.GetSession(issueId);
+        var row = FavoriteRows.FirstOrDefault(r => r.Ticket.Id == issueId);
+        var subject = row?.Ticket.Subject ?? "Ticket";
+        var elapsed = session is null ? "0:00:00" : WorkTimerFormatting.FormatElapsed(session.GetElapsed(now));
+
+        ActiveWorkTimerLabel = $"Läuft: #{issueId} {Truncate(subject, 40)} · {elapsed}";
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return value[..(maxLength - 1)] + "…";
+    }
+
     private void UpdateCachedTicketLastTimeEntry(int issueId, DateTime spentOn)
     {
         _appSettingsService.Update(settings =>
@@ -427,6 +559,15 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
     {
         CancelTodayHoursLoad();
         CancelRowLoads();
+
+        if (_workTimerTick is not null)
+        {
+            _workTimerTick.Stop();
+            _workTimerTick.Elapsed -= OnWorkTimerTick;
+            _workTimerTick.Dispose();
+            _workTimerTick = null;
+        }
+
         GC.SuppressFinalize(this);
     }
 }
