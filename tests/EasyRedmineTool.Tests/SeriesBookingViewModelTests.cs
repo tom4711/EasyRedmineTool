@@ -31,9 +31,14 @@ public class SeriesBookingViewModelTests
         var viewModel = new SeriesBookingViewModel(context.SettingsService, context.TimeEntryService);
         viewModel.PrepareView();
 
-        Assert.Equal(2, viewModel.Tickets.Count);
+        Assert.Single(viewModel.Tickets);
         Assert.Equal(200, viewModel.Tickets[0].Id);
         Assert.Equal(200, viewModel.SelectedTicket?.Id);
+
+        viewModel.ShowAllTicketsViewCommand.Execute(null);
+
+        Assert.Equal(2, viewModel.Tickets.Count);
+        Assert.Equal(200, viewModel.Tickets[0].Id);
     }
 
     [Fact]
@@ -47,6 +52,7 @@ public class SeriesBookingViewModelTests
         {
             BaseUrl = "https://redmine.example/",
             ApiKey = "secret",
+            FavoriteTicketIds = [42],
             CachedTickets = [new IssueDto { Id = 42, Subject = "Task" }]
         });
 
@@ -87,6 +93,7 @@ public class SeriesBookingViewModelTests
         {
             BaseUrl = "https://redmine.example/",
             ApiKey = "secret",
+            FavoriteTicketIds = [42],
             CachedTickets = [new IssueDto { Id = 42, Subject = "Task" }]
         });
 
@@ -116,6 +123,7 @@ public class SeriesBookingViewModelTests
         {
             BaseUrl = "https://redmine.example/",
             ApiKey = "secret",
+            FavoriteTicketIds = [100, 200],
             CachedTickets =
             [
                 new IssueDto { Id = 100, Subject = "Alpha" },
