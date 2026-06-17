@@ -11,6 +11,7 @@ public partial class TimeEntryCustomFieldRowViewModel : ViewModelBase
         string name,
         bool isRequired,
         bool hasPossibleValues,
+        bool isSearchableList,
         IEnumerable<string> possibleValues,
         string value)
     {
@@ -18,6 +19,7 @@ public partial class TimeEntryCustomFieldRowViewModel : ViewModelBase
         Name = name;
         IsRequired = isRequired;
         HasPossibleValues = hasPossibleValues;
+        IsSearchableList = isSearchableList;
 
         foreach (var possibleValue in possibleValues.Where(possibleValue => !string.IsNullOrWhiteSpace(possibleValue)))
         {
@@ -38,6 +40,10 @@ public partial class TimeEntryCustomFieldRowViewModel : ViewModelBase
     public bool IsRequired { get; }
 
     public bool HasPossibleValues { get; }
+
+    public bool IsSearchableList { get; }
+
+    public bool HasCompactPossibleValues => HasPossibleValues && !IsSearchableList;
 
     public ObservableCollection<string> PossibleValues { get; } = [];
 

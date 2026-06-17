@@ -276,6 +276,7 @@ public class TimeEntriesViewModelTests
             string apiKey,
             int? issueId = null,
             int? projectId = null,
+            int? activityId = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TimeEntryCustomFieldValueDto>>([]);
 
@@ -283,9 +284,10 @@ public class TimeEntriesViewModelTests
             AppSettings settings,
             int? issueId = null,
             int? projectId = null,
+            int? activityId = null,
             IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(TimeEntryCustomFieldSupport.CreateRows([], [], settings, projectId, existingValues));
+            Task.FromResult(TimeEntryCustomFieldSupport.CreateRows([], [], settings, projectId, activityId, existingValues));
 
         public Task<TimeEntryLoadResult> GetMyTimeEntriesAsync(
             string baseUrl,

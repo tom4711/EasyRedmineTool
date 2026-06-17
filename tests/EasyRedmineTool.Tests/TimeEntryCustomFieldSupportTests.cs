@@ -6,20 +6,34 @@ using EasyRedmineTool.Core.Models.TimeEntries;
 
 public class TimeEntryCustomFieldSupportTests
 {
+    private static TimeEntryCustomFieldDefinitionDto CreateDefinition(
+        int id,
+        string name,
+        bool isRequired = false,
+        IReadOnlyList<int>? projectIds = null,
+        IReadOnlyList<int>? activityIds = null,
+        IReadOnlyList<string>? possibleValues = null) =>
+        new()
+        {
+            Id = id,
+            Name = name,
+            FieldFormat = possibleValues is { Count: > 0 } ? "list" : "string",
+            IsRequired = isRequired,
+            IsForAll = false,
+            ProjectIds = projectIds ?? [],
+            ActivityIds = activityIds ?? [],
+            PossibleValues = possibleValues ?? []
+        };
+
     [Fact]
     public void Validate_returns_message_for_missing_required_field()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [CreateDefinition(5, "Produktdaten Hierarchie", isRequired: true, projectIds: [42])],
             [],
-            [
-                new TimeEntryCustomFieldValueDto
-                {
-                    Id = 5,
-                    Name = "Produktdaten Hierarchie",
-                    Value = string.Empty
-                }
-            ],
-            new AppSettings());
+            new AppSettings(),
+            projectId: 42,
+            activityId: 10);
 
         var message = TimeEntryCustomFieldSupport.Validate(rows);
 
@@ -30,7 +44,7 @@ public class TimeEntryCustomFieldSupportTests
     public void CreateRows_prefers_existing_entry_values_over_defaults()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
-            [],
+            [CreateDefinition(5, "Produktdaten Hierarchie", projectIds: [42])],
             [],
             new AppSettings
             {
@@ -39,6 +53,8 @@ public class TimeEntryCustomFieldSupportTests
                     new TimeEntryCustomFieldDefault { Id = 5, Name = "Produktdaten Hierarchie", Value = "A" }
                 ]
             },
+            projectId: 42,
+            activityId: 10,
             existingValues:
             [
                 new TimeEntryCustomFieldValueDto { Id = 5, Name = "Produktdaten Hierarchie", Value = "B" }
@@ -49,7 +65,7 @@ public class TimeEntryCustomFieldSupportTests
     }
 
     [Fact]
-    public void CreateRows_uses_recent_values_without_defaults()
+    public void CreateRows_ignores_recent_values_without_matching_definition()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
             [],
@@ -61,10 +77,11 @@ public class TimeEntryCustomFieldSupportTests
                     Value = "Projekt A"
                 }
             ],
-            new AppSettings());
+            new AppSettings(),
+            projectId: 42,
+            activityId: 10);
 
-        Assert.Single(rows);
-        Assert.Equal("Projekt A", rows[0].Value);
+        Assert.Empty(rows);
     }
 
     [Fact]
@@ -121,6 +138,35 @@ public class TimeEntryCustomFieldSupportTests
     }
 
     [Fact]
+    public void CreateRows_filters_definitions_by_activity()
+    {
+        var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [
+                new TimeEntryCustomFieldDefinitionDto
+                {
+                    Id = 5,
+                    Name = "Produktdaten Hierarchie",
+                    IsProjectScoped = true,
+                    ActivityIds = [100]
+                },
+                new TimeEntryCustomFieldDefinitionDto
+                {
+                    Id = 6,
+                    Name = "Anderes Feld",
+                    IsProjectScoped = true,
+                    ActivityIds = [200]
+                }
+            ],
+            [],
+            new AppSettings(),
+            projectId: 42,
+            activityId: 100);
+
+        Assert.Single(rows);
+        Assert.Equal(5, rows[0].Id);
+    }
+
+    [Fact]
     public void AppliesToProject_includes_global_fields()
     {
         var definition = new TimeEntryCustomFieldDefinitionDto
@@ -133,15 +179,32 @@ public class TimeEntryCustomFieldSupportTests
     }
 
     [Fact]
+    public void AppliesToProject_includes_project_scoped_fields()
+    {
+        var definition = new TimeEntryCustomFieldDefinitionDto
+        {
+            IsProjectScoped = true
+        };
+
+        Assert.True(TimeEntryCustomFieldSupport.AppliesToProject(definition, 42));
+    }
+
+    [Fact]
     public void BuildValues_includes_only_filled_fields()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [
+                CreateDefinition(1, "A", projectIds: [42]),
+                CreateDefinition(2, "B", projectIds: [42])
+            ],
             [],
+            new AppSettings(),
+            projectId: 42,
+            existingValues:
             [
                 new TimeEntryCustomFieldValueDto { Id = 1, Name = "A", Value = "x" },
                 new TimeEntryCustomFieldValueDto { Id = 2, Name = "B", Value = string.Empty }
-            ],
-            new AppSettings());
+            ]);
 
         var values = TimeEntryCustomFieldSupport.BuildValues(rows);
 

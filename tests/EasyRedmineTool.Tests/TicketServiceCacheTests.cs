@@ -98,6 +98,7 @@ public class TicketServiceCacheTests
             string apiKey,
             int? issueId = null,
             int? projectId = null,
+            int? activityId = null,
             CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 

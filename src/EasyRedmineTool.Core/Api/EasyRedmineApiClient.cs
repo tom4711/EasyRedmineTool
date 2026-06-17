@@ -341,21 +341,26 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         string apiKey,
         int? issueId = null,
         int? projectId = null,
+        int? activityId = null,
         CancellationToken cancellationToken = default)
     {
         var endpoints = new List<string>();
+        var activityQuery = activityId.HasValue ? $"&activity_id={activityId.Value}" : string.Empty;
 
         if (issueId.HasValue)
         {
-            endpoints.Add($"time_entries.json?issue_id={issueId.Value}&user_id=me&limit=1");
+            endpoints.Add($"time_entries.json?issue_id={issueId.Value}&user_id=me&limit=1{activityQuery}");
         }
 
         if (projectId.HasValue)
         {
-            endpoints.Add($"time_entries.json?project_id={projectId.Value}&user_id=me&limit=1");
+            endpoints.Add($"time_entries.json?project_id={projectId.Value}&user_id=me&limit=1{activityQuery}");
         }
 
-        endpoints.Add("time_entries.json?user_id=me&limit=1");
+        if (!activityId.HasValue)
+        {
+            endpoints.Add("time_entries.json?user_id=me&limit=1");
+        }
 
         RedmineApiException? lastFailure = null;
         var hadSuccessfulResponse = false;
@@ -393,44 +398,44 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         int? projectId = null,
         CancellationToken cancellationToken = default)
     {
-        var endpoints = new List<string>();
-
         if (projectId.HasValue)
         {
-            endpoints.Add($"projects/{projectId.Value}.json?include=time_entry_custom_fields");
-            endpoints.Add($"projects/{projectId.Value}/time_entry_custom_fields.json");
-        }
-
-        endpoints.Add("custom_fields.json");
-
-        RedmineApiException? lastFailure = null;
-        var hadSuccessfulResponse = false;
-
-        foreach (var endpoint in endpoints)
-        {
-            using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            var projectEndpoints = new[]
             {
-                lastFailure = await CreateApiExceptionAsync(response, endpoint, cancellationToken);
-                continue;
+                $"projects/{projectId.Value}.json?include=time_entry_custom_fields",
+                $"projects/{projectId.Value}/time_entry_custom_fields.json"
+            };
+
+            foreach (var endpoint in projectEndpoints)
+            {
+                var projectDefinitions = await TryLoadCustomFieldDefinitionsAsync(baseUrl, apiKey, endpoint, cancellationToken);
+                if (projectDefinitions.Count > 0)
+                {
+                    return projectDefinitions;
+                }
             }
 
-            hadSuccessfulResponse = true;
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var parsed = ParseCustomFieldDefinitions(json);
-            if (parsed.Count > 0)
-            {
-                return parsed;
-            }
+            return [];
         }
 
-        if (!hadSuccessfulResponse && lastFailure is not null)
+        return await TryLoadCustomFieldDefinitionsAsync(baseUrl, apiKey, "custom_fields.json", cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> TryLoadCustomFieldDefinitionsAsync(
+        string baseUrl,
+        string apiKey,
+        string endpoint,
+        CancellationToken cancellationToken)
+    {
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
         {
-            throw lastFailure;
+            return [];
         }
 
-        return [];
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        return ParseCustomFieldDefinitions(json);
     }
 
     public async Task<HttpResponseMessage> CreateTimeEntryAsync(
@@ -630,19 +635,19 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         var root = doc.RootElement;
 
         if (root.TryGetProperty("project", out var project)
-            && TryReadCustomFieldDefinitionsArray(project, requireTimeEntryType: false, out var projectFields))
+            && TryReadCustomFieldDefinitionsArray(project, requireTimeEntryType: false, isProjectScoped: true, out var projectFields))
         {
             return projectFields;
         }
 
         if (TryGetArray(root, "time_entry_custom_fields", out var timeEntryFields))
         {
-            return ParseCustomFieldDefinitionArray(timeEntryFields, requireTimeEntryType: false);
+            return ParseCustomFieldDefinitionArray(timeEntryFields, requireTimeEntryType: false, isProjectScoped: true);
         }
 
         if (TryGetArray(root, "custom_fields", out var customFields))
         {
-            return ParseCustomFieldDefinitionArray(customFields, requireTimeEntryType: true);
+            return ParseCustomFieldDefinitionArray(customFields, requireTimeEntryType: true, isProjectScoped: false);
         }
 
         return [];
@@ -651,6 +656,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
     private static bool TryReadCustomFieldDefinitionsArray(
         JsonElement source,
         bool requireTimeEntryType,
+        bool isProjectScoped,
         out List<TimeEntryCustomFieldDefinitionDto> definitions)
     {
         definitions = [];
@@ -661,13 +667,14 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
             return false;
         }
 
-        definitions = ParseCustomFieldDefinitionArray(array, requireTimeEntryType);
+        definitions = ParseCustomFieldDefinitionArray(array, requireTimeEntryType, isProjectScoped);
         return definitions.Count > 0;
     }
 
     private static List<TimeEntryCustomFieldDefinitionDto> ParseCustomFieldDefinitionArray(
         JsonElement array,
-        bool requireTimeEntryType)
+        bool requireTimeEntryType,
+        bool isProjectScoped)
     {
         var definitions = new List<TimeEntryCustomFieldDefinitionDto>();
 
@@ -707,7 +714,9 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
                 FieldFormat = fieldFormat,
                 IsRequired = isRequired,
                 IsForAll = isForAll,
+                IsProjectScoped = isProjectScoped,
                 ProjectIds = ParseProjectIds(item),
+                ActivityIds = ParseActivityIds(item),
                 PossibleValues = ParsePossibleValues(item)
             });
         }
@@ -741,14 +750,91 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return projectIds;
     }
 
+    private static List<int> ParseActivityIds(JsonElement item)
+    {
+        if (TryGetIntArray(item, "activity_ids", out var activityIds)
+            || TryGetIntArray(item, "time_entry_activity_ids", out activityIds)
+            || TryGetIntArray(item, "visible_for_activity_ids", out activityIds))
+        {
+            return activityIds;
+        }
+
+        if (!TryGetArray(item, "activities", out var activities))
+        {
+            return [];
+        }
+
+        var ids = new List<int>();
+        foreach (var activity in activities.EnumerateArray())
+        {
+            if (activity.TryGetProperty("id", out var idProperty)
+                && idProperty.ValueKind == JsonValueKind.Number
+                && idProperty.TryGetInt32(out var activityId))
+            {
+                ids.Add(activityId);
+            }
+        }
+
+        return ids;
+    }
+
+    private static bool TryGetIntArray(JsonElement item, string propertyName, out List<int> values)
+    {
+        values = [];
+        if (!TryGetArray(item, propertyName, out var array))
+        {
+            return false;
+        }
+
+        foreach (var value in array.EnumerateArray())
+        {
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var id))
+            {
+                values.Add(id);
+            }
+        }
+
+        return values.Count > 0;
+    }
+
     private static List<string> ParsePossibleValues(JsonElement item)
     {
         var values = new List<string>();
+        values.AddRange(ParsePossibleValuesFromArray(item, "possible_values"));
+        values.AddRange(ParseEnumerationNames(item));
+        return values
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
-        if (!item.TryGetProperty("possible_values", out var possibleValues)
+    private static IEnumerable<string> ParseEnumerationNames(JsonElement item)
+    {
+        if (!TryGetArray(item, "enumerations", out var enumerations))
+        {
+            yield break;
+        }
+
+        foreach (var enumeration in enumerations.EnumerateArray())
+        {
+            if (!enumeration.TryGetProperty("name", out var nameProperty))
+            {
+                continue;
+            }
+
+            var name = nameProperty.GetString();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                yield return name;
+            }
+        }
+    }
+
+    private static IEnumerable<string> ParsePossibleValuesFromArray(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var possibleValues)
             || possibleValues.ValueKind != JsonValueKind.Array)
         {
-            return values;
+            yield break;
         }
 
         foreach (var possibleValue in possibleValues.EnumerateArray())
@@ -756,22 +842,30 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
             switch (possibleValue.ValueKind)
             {
                 case JsonValueKind.String:
-                    AddPossibleValue(values, possibleValue.GetString());
+                    var stringValue = possibleValue.GetString();
+                    if (!string.IsNullOrWhiteSpace(stringValue))
+                    {
+                        yield return stringValue;
+                    }
+
                     break;
                 case JsonValueKind.Object when possibleValue.TryGetProperty("value", out var valueProperty):
-                    AddPossibleValue(values, valueProperty.GetString());
+                    var objectValue = valueProperty.GetString();
+                    if (!string.IsNullOrWhiteSpace(objectValue))
+                    {
+                        yield return objectValue;
+                    }
+
+                    break;
+                case JsonValueKind.Object when possibleValue.TryGetProperty("name", out var nameProperty):
+                    var nameValue = nameProperty.GetString();
+                    if (!string.IsNullOrWhiteSpace(nameValue))
+                    {
+                        yield return nameValue;
+                    }
+
                     break;
             }
-        }
-
-        return values;
-    }
-
-    private static void AddPossibleValue(List<string> values, string? value)
-    {
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            values.Add(value);
         }
     }
 

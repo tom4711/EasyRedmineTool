@@ -18,6 +18,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
     private readonly TimeEntryDto _entry;
+    private CancellationTokenSource? _customFieldsCts;
 
     [ObservableProperty]
     private string hours = string.Empty;
@@ -104,6 +105,14 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             IsDeleteConfirmationVisible = false;
             CustomFields.Clear();
             OnPropertyChanged(nameof(HasCustomFields));
+        }
+    }
+
+    partial void OnSelectedActivityChanged(TimeEntryActivityDto? value)
+    {
+        if (IsEditing)
+        {
+            _ = LoadCustomFieldsAsync();
         }
     }
 
@@ -266,12 +275,43 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             ?? Activities.FirstOrDefault(activity => activity.Id == _entry.Activity?.Id)
             ?? Activities.FirstOrDefault();
 
+        await LoadCustomFieldsAsync();
+    }
+
+    private async Task LoadCustomFieldsAsync()
+    {
+        _customFieldsCts?.Cancel();
+        _customFieldsCts?.Dispose();
+        _customFieldsCts = new CancellationTokenSource();
+        var loadToken = _customFieldsCts.Token;
+
+        var settings = _appSettingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            return;
+        }
+
         CustomFields.Clear();
+        OnPropertyChanged(nameof(HasCustomFields));
+
+        if (SelectedActivity is null)
+        {
+            return;
+        }
+
+        var projectId = CachedTicket?.Project?.Id;
         var customFieldRows = await _timeEntryService.GetCustomFieldRowsAsync(
             settings,
             IssueId,
             projectId,
-            _entry.Custom_Fields);
+            SelectedActivity.Id,
+            _entry.Custom_Fields,
+            loadToken);
+
+        if (loadToken.IsCancellationRequested)
+        {
+            return;
+        }
 
         foreach (var row in customFieldRows)
         {

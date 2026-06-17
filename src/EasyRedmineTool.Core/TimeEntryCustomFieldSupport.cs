@@ -12,34 +12,30 @@ public static class TimeEntryCustomFieldSupport
         IReadOnlyList<TimeEntryCustomFieldValueDto> recentValues,
         AppSettings settings,
         int? projectId = null,
+        int? activityId = null,
         IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null)
     {
-        var fieldMeta = definitions
+        var applicableDefinitions = definitions
             .Where(definition => AppliesToProject(definition, projectId))
-            .ToDictionary(definition => definition.Id);
+            .Where(definition => AppliesToActivity(definition, activityId))
+            .ToList();
 
+        var fieldMeta = applicableDefinitions.ToDictionary(definition => definition.Id);
+        var allowedIds = fieldMeta.Keys.ToHashSet();
         var fields = new Dictionary<int, (string Name, string Value)>();
 
-        foreach (var definition in fieldMeta.Values)
+        foreach (var definition in applicableDefinitions)
         {
             fields[definition.Id] = (definition.Name, string.Empty);
         }
 
-        foreach (var field in settings.TimeEntryCustomFieldDefaults)
+        if (allowedIds.Count > 0)
         {
-            fields[field.Id] = (field.Name, field.Value);
-        }
-
-        foreach (var recentValue in recentValues)
-        {
-            UpsertField(fields, recentValue);
-        }
-
-        if (existingValues is not null)
-        {
-            foreach (var existingValue in existingValues)
+            ApplyKnownValues(fields, settings.TimeEntryCustomFieldDefaults, allowedIds);
+            ApplyKnownValues(fields, recentValues, allowedIds);
+            if (existingValues is not null)
             {
-                UpsertField(fields, existingValue);
+                ApplyKnownValues(fields, existingValues, allowedIds);
             }
         }
 
@@ -56,6 +52,11 @@ public static class TimeEntryCustomFieldSupport
 
     public static bool AppliesToProject(TimeEntryCustomFieldDefinitionDto definition, int? projectId)
     {
+        if (definition.IsProjectScoped)
+        {
+            return true;
+        }
+
         if (!projectId.HasValue)
         {
             return true;
@@ -72,6 +73,21 @@ public static class TimeEntryCustomFieldSupport
         }
 
         return definition.ProjectIds.Contains(projectId.Value);
+    }
+
+    public static bool AppliesToActivity(TimeEntryCustomFieldDefinitionDto definition, int? activityId)
+    {
+        if (definition.ActivityIds.Count == 0)
+        {
+            return true;
+        }
+
+        if (!activityId.HasValue)
+        {
+            return false;
+        }
+
+        return definition.ActivityIds.Contains(activityId.Value);
     }
 
     public static string? Validate(IEnumerable<TimeEntryCustomFieldRowViewModel> rows)
@@ -114,7 +130,41 @@ public static class TimeEntryCustomFieldSupport
             return;
         }
 
-        settingsService.Update(settings => settings.TimeEntryCustomFieldDefaults = defaults);
+        settingsService.Update(settings =>
+        {
+            var merged = settings.TimeEntryCustomFieldDefaults
+                .Where(existing => defaults.All(row => row.Id != existing.Id))
+                .Concat(defaults)
+                .ToList();
+            settings.TimeEntryCustomFieldDefaults = merged;
+        });
+    }
+
+    private static void ApplyKnownValues(
+        Dictionary<int, (string Name, string Value)> fields,
+        IEnumerable<TimeEntryCustomFieldDefault> defaults,
+        IReadOnlySet<int> allowedIds)
+    {
+        foreach (var field in defaults.Where(field => allowedIds.Contains(field.Id)))
+        {
+            UpsertField(fields, new TimeEntryCustomFieldValueDto
+            {
+                Id = field.Id,
+                Name = field.Name,
+                Value = field.Value
+            });
+        }
+    }
+
+    private static void ApplyKnownValues(
+        Dictionary<int, (string Name, string Value)> fields,
+        IEnumerable<TimeEntryCustomFieldValueDto> values,
+        IReadOnlySet<int> allowedIds)
+    {
+        foreach (var value in values.Where(value => allowedIds.Contains(value.Id)))
+        {
+            UpsertField(fields, value);
+        }
     }
 
     private static TimeEntryCustomFieldRowViewModel CreateRow(
@@ -125,8 +175,9 @@ public static class TimeEntryCustomFieldSupport
         new(
             id,
             name,
-            isRequired: definition?.IsRequired ?? true,
+            isRequired: definition?.IsRequired ?? false,
             hasPossibleValues: definition?.HasPossibleValues ?? false,
+            isSearchableList: definition?.IsSearchableList ?? false,
             possibleValues: definition?.PossibleValues ?? [],
             value: value);
 

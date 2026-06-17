@@ -18,12 +18,14 @@ public interface ITimeEntryService
         string apiKey,
         int? issueId = null,
         int? projectId = null,
+        int? activityId = null,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TimeEntryCustomFieldRowViewModel>> GetCustomFieldRowsAsync(
         AppSettings settings,
         int? issueId = null,
         int? projectId = null,
+        int? activityId = null,
         IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
         CancellationToken cancellationToken = default);
 

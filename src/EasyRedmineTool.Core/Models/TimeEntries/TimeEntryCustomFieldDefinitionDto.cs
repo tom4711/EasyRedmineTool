@@ -12,14 +12,21 @@ public class TimeEntryCustomFieldDefinitionDto
 
     public bool IsForAll { get; set; }
 
+    public bool IsProjectScoped { get; set; }
+
     public IReadOnlyList<int> ProjectIds { get; set; } = [];
+
+    public IReadOnlyList<int> ActivityIds { get; set; } = [];
 
     public IReadOnlyList<string> PossibleValues { get; set; } = [];
 
     public bool HasPossibleValues =>
         PossibleValues.Count > 0 && IsListFormat();
 
+    public bool IsSearchableList => HasPossibleValues && PossibleValues.Count > 12;
+
     public bool IsListFormat() =>
         FieldFormat.Equals("list", StringComparison.OrdinalIgnoreCase)
-        || FieldFormat.Equals("enumeration", StringComparison.OrdinalIgnoreCase);
+        || FieldFormat.Equals("enumeration", StringComparison.OrdinalIgnoreCase)
+        || FieldFormat.Equals("depending_enumeration", StringComparison.OrdinalIgnoreCase);
 }

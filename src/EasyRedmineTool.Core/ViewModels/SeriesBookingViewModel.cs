@@ -19,6 +19,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
     private CancellationTokenSource? _ticketDetailsCts;
+    private CancellationTokenSource? _customFieldsCts;
     private CancellationTokenSource? _ticketFilterCts;
 
     [ObservableProperty]
@@ -628,24 +629,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
             SelectedActivity = Activities.FirstOrDefault();
 
-            CustomFields.Clear();
-            var customFieldRows = await _timeEntryService.GetCustomFieldRowsAsync(
-                settings,
-                ticketId,
-                ticket.Project?.Id,
-                cancellationToken: loadToken);
-
-            if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))
-            {
-                return;
-            }
-
-            foreach (var row in customFieldRows)
-            {
-                CustomFields.Add(row);
-            }
-
-            OnPropertyChanged(nameof(HasCustomFields));
+            await LoadCustomFieldsAsync(loadToken, ticketId, ticket.Project?.Id);
         }
         catch (OperationCanceledException) when (loadToken.IsCancellationRequested)
         {
@@ -654,6 +638,62 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
         {
             StatusMessage = ex.Message;
         }
+    }
+
+    partial void OnSelectedActivityChanged(TimeEntryActivityDto? value)
+    {
+        if (SelectedTicket is null)
+        {
+            return;
+        }
+
+        _ = LoadCustomFieldsAsync(CancellationToken.None, SelectedTicket.Id, SelectedTicket.Project?.Id);
+    }
+
+    private async Task LoadCustomFieldsAsync(CancellationToken parentToken, int ticketId, int? projectId)
+    {
+        _customFieldsCts?.Cancel();
+        _customFieldsCts?.Dispose();
+        _customFieldsCts = CancellationTokenSource.CreateLinkedTokenSource(parentToken);
+        var loadToken = _customFieldsCts.Token;
+
+        var settings = _appSettingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            return;
+        }
+
+        CustomFields.Clear();
+        OnPropertyChanged(nameof(HasCustomFields));
+
+        if (SelectedActivity is null)
+        {
+            return;
+        }
+
+        if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))
+        {
+            return;
+        }
+
+        var customFieldRows = await _timeEntryService.GetCustomFieldRowsAsync(
+            settings,
+            ticketId,
+            projectId,
+            SelectedActivity.Id,
+            cancellationToken: loadToken);
+
+        if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))
+        {
+            return;
+        }
+
+        foreach (var row in customFieldRows)
+        {
+            CustomFields.Add(row);
+        }
+
+        OnPropertyChanged(nameof(HasCustomFields));
     }
 
     private bool ShouldIgnoreTicketDetailsResult(CancellationToken loadToken, int ticketId) =>
@@ -683,6 +723,9 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     {
         CancelTicketDetailsLoad();
         CancelTicketFilterLoad();
+        _customFieldsCts?.Cancel();
+        _customFieldsCts?.Dispose();
+        _customFieldsCts = null;
         GC.SuppressFinalize(this);
     }
 

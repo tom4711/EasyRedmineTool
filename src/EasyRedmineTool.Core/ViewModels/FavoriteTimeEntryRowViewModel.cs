@@ -17,6 +17,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
     private readonly TimeEntriesViewModel _parent;
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
+    private CancellationTokenSource? _customFieldsCts;
 
     [ObservableProperty]
     private string hours = AppConstants.DefaultHours;
@@ -72,6 +73,11 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedDateLabel));
     }
 
+    partial void OnSelectedActivityChanged(TimeEntryActivityDto? value)
+    {
+        _ = LoadCustomFieldsAsync();
+    }
+
     public async Task LoadActivitiesAsync(CancellationToken cancellationToken = default)
     {
         var settings = _appSettingsService.Load();
@@ -103,14 +109,38 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             SelectedActivity = Activities.FirstOrDefault();
         }
 
+        await LoadCustomFieldsAsync(cancellationToken);
+    }
+
+    private async Task LoadCustomFieldsAsync(CancellationToken cancellationToken = default)
+    {
+        _customFieldsCts?.Cancel();
+        _customFieldsCts?.Dispose();
+        _customFieldsCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var loadToken = _customFieldsCts.Token;
+
+        var settings = _appSettingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            return;
+        }
+
         CustomFields.Clear();
+        OnPropertyChanged(nameof(HasCustomFields));
+
+        if (SelectedActivity is null)
+        {
+            return;
+        }
+
         var customFieldRows = await _timeEntryService.GetCustomFieldRowsAsync(
             settings,
             Ticket.Id,
             Ticket.Project?.Id,
-            cancellationToken: cancellationToken);
+            SelectedActivity.Id,
+            cancellationToken: loadToken);
 
-        if (cancellationToken.IsCancellationRequested)
+        if (loadToken.IsCancellationRequested)
         {
             return;
         }

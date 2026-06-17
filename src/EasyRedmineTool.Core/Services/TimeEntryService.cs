@@ -24,13 +24,15 @@ public class TimeEntryService(
         string apiKey,
         int? issueId = null,
         int? projectId = null,
+        int? activityId = null,
         CancellationToken cancellationToken = default) =>
-        _apiClient.GetRecentTimeEntryCustomFieldValuesAsync(baseUrl, apiKey, issueId, projectId, cancellationToken);
+        _apiClient.GetRecentTimeEntryCustomFieldValuesAsync(baseUrl, apiKey, issueId, projectId, activityId, cancellationToken);
 
     public async Task<IReadOnlyList<TimeEntryCustomFieldRowViewModel>> GetCustomFieldRowsAsync(
         AppSettings settings,
         int? issueId = null,
         int? projectId = null,
+        int? activityId = null,
         IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
         CancellationToken cancellationToken = default)
     {
@@ -53,6 +55,7 @@ public class TimeEntryService(
                 settings.ApiKey,
                 issueId,
                 projectId,
+                activityId,
                 cancellationToken);
         }
         catch (OperationCanceledException)
@@ -77,6 +80,7 @@ public class TimeEntryService(
             recentValues,
             settings,
             projectId,
+            activityId,
             existingValues);
     }
 
