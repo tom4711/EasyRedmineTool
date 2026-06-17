@@ -1,1 +1,4 @@
-{}
+{
+    "dotnet.defaultSolution": "EasyRedmineTool.slnx",
+    "csharp.debug.console": "integratedTerminal"
+}

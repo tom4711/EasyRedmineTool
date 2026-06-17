@@ -1,15 +1,24 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "C# Dev Tools: Launch",
-            "type": "devtools",
+            "name": "EasyRedmineTool.Desktop",
+            "type": "coreclr",
             "request": "launch",
-            "projectPath": "${workspaceFolder}/src/MyProject/MyProject.csproj",
-            "withDebug": true
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/EasyRedmineTool.Desktop/bin/Debug/net10.0/EasyRedmineTool.Desktop.dll",
+            "cwd": "${workspaceFolder}/src/EasyRedmineTool.Desktop/bin/Debug/net10.0",
+            "console": "integratedTerminal",
+            "stopAtEntry": false,
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "EasyRedmineTool.Desktop (attach)",
+            "type": "coreclr",
+            "request": "attach",
+            "processName": "EasyRedmineTool.Desktop"
         }
     ]
 }
