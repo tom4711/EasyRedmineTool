@@ -188,6 +188,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             IsBusy = true;
             StatusMessage = "Tickets werden geladen ...";
             Tickets.Clear();
+            ApplyTicketFilter();
 
             SyncPendingFromSelection();
             var filter = BuildCurrentFilter();
@@ -207,7 +208,6 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             PersistCurrentState();
             RestoreSelectedStatusFilter(SelectedStatusFilter?.Value);
             StatusMessage = BuildLoadStatusMessage(result, filter, SelectedStatusFilter?.Value);
-            ApplyTicketFilter();
         }
         catch (OperationCanceledException)
         {
@@ -219,7 +219,12 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         }
         finally
         {
+            var isCurrentOperation = _operationCts == operationCts;
             CompleteOperation(operationCts);
+            if (isCurrentOperation)
+            {
+                ApplyTicketFilter();
+            }
         }
     }
 
@@ -483,7 +488,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
 
         var query = TicketFilterText.Trim();
         return ticket.Id.ToString(CultureInfo.InvariantCulture).Contains(query, StringComparison.OrdinalIgnoreCase)
-            || ticket.Subject.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || (ticket.Subject?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
             || (ticket.Project?.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
     }
 

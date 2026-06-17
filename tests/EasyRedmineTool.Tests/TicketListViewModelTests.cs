@@ -42,6 +42,70 @@ public class TicketListViewModelTests
 
         Assert.Single(viewModel.FilteredTickets);
         Assert.Equal(10, viewModel.FilteredTickets[0].Ticket.Id);
+
+        viewModel.TicketFilterText = "proj b";
+
+        Assert.Single(viewModel.FilteredTickets);
+        Assert.Equal(20, viewModel.FilteredTickets[0].Ticket.Id);
+
+        viewModel.ToggleFavoriteForTicketCommand.Execute(viewModel.FilteredTickets[0]);
+
+        viewModel.TicketFilterText = string.Empty;
+
+        Assert.Equal(2, viewModel.FilteredTickets.Count);
+        Assert.Contains(viewModel.FilteredTickets, ticket => ticket.Ticket.Id == 20 && ticket.IsFavorite);
+        Assert.Equal("2 Tickets", viewModel.ListScopeSummary);
+    }
+
+    [Fact]
+    public void TicketFilterText_handles_null_subject_without_throwing()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            CachedTickets = [new IssueDto { Id = 30, Subject = null! }],
+            LastLoadedTicketIds = [30]
+        });
+
+        var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
+
+        viewModel.TicketFilterText = "missing";
+
+        Assert.Empty(viewModel.FilteredTickets);
+        Assert.Equal("0 von 1 Tickets", viewModel.ListScopeSummary);
+
+        viewModel.TicketFilterText = "30";
+
+        Assert.Single(viewModel.FilteredTickets);
+        Assert.Equal(30, viewModel.FilteredTickets[0].Ticket.Id);
+    }
+
+    [Fact]
+    public async Task LoadTicketsAsync_keeps_filtered_tickets_in_sync_when_load_fails()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            CachedTickets = [new IssueDto { Id = 10, Subject = "Cached" }],
+            LastLoadedTicketIds = [10]
+        });
+        context.TicketService.NextLoadException = new InvalidOperationException("API down");
+
+        var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
+        viewModel.TicketFilterText = "cached";
+
+        Assert.Single(viewModel.FilteredTickets);
+
+        await viewModel.LoadTicketsCommand.ExecuteAsync(null);
+
+        Assert.Empty(viewModel.Tickets);
+        Assert.Empty(viewModel.FilteredTickets);
+        Assert.Equal("Keine Tickets geladen", viewModel.ListScopeSummary);
+        Assert.Contains("API down", viewModel.StatusMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -295,6 +359,7 @@ public class TicketListViewModelTests
         public TicketListLoadResult NextLoadResult { get; set; } = new();
         public TicketListLoadResult LatestLoadResult { get; set; } = new();
         public IssueDto? NextIssue { get; set; }
+        public Exception? NextLoadException { get; set; }
 
         public void InvalidateTimeEntryCache()
         {
@@ -328,6 +393,11 @@ public class TicketListViewModelTests
             CancellationToken cancellationToken = default)
         {
             _loadCallCount++;
+            if (NextLoadException is not null)
+            {
+                throw NextLoadException;
+            }
+
             if (_loadCallCount == 1 && FirstCallDelay > TimeSpan.Zero)
             {
                 await Task.Delay(FirstCallDelay, cancellationToken);
