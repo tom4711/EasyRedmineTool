@@ -10,6 +10,7 @@ public class TimeEntryCustomFieldSupportTests
     public void Validate_returns_message_for_missing_required_field()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [],
             [
                 new TimeEntryCustomFieldValueDto
                 {
@@ -29,6 +30,7 @@ public class TimeEntryCustomFieldSupportTests
     public void CreateRows_prefers_existing_entry_values_over_defaults()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [],
             [],
             new AppSettings
             {
@@ -50,6 +52,7 @@ public class TimeEntryCustomFieldSupportTests
     public void CreateRows_uses_recent_values_without_defaults()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [],
             [
                 new TimeEntryCustomFieldValueDto
                 {
@@ -65,9 +68,75 @@ public class TimeEntryCustomFieldSupportTests
     }
 
     [Fact]
+    public void CreateRows_uses_project_definitions_even_without_recent_values()
+    {
+        var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [
+                new TimeEntryCustomFieldDefinitionDto
+                {
+                    Id = 7,
+                    Name = "Kostenstelle",
+                    FieldFormat = "list",
+                    IsRequired = true,
+                    IsForAll = false,
+                    ProjectIds = [42],
+                    PossibleValues = ["A", "B"]
+                }
+            ],
+            [],
+            new AppSettings(),
+            projectId: 42);
+
+        Assert.Single(rows);
+        Assert.Equal(7, rows[0].Id);
+        Assert.True(rows[0].IsRequired);
+        Assert.True(rows[0].HasPossibleValues);
+        Assert.Equal(["A", "B"], rows[0].PossibleValues);
+    }
+
+    [Fact]
+    public void CreateRows_filters_definitions_by_project()
+    {
+        var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [
+                new TimeEntryCustomFieldDefinitionDto
+                {
+                    Id = 1,
+                    Name = "Projekt A Feld",
+                    ProjectIds = [10]
+                },
+                new TimeEntryCustomFieldDefinitionDto
+                {
+                    Id = 2,
+                    Name = "Projekt B Feld",
+                    ProjectIds = [20]
+                }
+            ],
+            [],
+            new AppSettings(),
+            projectId: 10);
+
+        Assert.Single(rows);
+        Assert.Equal(1, rows[0].Id);
+    }
+
+    [Fact]
+    public void AppliesToProject_includes_global_fields()
+    {
+        var definition = new TimeEntryCustomFieldDefinitionDto
+        {
+            IsForAll = true,
+            ProjectIds = [99]
+        };
+
+        Assert.True(TimeEntryCustomFieldSupport.AppliesToProject(definition, 42));
+    }
+
+    [Fact]
     public void BuildValues_includes_only_filled_fields()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [],
             [
                 new TimeEntryCustomFieldValueDto { Id = 1, Name = "A", Value = "x" },
                 new TimeEntryCustomFieldValueDto { Id = 2, Name = "B", Value = string.Empty }

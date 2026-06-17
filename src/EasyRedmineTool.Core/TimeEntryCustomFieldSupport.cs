@@ -8,11 +8,22 @@ using EasyRedmineTool.Core.ViewModels;
 public static class TimeEntryCustomFieldSupport
 {
     public static IReadOnlyList<TimeEntryCustomFieldRowViewModel> CreateRows(
+        IReadOnlyList<TimeEntryCustomFieldDefinitionDto> definitions,
         IReadOnlyList<TimeEntryCustomFieldValueDto> recentValues,
         AppSettings settings,
+        int? projectId = null,
         IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null)
     {
+        var fieldMeta = definitions
+            .Where(definition => AppliesToProject(definition, projectId))
+            .ToDictionary(definition => definition.Id);
+
         var fields = new Dictionary<int, (string Name, string Value)>();
+
+        foreach (var definition in fieldMeta.Values)
+        {
+            fields[definition.Id] = (definition.Name, string.Empty);
+        }
 
         foreach (var field in settings.TimeEntryCustomFieldDefaults)
         {
@@ -39,14 +50,28 @@ public static class TimeEntryCustomFieldSupport
 
         return fields
             .OrderBy(field => field.Value.Name)
-            .Select(field => new TimeEntryCustomFieldRowViewModel(
-                field.Key,
-                field.Value.Name,
-                isRequired: true,
-                hasPossibleValues: false,
-                possibleValues: [],
-                value: field.Value.Value))
+            .Select(field => CreateRow(field.Key, field.Value.Name, field.Value.Value, fieldMeta.GetValueOrDefault(field.Key)))
             .ToList();
+    }
+
+    public static bool AppliesToProject(TimeEntryCustomFieldDefinitionDto definition, int? projectId)
+    {
+        if (!projectId.HasValue)
+        {
+            return true;
+        }
+
+        if (definition.IsForAll)
+        {
+            return true;
+        }
+
+        if (definition.ProjectIds.Count == 0)
+        {
+            return false;
+        }
+
+        return definition.ProjectIds.Contains(projectId.Value);
     }
 
     public static string? Validate(IEnumerable<TimeEntryCustomFieldRowViewModel> rows)
@@ -91,6 +116,19 @@ public static class TimeEntryCustomFieldSupport
 
         settingsService.Update(settings => settings.TimeEntryCustomFieldDefaults = defaults);
     }
+
+    private static TimeEntryCustomFieldRowViewModel CreateRow(
+        int id,
+        string name,
+        string value,
+        TimeEntryCustomFieldDefinitionDto? definition) =>
+        new(
+            id,
+            name,
+            isRequired: definition?.IsRequired ?? true,
+            hasPossibleValues: definition?.HasPossibleValues ?? false,
+            possibleValues: definition?.PossibleValues ?? [],
+            value: value);
 
     private static void UpsertField(
         Dictionary<int, (string Name, string Value)> fields,

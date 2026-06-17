@@ -1,6 +1,8 @@
 namespace EasyRedmineTool.Core.Services.Interfaces;
 
+using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
+using EasyRedmineTool.Core.ViewModels;
 
 public interface ITimeEntryService
 {
@@ -16,6 +18,13 @@ public interface ITimeEntryService
         string apiKey,
         int? issueId = null,
         int? projectId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TimeEntryCustomFieldRowViewModel>> GetCustomFieldRowsAsync(
+        AppSettings settings,
+        int? issueId = null,
+        int? projectId = null,
+        IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
         CancellationToken cancellationToken = default);
 
     Task<TimeEntryLoadResult> GetMyTimeEntriesAsync(

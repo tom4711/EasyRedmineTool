@@ -104,19 +104,18 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         }
 
         CustomFields.Clear();
-        var recentValues = await _timeEntryService.GetRecentCustomFieldValuesAsync(
-            settings.BaseUrl,
-            settings.ApiKey,
+        var customFieldRows = await _timeEntryService.GetCustomFieldRowsAsync(
+            settings,
             Ticket.Id,
             Ticket.Project?.Id,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         if (cancellationToken.IsCancellationRequested)
         {
             return;
         }
 
-        foreach (var row in TimeEntryCustomFieldSupport.CreateRows(recentValues, settings))
+        foreach (var row in customFieldRows)
         {
             CustomFields.Add(row);
         }

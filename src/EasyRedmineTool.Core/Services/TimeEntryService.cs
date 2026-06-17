@@ -1,8 +1,11 @@
 namespace EasyRedmineTool.Core.Services;
 
+using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Api;
+using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Services.Interfaces;
+using EasyRedmineTool.Core.ViewModels;
 
 using Microsoft.Extensions.Logging;
 
@@ -23,6 +26,88 @@ public class TimeEntryService(
         int? projectId = null,
         CancellationToken cancellationToken = default) =>
         _apiClient.GetRecentTimeEntryCustomFieldValuesAsync(baseUrl, apiKey, issueId, projectId, cancellationToken);
+
+    public async Task<IReadOnlyList<TimeEntryCustomFieldRowViewModel>> GetCustomFieldRowsAsync(
+        AppSettings settings,
+        int? issueId = null,
+        int? projectId = null,
+        IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            return [];
+        }
+
+        var definitions = await GetCustomFieldDefinitionsAsync(
+            settings.BaseUrl,
+            settings.ApiKey,
+            projectId,
+            cancellationToken);
+
+        IReadOnlyList<TimeEntryCustomFieldValueDto> recentValues = [];
+        try
+        {
+            recentValues = await GetRecentCustomFieldValuesAsync(
+                settings.BaseUrl,
+                settings.ApiKey,
+                issueId,
+                projectId,
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (RedmineApiException)
+        {
+            // Recent values are optional when definitions are available.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Letzte Custom-Field-Werte konnten nicht geladen werden (Issue {IssueId}, Projekt {ProjectId}).",
+                issueId,
+                projectId);
+        }
+
+        return TimeEntryCustomFieldSupport.CreateRows(
+            definitions,
+            recentValues,
+            settings,
+            projectId,
+            existingValues);
+    }
+
+    private async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
+        string baseUrl,
+        string apiKey,
+        int? projectId,
+        CancellationToken cancellationToken)
+    {
+        var cacheKey = TimeEntryFormDataCache.BuildCustomFieldDefinitionsKey(baseUrl, apiKey, projectId);
+
+        try
+        {
+            return await _formDataCache.GetOrLoadCustomFieldDefinitionsAsync(
+                cacheKey,
+                token => _apiClient.GetTimeEntryCustomFieldDefinitionsAsync(baseUrl, apiKey, projectId, token),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Custom-Field-Definitionen konnten nicht geladen werden (Projekt {ProjectId}).",
+                projectId);
+            return [];
+        }
+    }
 
     public async Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
         string baseUrl,

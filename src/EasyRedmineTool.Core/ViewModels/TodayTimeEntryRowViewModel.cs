@@ -266,17 +266,14 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             ?? Activities.FirstOrDefault(activity => activity.Id == _entry.Activity?.Id)
             ?? Activities.FirstOrDefault();
 
-        var recentValues = await _timeEntryService.GetRecentCustomFieldValuesAsync(
-            settings.BaseUrl,
-            settings.ApiKey,
-            IssueId,
-            projectId);
-
         CustomFields.Clear();
-        foreach (var row in TimeEntryCustomFieldSupport.CreateRows(
-                     recentValues,
-                     settings,
-                     _entry.Custom_Fields))
+        var customFieldRows = await _timeEntryService.GetCustomFieldRowsAsync(
+            settings,
+            IssueId,
+            projectId,
+            _entry.Custom_Fields);
+
+        foreach (var row in customFieldRows)
         {
             CustomFields.Add(row);
         }

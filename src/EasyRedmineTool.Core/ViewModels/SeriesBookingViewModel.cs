@@ -628,20 +628,19 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
             SelectedActivity = Activities.FirstOrDefault();
 
-            var recentValues = await _timeEntryService.GetRecentCustomFieldValuesAsync(
-                settings.BaseUrl,
-                settings.ApiKey,
+            CustomFields.Clear();
+            var customFieldRows = await _timeEntryService.GetCustomFieldRowsAsync(
+                settings,
                 ticketId,
                 ticket.Project?.Id,
-                loadToken);
+                cancellationToken: loadToken);
 
             if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))
             {
                 return;
             }
 
-            CustomFields.Clear();
-            foreach (var row in TimeEntryCustomFieldSupport.CreateRows(recentValues, settings))
+            foreach (var row in customFieldRows)
             {
                 CustomFields.Add(row);
             }

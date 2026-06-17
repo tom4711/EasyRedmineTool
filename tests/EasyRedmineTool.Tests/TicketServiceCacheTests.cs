@@ -101,6 +101,13 @@ public class TicketServiceCacheTests
             CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
+        public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetTimeEntryCustomFieldDefinitionsAsync(
+            string baseUrl,
+            string apiKey,
+            int? projectId = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
         public Task<HttpResponseMessage> CreateTimeEntryAsync(
             string baseUrl,
             string apiKey,
