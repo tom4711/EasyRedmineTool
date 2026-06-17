@@ -47,6 +47,9 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private DateTime calendarDisplayDate = DateTime.Today;
 
+    [ObservableProperty]
+    private bool includeTimeEntryTickets;
+
     public ObservableCollection<TicketListItemViewModel> Tickets { get; } = [];
 
     public ObservableCollection<TicketFilterOption<TicketStatusFilterSelection>> StatusFilterOptions { get; } = [];
@@ -74,6 +77,8 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
 
     public bool HasLastBookedUntilFilter => LastBookedUntil.HasValue;
 
+    public bool IsLastBookedUntilFilterEnabled => IncludeTimeEntryTickets;
+
     partial void OnLastBookedUntilChanged(DateTime? value)
     {
         OnPropertyChanged(nameof(LastBookedUntilLabel));
@@ -94,6 +99,12 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         PersistFilterSettings();
     }
 
+    partial void OnIncludeTimeEntryTicketsChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsLastBookedUntilFilterEnabled));
+        PersistFilterSettings();
+    }
+
     public void ReloadSettings()
     {
         var settings = _appSettingsService.Load();
@@ -109,6 +120,8 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         _pendingStatusId = settings.TicketLoadStatusId;
         _pendingStatusName = settings.TicketLoadStatusName;
         LastBookedUntil = RedmineDates.TryParseSpentOn(settings.TicketLoadLastBookedUntil);
+        IncludeTimeEntryTickets = settings.TicketLoadIncludeTimeEntryTickets;
+        OnPropertyChanged(nameof(IsLastBookedUntilFilterEnabled));
         RestoreSelectedStatusFilter();
 
         Tickets.Clear();
@@ -407,7 +420,8 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             Assignee = SelectedAssigneeFilter?.Value ?? TicketAssigneeFilter.Me,
             StatusKind = statusSelection.Kind,
             StatusId = statusSelection.StatusId,
-            LastBookedUntil = LastBookedUntil
+            IncludeTimeEntryTickets = IncludeTimeEntryTickets,
+            LastBookedUntil = IncludeTimeEntryTickets ? LastBookedUntil : null
         };
     }
 
@@ -417,6 +431,11 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         TicketStatusFilterSelection? statusSelection)
     {
         var filterSummary = BuildFilterSummary(filter, statusSelection);
+        if (!filter.IncludeTimeEntryTickets)
+        {
+            return $"{result.Tickets.Count} Ticket(s) geladen (nur Zuweisung/Status{filterSummary}).";
+        }
+
         if (result.TimeEntryTicketCount == 0)
         {
             return $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} aus Filter{filterSummary}).";
@@ -499,6 +518,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             settings.TicketLoadLastBookedUntil = LastBookedUntil.HasValue
                 ? RedmineDates.FormatSpentOn(LastBookedUntil.Value)
                 : null;
+            settings.TicketLoadIncludeTimeEntryTickets = IncludeTimeEntryTickets;
         });
     }
 

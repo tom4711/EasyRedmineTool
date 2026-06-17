@@ -18,6 +18,7 @@ public class AppSettings
     public int? TicketLoadStatusId { get; set; }
     public string? TicketLoadStatusName { get; set; }
     public string? TicketLoadLastBookedUntil { get; set; }
+    public bool TicketLoadIncludeTimeEntryTickets { get; set; }
 
     public List<TimeEntryCustomFieldDefault> TimeEntryCustomFieldDefaults { get; set; } = [];
 }

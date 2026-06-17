@@ -79,7 +79,7 @@
           <TextBlock Text="Lade-Filter"
                      FontSize="14"
                      FontWeight="SemiBold" />
-          <TextBlock Text="Filter lassen sich kombinieren und werden für den nächsten Ladevorgang gespeichert. Status werden aus Redmine geladen."
+          <TextBlock Text="Standardmäßig werden nur Tickets nach Zuweisung und Status geladen. Fehlende Tickets können per ID ergänzt werden. Optional lassen sich zusätzliche Tickets aus Zeiteinträgen nachladen."
                      FontSize="12"
                      Opacity="0.75"
                      TextWrapping="Wrap" />
@@ -113,7 +113,7 @@
               </ComboBox>
             </StackPanel>
 
-            <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4">
+            <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4" IsEnabled="{Binding IsLastBookedUntilFilterEnabled}">
               <TextBlock Classes="filter-label" Text="Zuletzt gebucht bis" />
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                 <Button Grid.Column="0"
@@ -150,6 +150,9 @@
               </Grid>
             </StackPanel>
           </Grid>
+
+          <CheckBox Content="Zusätzlich Tickets aus Zeiteinträgen laden (letzte 12 Monate, langsamer)"
+                    IsChecked="{Binding IncludeTimeEntryTickets}" />
         </StackPanel>
       </Border>
 

@@ -9,4 +9,6 @@ public class TicketLoadFilter
     public int? StatusId { get; set; }
 
     public DateTime? LastBookedUntil { get; set; }
+
+    public bool IncludeTimeEntryTickets { get; set; }
 }

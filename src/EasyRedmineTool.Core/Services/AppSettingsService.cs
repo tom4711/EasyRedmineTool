@@ -104,6 +104,7 @@ public sealed class AppSettingsService : IAppSettingsService
         TicketLoadStatusId = settings.TicketLoadStatusId,
         TicketLoadStatusName = settings.TicketLoadStatusName,
         TicketLoadLastBookedUntil = settings.TicketLoadLastBookedUntil,
+        TicketLoadIncludeTimeEntryTickets = settings.TicketLoadIncludeTimeEntryTickets,
         TimeEntryCustomFieldDefaults = settings.TimeEntryCustomFieldDefaults ?? [],
     };
 

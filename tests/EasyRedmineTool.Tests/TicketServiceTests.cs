@@ -61,6 +61,24 @@ public class TicketServiceTests
     }
 
     [Fact]
+    public async Task GetTicketsForListAsync_skips_time_entries_when_not_included()
+    {
+        var apiClient = new FilteringTicketApiClient(
+            primaryIssues: [new IssueDto { Id = 1, Subject = "Primary" }],
+            timeEntries: [CreateEntry(issueId: 99, spentOn: RedmineDates.FormatSpentOn(DateTime.Today))]);
+        var service = new TicketService(apiClient);
+
+        var result = await service.GetTicketsForListAsync(
+            "https://redmine.example/",
+            "secret",
+            new TicketLoadFilter { IncludeTimeEntryTickets = false });
+
+        Assert.Single(result.Tickets);
+        Assert.Equal(1, result.Tickets[0].Id);
+        Assert.Equal(0, result.TimeEntryTicketCount);
+    }
+
+    [Fact]
     public async Task GetTicketsForListAsync_excludes_unbooked_and_recently_booked_primary_tickets()
     {
         var yesterday = DateTime.Today.AddDays(-1);
@@ -77,7 +95,11 @@ public class TicketServiceTests
                 CreateEntry(issueId: 2, spentOn: RedmineDates.FormatSpentOn(yesterday)),
             ]);
         var service = new TicketService(apiClient);
-        var filter = new TicketLoadFilter { LastBookedUntil = yesterday };
+        var filter = new TicketLoadFilter
+        {
+            LastBookedUntil = yesterday,
+            IncludeTimeEntryTickets = true
+        };
 
         var result = await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
 

@@ -38,8 +38,6 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
         TicketLoadFilter filter,
         CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _apiClient.GetCurrentUserIdAsync(baseUrl, apiKey, cancellationToken);
-
         var primaryIssues = await _apiClient.GetIssuesAsync(
             baseUrl,
             apiKey,
@@ -47,6 +45,18 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
             filter.StatusKind,
             filter.StatusId,
             cancellationToken);
+        if (!filter.IncludeTimeEntryTickets)
+        {
+            var primaryOnly = primaryIssues.OrderBy(ticket => ticket.Id).ToList();
+            return new TicketListLoadResult
+            {
+                Tickets = primaryOnly,
+                OpenTicketCount = primaryOnly.Count,
+                TimeEntryTicketCount = 0
+            };
+        }
+
+        var currentUserId = await _apiClient.GetCurrentUserIdAsync(baseUrl, apiKey, cancellationToken);
         var knownIds = new HashSet<int>(primaryIssues.Select(i => i.Id));
 
         var to = DateTime.Today;
