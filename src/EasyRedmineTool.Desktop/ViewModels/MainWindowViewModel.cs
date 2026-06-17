@@ -12,11 +12,16 @@ using EasyRedmineTool.Core.Services.Interfaces;
 using EasyRedmineTool.Core.ViewModels;
 
 using System;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly IAppSettingsService _appSettingsService;
+    private readonly IUpdateCheckService _updateCheckService;
+    private CancellationTokenSource? _updateCheckCts;
     private bool _isApplyingThemeFromSettings;
     private bool _disposed;
 
@@ -38,6 +43,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool isSeriesBookingVisible;
 
+    [ObservableProperty]
+    private bool isUpdateAvailable;
+
+    [ObservableProperty]
+    private string? latestUpdateVersion;
+
+    [ObservableProperty]
+    private string? updateReleaseUrl;
+
+    public string UpdateAvailableMessage =>
+        string.IsNullOrWhiteSpace(LatestUpdateVersion)
+            ? "Eine neue Version ist verfügbar."
+            : $"Version {LatestUpdateVersion} ist verfügbar.";
+
     public string WindowTitle => AppInfo.WindowTitle;
 
     public MainWindowViewModel(
@@ -47,7 +66,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         WeeklySummaryViewModel weeklySummaryViewModel,
         SeriesBookingViewModel seriesBookingViewModel,
         AboutViewModel aboutViewModel,
-        IAppSettingsService appSettingsService)
+        IAppSettingsService appSettingsService,
+        IUpdateCheckService updateCheckService)
     {
         SettingsViewModel = settingsViewModel;
         TicketListViewModel = ticketListViewModel;
@@ -56,12 +76,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SeriesBookingViewModel = seriesBookingViewModel;
         AboutViewModel = aboutViewModel;
         _appSettingsService = appSettingsService;
+        _updateCheckService = updateCheckService;
 
         SettingsViewModel.SettingsSaved += OnSettingsSaved;
         WeeklySummaryViewModel.OpenTimeEntryRequested += OnOpenTimeEntryFromSummary;
 
         ApplyThemeFromSettings();
         ShowInitialView();
+        _ = CheckForUpdatesOnStartupAsync();
     }
 
     public SettingsViewModel SettingsViewModel { get; }
@@ -85,6 +107,30 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             _appSettingsService.Update(settings => settings.IsDarkMode = value);
         }
+    }
+
+    partial void OnLatestUpdateVersionChanged(string? value) =>
+        OnPropertyChanged(nameof(UpdateAvailableMessage));
+
+    [RelayCommand]
+    private void OpenUpdateRelease()
+    {
+        if (string.IsNullOrWhiteSpace(UpdateReleaseUrl))
+        {
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = UpdateReleaseUrl,
+            UseShellExecute = true,
+        });
+    }
+
+    [RelayCommand]
+    private void DismissUpdateNotice()
+    {
+        IsUpdateAvailable = false;
     }
 
     [RelayCommand]
@@ -128,6 +174,47 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void OpenAbout()
     {
         ShowAbout();
+    }
+
+    private async Task CheckForUpdatesOnStartupAsync()
+    {
+        CancelUpdateCheck();
+        var updateCheckCts = new CancellationTokenSource();
+        _updateCheckCts = updateCheckCts;
+
+        try
+        {
+            var result = await _updateCheckService.CheckForUpdateAsync(updateCheckCts.Token);
+            if (updateCheckCts.IsCancellationRequested || !result.IsUpdateAvailable)
+            {
+                return;
+            }
+
+            IsUpdateAvailable = true;
+            LatestUpdateVersion = result.LatestVersion;
+            UpdateReleaseUrl = result.ReleaseUrl;
+            OnPropertyChanged(nameof(UpdateAvailableMessage));
+        }
+        catch (OperationCanceledException)
+        {
+            // App shutdown or a newer check superseded this request.
+        }
+        finally
+        {
+            if (_updateCheckCts == updateCheckCts)
+            {
+                _updateCheckCts = null;
+            }
+
+            updateCheckCts.Dispose();
+        }
+    }
+
+    private void CancelUpdateCheck()
+    {
+        _updateCheckCts?.Cancel();
+        _updateCheckCts?.Dispose();
+        _updateCheckCts = null;
     }
 
     private void OnSettingsSaved(object? sender, EventArgs e)
@@ -233,6 +320,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         _disposed = true;
+        CancelUpdateCheck();
         SettingsViewModel.SettingsSaved -= OnSettingsSaved;
         WeeklySummaryViewModel.OpenTimeEntryRequested -= OnOpenTimeEntryFromSummary;
 

@@ -21,6 +21,11 @@ public static class ServiceCollectionExtensions
 
         services.AddHttpClient<IEasyRedmineApiClient, EasyRedmineApiClient>();
 
+        services.AddHttpClient<IUpdateCheckService, UpdateCheckService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+
         services.AddSingleton<IConnectionTestService, ConnectionTestService>();
         services.AddSingleton<ITicketService, TicketService>();
         services.AddSingleton<ITimeEntryService, TimeEntryService>();

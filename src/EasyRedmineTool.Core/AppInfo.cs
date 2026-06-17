@@ -13,6 +13,11 @@ public static class AppInfo
         ?? GetAppAssembly().GetName().Version?.ToString()
         ?? "0.0.0";
 
+    public static string DisplayVersion => GetDisplayVersion();
+
+    public const string GitHubReleasesLatestApiUrl =
+        "https://api.github.com/repos/tom4711/EasyRedmineTool/releases/latest";
+
     public static string WindowTitle => $"{AppName} v{GetDisplayVersion()}";
 
     public static IReadOnlyList<LibraryInfo> Libraries { get; } =
