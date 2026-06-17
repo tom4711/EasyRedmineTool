@@ -9,6 +9,8 @@ using EasyRedmineTool.Desktop.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+using System;
+
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddEasyRedmineTool(this IServiceCollection services)
