@@ -11,7 +11,7 @@
         Icon="/Assets/app-icon.png"
         Title="{Binding WindowTitle}">
 
-  <Grid RowDefinitions="Auto,Auto,*">
+  <Grid RowDefinitions="Auto,Auto,Auto,*">
     <Border Grid.Row="0"
             Background="{DynamicResource CardBackgroundBrush}"
             Padding="24,16,24,12">
@@ -53,9 +53,42 @@
       </Grid>
     </Border>
 
-    <Separator Grid.Row="1" />
+    <Border Grid.Row="1"
+            IsVisible="{Binding IsUpdateAvailable}"
+            Background="{DynamicResource CardBackgroundBrush}"
+            BorderBrush="{DynamicResource CardBorderBrush}"
+            BorderThickness="0,0,0,1"
+            Padding="24,10">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+        <StackPanel Grid.Column="0"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    VerticalAlignment="Center">
+          <materialIcons:MaterialIcon Kind="ArrowUpCircleOutline"
+                                      Width="18"
+                                      Height="18"
+                                      VerticalAlignment="Center" />
+          <TextBlock Text="{Binding UpdateBannerMessage}"
+                     VerticalAlignment="Center"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+        <Button Grid.Column="1"
+                Classes="secondary compact"
+                Content="Release öffnen"
+                Command="{Binding OpenUpdateReleaseCommand}" />
+        <Button Grid.Column="2"
+                Classes="ghost compact"
+                ToolTip.Tip="Hinweis ausblenden"
+                AutomationProperties.Name="Hinweis ausblenden"
+                Command="{Binding DismissUpdateNoticeCommand}">
+          <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" />
+        </Button>
+      </Grid>
+    </Border>
 
-    <Panel Grid.Row="2" ClipToBounds="True">
+    <Separator Grid.Row="2" />
+
+    <Panel Grid.Row="3" ClipToBounds="True">
       <Grid IsVisible="{Binding IsSettingsVisible}">
         <views:SettingsView DataContext="{Binding SettingsViewModel}" />
       </Grid>

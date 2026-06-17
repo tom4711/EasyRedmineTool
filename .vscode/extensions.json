@@ -1,0 +1,10 @@
+{
+    "recommendations": [
+        "anysphere.csharp"
+    ],
+    "unwantedRecommendations": [
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.csharp",
+        "jakubkozera.csharp-dev-tools"
+    ]
+}

@@ -10,6 +10,7 @@ using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 
@@ -18,9 +19,19 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
     private CancellationTokenSource? _ticketDetailsCts;
+    private CancellationTokenSource? _ticketFilterCts;
 
     [ObservableProperty]
     private IssueDto? selectedTicket;
+
+    [ObservableProperty]
+    private string ticketFilterText = string.Empty;
+
+    [ObservableProperty]
+    private bool showFavoritesOnly = true;
+
+    [ObservableProperty]
+    private string ticketListScopeSummary = string.Empty;
 
     [ObservableProperty]
     private DateTimeOffset? fromDate = DateTime.Today.AddDays(-20);
@@ -92,6 +103,10 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
     public bool HasCustomFields => CustomFields.Count > 0;
 
+    public string TicketSearchPlaceholder => ShowFavoritesOnly
+        ? "In Favoriten suchen (Nr., Betreff, Projekt) …"
+        : "In allen Tickets suchen (Nr., Betreff, Projekt) …";
+
     public string PreviewSummary
     {
         get
@@ -130,6 +145,61 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     partial void OnSelectedTicketChanged(IssueDto? value)
     {
         _ = LoadTicketDetailsAsync();
+    }
+
+    partial void OnShowFavoritesOnlyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(TicketSearchPlaceholder));
+        ReloadTickets();
+    }
+
+    partial void OnTicketFilterTextChanged(string value)
+    {
+        _ = ReloadTicketsDebouncedAsync();
+    }
+
+    private async Task ReloadTicketsDebouncedAsync()
+    {
+        _ticketFilterCts?.Cancel();
+        _ticketFilterCts?.Dispose();
+        _ticketFilterCts = new CancellationTokenSource();
+        var token = _ticketFilterCts.Token;
+
+        try
+        {
+            await Task.Delay(250, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (!token.IsCancellationRequested)
+        {
+            ReloadTickets();
+        }
+    }
+
+    [RelayCommand]
+    private void ShowFavoritesOnlyView()
+    {
+        if (ShowFavoritesOnly)
+        {
+            return;
+        }
+
+        ShowFavoritesOnly = true;
+    }
+
+    [RelayCommand]
+    private void ShowAllTicketsView()
+    {
+        if (!ShowFavoritesOnly)
+        {
+            return;
+        }
+
+        ShowFavoritesOnly = false;
     }
 
     partial void OnIncludeMondayChanged(bool value) => ClearPreview();
@@ -455,13 +525,22 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
         var settings = _appSettingsService.Load();
         var favoriteIds = settings.FavoriteTicketIds.ToHashSet();
 
-        var orderedTickets = settings.CachedTickets
+        var scopedTickets = (ShowFavoritesOnly
+                ? settings.CachedTickets.Where(ticket => favoriteIds.Contains(ticket.Id))
+                : settings.CachedTickets)
+            .ToList();
+
+        var orderedTickets = scopedTickets
             .OrderByDescending(ticket => favoriteIds.Contains(ticket.Id))
             .ThenBy(ticket => ticket.Id)
             .ToList();
 
+        var filteredTickets = orderedTickets
+            .Where(ticket => MatchesTicketFilter(ticket))
+            .ToList();
+
         Tickets.Clear();
-        foreach (var ticket in orderedTickets)
+        foreach (var ticket in filteredTickets)
         {
             Tickets.Add(ticket);
         }
@@ -471,6 +550,35 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             SelectedTicket = Tickets.FirstOrDefault(ticket => favoriteIds.Contains(ticket.Id))
                 ?? Tickets.FirstOrDefault();
         }
+
+        UpdateTicketScopeSummary(total: orderedTickets.Count, filtered: Tickets.Count);
+    }
+
+    private bool MatchesTicketFilter(IssueDto ticket)
+    {
+        if (string.IsNullOrWhiteSpace(TicketFilterText))
+        {
+            return true;
+        }
+
+        var query = TicketFilterText.Trim();
+        return ticket.Id.ToString(CultureInfo.InvariantCulture).Contains(query, StringComparison.OrdinalIgnoreCase)
+            || (ticket.Subject?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (ticket.Project?.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    private void UpdateTicketScopeSummary(int total, int filtered)
+    {
+        var hasSearch = !string.IsNullOrWhiteSpace(TicketFilterText);
+        var scopeLabel = ShowFavoritesOnly ? "Favoriten" : "Tickets";
+
+        TicketListScopeSummary = total switch
+        {
+            0 => ShowFavoritesOnly ? "Keine Favoriten" : "Keine Tickets geladen",
+            _ when hasSearch && filtered != total => $"{filtered} von {total} {scopeLabel}",
+            1 => ShowFavoritesOnly ? "1 Favorit" : "1 Ticket",
+            _ => $"{total} {scopeLabel}"
+        };
     }
 
     private async Task LoadTicketDetailsAsync()
@@ -559,6 +667,13 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
         _ticketDetailsCts = null;
     }
 
+    private void CancelTicketFilterLoad()
+    {
+        _ticketFilterCts?.Cancel();
+        _ticketFilterCts?.Dispose();
+        _ticketFilterCts = null;
+    }
+
     private CancellationToken BeginTicketDetailsLoad()
     {
         _ticketDetailsCts = new CancellationTokenSource();
@@ -568,6 +683,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         CancelTicketDetailsLoad();
+        CancelTicketFilterLoad();
         GC.SuppressFinalize(this);
     }
 

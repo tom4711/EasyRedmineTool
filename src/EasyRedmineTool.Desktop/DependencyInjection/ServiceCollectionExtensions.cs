@@ -9,6 +9,8 @@ using EasyRedmineTool.Desktop.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+using System;
+
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddEasyRedmineTool(this IServiceCollection services)
@@ -20,6 +22,11 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddHttpClient<IEasyRedmineApiClient, EasyRedmineApiClient>();
+
+        services.AddHttpClient<IUpdateCheckService, UpdateCheckService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
 
         services.AddSingleton<IConnectionTestService, ConnectionTestService>();
         services.AddSingleton<ITicketService, TicketService>();

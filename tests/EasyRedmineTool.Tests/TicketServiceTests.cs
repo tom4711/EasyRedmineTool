@@ -11,57 +11,65 @@ using System.Net.Http;
 public class TicketServiceTests
 {
     [Fact]
-    public void GetTimeEntryFetchFrom_uses_default_lookback_without_filter()
+    public void GetTimeEntryFetchFrom_uses_configured_lookback()
     {
         var to = new DateTime(2026, 6, 11);
 
-        var from = TicketService.GetTimeEntryFetchFrom(to, lastBookedUntil: null);
+        Assert.Equal(new DateTime(2026, 3, 11), TicketService.GetTimeEntryFetchFrom(to, lookbackMonths: 3));
+        Assert.Equal(new DateTime(2025, 6, 11), TicketService.GetTimeEntryFetchFrom(to, lookbackMonths: 12));
+    }
 
-        Assert.Equal(new DateTime(2025, 6, 11), from);
+    [Theory]
+    [InlineData(0, 12)]
+    [InlineData(5, 12)]
+    [InlineData(3, 3)]
+    [InlineData(6, 6)]
+    [InlineData(9, 9)]
+    [InlineData(12, 12)]
+    public void NormalizeTimeEntryLookbackMonths_maps_to_supported_values(int input, int expected)
+    {
+        Assert.Equal(expected, TicketService.NormalizeTimeEntryLookbackMonths(input));
     }
 
     [Fact]
-    public void GetTimeEntryFetchFrom_extends_lookback_when_filter_is_older_than_default_window()
+    public async Task GetTicketsForListAsync_skips_time_entries_when_not_included()
     {
-        var to = new DateTime(2026, 6, 11);
-        var filter = new DateTime(2025, 1, 1);
+        var apiClient = new FilteringTicketApiClient(
+            primaryIssues: [new IssueDto { Id = 1, Subject = "Primary" }],
+            timeEntries: [CreateEntry(issueId: 99, spentOn: RedmineDates.FormatSpentOn(DateTime.Today))]);
+        var service = new TicketService(apiClient);
 
-        var from = TicketService.GetTimeEntryFetchFrom(to, filter);
+        var result = await service.GetTicketsForListAsync(
+            "https://redmine.example/",
+            "secret",
+            new TicketLoadFilter { IncludeTimeEntryTickets = false });
 
-        Assert.Equal(filter, from);
+        Assert.Single(result.Tickets);
+        Assert.Equal(1, result.Tickets[0].Id);
+        Assert.Equal(0, result.TimeEntryTicketCount);
+        Assert.False(apiClient.GetCurrentUserIdCalled);
     }
 
     [Fact]
-    public void GetTimeEntryFetchFrom_keeps_default_lookback_when_filter_is_within_window()
+    public async Task GetTicketsForListAsync_skips_current_user_lookup_when_assignee_is_not_me()
     {
-        var to = new DateTime(2026, 6, 11);
-        var filter = new DateTime(2026, 5, 1);
-
-        var from = TicketService.GetTimeEntryFetchFrom(to, filter);
-
-        Assert.Equal(new DateTime(2025, 6, 11), from);
-    }
-
-    [Fact]
-    public void BuildIssueIdsWithSpentOnAfter_collects_issues_booked_after_filter_date()
-    {
-        var until = new DateTime(2026, 6, 10);
-        var entries = new List<TimeEntryDto>
+        var apiClient = new FilteringTicketApiClient(
+            primaryIssues: [new IssueDto { Id = 1, Subject = "Primary" }],
+            timeEntries: [CreateEntry(issueId: 99, spentOn: RedmineDates.FormatSpentOn(DateTime.Today))]);
+        var service = new TicketService(apiClient);
+        var filter = new TicketLoadFilter
         {
-            CreateEntry(issueId: 1, spentOn: "2026-06-11"),
-            CreateEntry(issueId: 2, spentOn: "2026-06-10"),
-            CreateEntry(issueId: 3, spentOn: "2026-06-09"),
-            CreateEntry(issueId: 0, spentOn: "2026-06-11"),
+            IncludeTimeEntryTickets = true,
+            Assignee = TicketAssigneeFilter.All
         };
 
-        var issueIds = TicketService.BuildIssueIdsWithSpentOnAfter(entries, until);
+        await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
 
-        Assert.Single(issueIds);
-        Assert.Contains(1, issueIds);
+        Assert.False(apiClient.GetCurrentUserIdCalled);
     }
 
     [Fact]
-    public async Task GetTicketsForListAsync_excludes_unbooked_and_recently_booked_primary_tickets()
+    public async Task GetTicketsForListAsync_includes_all_primary_tickets_when_time_entries_enabled()
     {
         var yesterday = DateTime.Today.AddDays(-1);
         var apiClient = new FilteringTicketApiClient(
@@ -77,12 +85,12 @@ public class TicketServiceTests
                 CreateEntry(issueId: 2, spentOn: RedmineDates.FormatSpentOn(yesterday)),
             ]);
         var service = new TicketService(apiClient);
-        var filter = new TicketLoadFilter { LastBookedUntil = yesterday };
+        var filter = new TicketLoadFilter { IncludeTimeEntryTickets = true };
 
         var result = await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
 
-        Assert.Single(result.Tickets);
-        Assert.Equal(2, result.Tickets[0].Id);
+        Assert.Equal(3, result.Tickets.Count);
+        Assert.Equal(3, result.OpenTicketCount);
     }
 
     [Fact]
@@ -114,8 +122,13 @@ public class TicketServiceTests
         IReadOnlyList<IssueDto> primaryIssues,
         IReadOnlyList<TimeEntryDto> timeEntries) : IEasyRedmineApiClient
     {
-        public Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
-            Task.FromResult<int?>(1);
+        public bool GetCurrentUserIdCalled { get; private set; }
+
+        public Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default)
+        {
+            GetCurrentUserIdCalled = true;
+            return Task.FromResult<int?>(1);
+        }
 
         public Task<IReadOnlyList<IssueDto>> GetIssuesAsync(
             string baseUrl,
