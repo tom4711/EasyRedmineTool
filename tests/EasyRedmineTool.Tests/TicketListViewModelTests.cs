@@ -111,7 +111,8 @@ public class TicketListViewModelTests
         var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
         viewModel.SelectedAssigneeFilter = viewModel.AssigneeFilterOptions.First(option => option.Value == TicketAssigneeFilter.Unassigned);
         viewModel.SelectedStatusFilter = viewModel.StatusFilterOptions.First(option => option.Value.Kind == TicketStatusFilterKind.Specific);
-        viewModel.LastBookedUntil = new DateTime(2025, 6, 1);
+        viewModel.IncludeTimeEntryTickets = true;
+        viewModel.TimeEntryLookbackMonths = 6;
 
         await viewModel.LoadTicketsCommand.ExecuteAsync(null);
 
@@ -119,7 +120,46 @@ public class TicketListViewModelTests
         Assert.Equal(TicketAssigneeFilter.Unassigned, context.TicketService.LastFilter!.Assignee);
         Assert.Equal(TicketStatusFilterKind.Specific, context.TicketService.LastFilter.StatusKind);
         Assert.Equal(3, context.TicketService.LastFilter.StatusId);
-        Assert.Equal(new DateTime(2025, 6, 1), context.TicketService.LastFilter.LastBookedUntil);
+        Assert.True(context.TicketService.LastFilter.IncludeTimeEntryTickets);
+        Assert.Equal(6, context.TicketService.LastFilter.TimeEntryLookbackMonths);
+    }
+
+    [Fact]
+    public async Task ReloadSettings_preserves_saved_status_filter_when_time_entry_options_are_enabled()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            TicketLoadAssigneeFilter = TicketAssigneeFilter.Unassigned,
+            TicketLoadStatusFilterKind = TicketStatusFilterKind.Specific,
+            TicketLoadStatusId = 3,
+            TicketLoadStatusName = "In Arbeit",
+            TicketLoadIncludeTimeEntryTickets = true,
+            TicketLoadTimeEntryLookbackMonths = 6
+        });
+
+        var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
+        await Task.Delay(50);
+
+        var settings = context.SettingsService.Load();
+        Assert.Equal(TicketStatusFilterKind.Specific, settings.TicketLoadStatusFilterKind);
+        Assert.Equal(3, settings.TicketLoadStatusId);
+        Assert.Equal("In Arbeit", settings.TicketLoadStatusName);
+        Assert.True(settings.TicketLoadIncludeTimeEntryTickets);
+        Assert.Equal(6, settings.TicketLoadTimeEntryLookbackMonths);
+        Assert.Equal(TicketStatusFilterKind.Specific, viewModel.SelectedStatusFilter?.Value.Kind);
+        Assert.Equal(3, viewModel.SelectedStatusFilter?.Value.StatusId);
+
+        viewModel.ReloadSettings();
+        await Task.Delay(50);
+
+        settings = context.SettingsService.Load();
+        Assert.Equal(TicketStatusFilterKind.Specific, settings.TicketLoadStatusFilterKind);
+        Assert.Equal(3, settings.TicketLoadStatusId);
+        Assert.Equal(TicketStatusFilterKind.Specific, viewModel.SelectedStatusFilter?.Value.Kind);
+        Assert.Equal(3, viewModel.SelectedStatusFilter?.Value.StatusId);
     }
 
     [Fact]

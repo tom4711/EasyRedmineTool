@@ -13,13 +13,27 @@ public class TicketServiceCacheTests
         var apiClient = new CountingTimeEntryApiClient();
         var service = new TicketService(apiClient);
 
-        var filter = new TicketLoadFilter();
+        var filter = new TicketLoadFilter { IncludeTimeEntryTickets = true };
         await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
         await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
         service.InvalidateTimeEntryCache();
         await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
 
         Assert.Equal(2, apiClient.TimeEntryRequestCount);
+    }
+
+    [Fact]
+    public async Task GetTicketsForListAsync_without_time_entries_does_not_query_time_entries()
+    {
+        var apiClient = new CountingTimeEntryApiClient();
+        var service = new TicketService(apiClient);
+
+        await service.GetTicketsForListAsync(
+            "https://redmine.example/",
+            "secret",
+            new TicketLoadFilter { IncludeTimeEntryTickets = false });
+
+        Assert.Equal(0, apiClient.TimeEntryRequestCount);
     }
 
     private sealed class CountingTimeEntryApiClient : IEasyRedmineApiClient

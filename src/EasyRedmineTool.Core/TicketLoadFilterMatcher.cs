@@ -7,20 +7,14 @@ public static class TicketLoadFilterMatcher
     public static bool Matches(
         IssueDto issue,
         TicketLoadFilter filter,
-        int? currentUserId,
-        IReadOnlySet<int>? issueIdsBookedAfterFilter = null)
+        int? currentUserId)
     {
         if (!MatchesAssignee(issue, filter.Assignee, currentUserId))
         {
             return false;
         }
 
-        if (!MatchesStatus(issue, filter))
-        {
-            return false;
-        }
-
-        return MatchesLastBookedUntil(issue, filter.LastBookedUntil, issueIdsBookedAfterFilter);
+        return MatchesStatus(issue, filter);
     }
 
     public static bool MatchesAssignee(IssueDto issue, TicketAssigneeFilter filter, int? currentUserId) =>
@@ -40,37 +34,4 @@ public static class TicketLoadFilterMatcher
             TicketStatusFilterKind.Specific => issue.Status?.Id == filter.StatusId,
             _ => true
         };
-
-    public static bool MatchesLastBookedUntil(
-        IssueDto issue,
-        DateTime? lastBookedUntil,
-        IReadOnlySet<int>? issueIdsBookedAfterFilter = null)
-    {
-        if (!lastBookedUntil.HasValue)
-        {
-            return true;
-        }
-
-        if (issueIdsBookedAfterFilter is not null)
-        {
-            if (issueIdsBookedAfterFilter.Contains(issue.Id))
-            {
-                return false;
-            }
-
-            if (!issue.LastTimeEntryOn.HasValue)
-            {
-                return false;
-            }
-
-            return issue.LastTimeEntryOn.Value.Date <= lastBookedUntil.Value.Date;
-        }
-
-        if (!issue.LastTimeEntryOn.HasValue)
-        {
-            return true;
-        }
-
-        return issue.LastTimeEntryOn.Value.Date <= lastBookedUntil.Value.Date;
-    }
 }

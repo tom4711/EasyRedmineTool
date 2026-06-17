@@ -17,7 +17,9 @@ public class AppSettings
     public TicketStatusFilterKind TicketLoadStatusFilterKind { get; set; } = TicketStatusFilterKind.Open;
     public int? TicketLoadStatusId { get; set; }
     public string? TicketLoadStatusName { get; set; }
-    public string? TicketLoadLastBookedUntil { get; set; }
+    public bool TicketLoadIncludeTimeEntryTickets { get; set; }
+
+    public int TicketLoadTimeEntryLookbackMonths { get; set; } = TicketLoadFilterDefaults.DefaultTimeEntryLookbackMonths;
 
     public List<TimeEntryCustomFieldDefault> TimeEntryCustomFieldDefaults { get; set; } = [];
 }
