@@ -79,6 +79,7 @@
         <Button Grid.Column="2"
                 Classes="ghost compact"
                 ToolTip.Tip="Hinweis ausblenden"
+                AutomationProperties.Name="Hinweis ausblenden"
                 Command="{Binding DismissUpdateNoticeCommand}">
           <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" />
         </Button>
