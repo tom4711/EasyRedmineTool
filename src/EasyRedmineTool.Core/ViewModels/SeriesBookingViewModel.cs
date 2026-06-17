@@ -563,7 +563,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
         var query = TicketFilterText.Trim();
         return ticket.Id.ToString(CultureInfo.InvariantCulture).Contains(query, StringComparison.OrdinalIgnoreCase)
-            || ticket.Subject.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || (ticket.Subject?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
             || (ticket.Project?.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
     }
 
