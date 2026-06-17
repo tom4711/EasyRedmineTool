@@ -52,6 +52,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string? updateReleaseUrl;
 
+    [ObservableProperty]
+    private string? updateNoticeDetail;
+
+    public string UpdateBannerMessage =>
+        UpdateNoticeDetail ?? UpdateAvailableMessage;
+
     public string UpdateAvailableMessage =>
         string.IsNullOrWhiteSpace(LatestUpdateVersion)
             ? "Eine neue Version ist verfügbar."
@@ -109,8 +115,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    partial void OnLatestUpdateVersionChanged(string? value) =>
+    partial void OnLatestUpdateVersionChanged(string? value)
+    {
         OnPropertyChanged(nameof(UpdateAvailableMessage));
+        OnPropertyChanged(nameof(UpdateBannerMessage));
+    }
+
+    partial void OnUpdateNoticeDetailChanged(string? value) =>
+        OnPropertyChanged(nameof(UpdateBannerMessage));
 
     [RelayCommand]
     private void OpenUpdateRelease()
@@ -120,11 +132,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = UpdateReleaseUrl,
-            UseShellExecute = true,
-        });
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = UpdateReleaseUrl,
+                UseShellExecute = true,
+            });
+            UpdateNoticeDetail = null;
+        }
+        catch (Exception)
+        {
+            UpdateNoticeDetail = "Release konnte nicht im Browser geöffnet werden.";
+        }
     }
 
     [RelayCommand]
@@ -193,7 +213,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             IsUpdateAvailable = true;
             LatestUpdateVersion = result.LatestVersion;
             UpdateReleaseUrl = result.ReleaseUrl;
+            UpdateNoticeDetail = null;
             OnPropertyChanged(nameof(UpdateAvailableMessage));
+            OnPropertyChanged(nameof(UpdateBannerMessage));
         }
         catch (OperationCanceledException)
         {

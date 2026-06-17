@@ -68,7 +68,7 @@
                                       Width="18"
                                       Height="18"
                                       VerticalAlignment="Center" />
-          <TextBlock Text="{Binding UpdateAvailableMessage}"
+          <TextBlock Text="{Binding UpdateBannerMessage}"
                      VerticalAlignment="Center"
                      TextWrapping="Wrap" />
         </StackPanel>
