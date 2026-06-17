@@ -11,6 +11,40 @@ using Microsoft.Extensions.Logging.Abstractions;
 public class TicketListViewModelTests
 {
     [Fact]
+    public void TicketFilterText_filters_displayed_tickets_by_subject_and_id()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            CachedTickets =
+            [
+                new IssueDto { Id = 10, Subject = "Alpha task", Project = new NamedEntityDto { Name = "Proj A" } },
+                new IssueDto { Id = 20, Subject = "Beta task", Project = new NamedEntityDto { Name = "Proj B" } }
+            ],
+            LastLoadedTicketIds = [10, 20]
+        });
+
+        var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
+
+        Assert.Equal(2, viewModel.Tickets.Count);
+        Assert.Equal(2, viewModel.FilteredTickets.Count);
+
+        viewModel.TicketFilterText = "beta";
+
+        Assert.Equal(2, viewModel.Tickets.Count);
+        Assert.Single(viewModel.FilteredTickets);
+        Assert.Equal(20, viewModel.FilteredTickets[0].Ticket.Id);
+        Assert.Equal("1 von 2 Tickets", viewModel.ListScopeSummary);
+
+        viewModel.TicketFilterText = "10";
+
+        Assert.Single(viewModel.FilteredTickets);
+        Assert.Equal(10, viewModel.FilteredTickets[0].Ticket.Id);
+    }
+
+    [Fact]
     public async Task LoadTicketsAsync_populates_ticket_list_from_service()
     {
         using var context = TestContext.Create();

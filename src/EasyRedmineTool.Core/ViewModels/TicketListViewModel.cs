@@ -10,6 +10,7 @@ using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
+using System.Globalization;
 
 public partial class TicketListViewModel : ViewModelBase, IDisposable
 {
@@ -47,7 +48,15 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private int timeEntryLookbackMonths = TicketLoadFilterDefaults.DefaultTimeEntryLookbackMonths;
 
+    [ObservableProperty]
+    private string ticketFilterText = string.Empty;
+
+    [ObservableProperty]
+    private string listScopeSummary = string.Empty;
+
     public ObservableCollection<TicketListItemViewModel> Tickets { get; } = [];
+
+    public ObservableCollection<TicketListItemViewModel> FilteredTickets { get; } = [];
 
     public ObservableCollection<TicketFilterOption<TicketStatusFilterSelection>> StatusFilterOptions { get; } = [];
 
@@ -74,6 +83,11 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     public bool IsTimeEntryLookback9Months => TimeEntryLookbackMonths == 9;
 
     public bool IsTimeEntryLookback12Months => TimeEntryLookbackMonths == 12;
+
+    public string SearchPlaceholder => "In Tickets suchen (Nr., Betreff, Projekt) …";
+
+    partial void OnTicketFilterTextChanged(string value) =>
+        ApplyTicketFilter();
 
     partial void OnSelectedAssigneeFilterChanged(TicketFilterOption<TicketAssigneeFilter>? value) =>
         PersistFilterSettings();
@@ -159,6 +173,8 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         {
             Tickets.Add(CreateTicketItem(ticket));
         }
+
+        ApplyTicketFilter();
     }
 
     [RelayCommand]
@@ -191,6 +207,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             PersistCurrentState();
             RestoreSelectedStatusFilter(SelectedStatusFilter?.Value);
             StatusMessage = BuildLoadStatusMessage(result, filter, SelectedStatusFilter?.Value);
+            ApplyTicketFilter();
         }
         catch (OperationCanceledException)
         {
@@ -248,6 +265,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             TicketIdToAdd = string.Empty;
             PersistCurrentState();
             StatusMessage = $"Ticket #{ticket.Id} wurde hinzugefügt.";
+            ApplyTicketFilter();
         }
         catch (OperationCanceledException)
         {
@@ -429,6 +447,45 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
 
     private TicketListItemViewModel CreateTicketItem(IssueDto ticket) =>
         new(ticket, _favoriteTicketIds.Contains(ticket.Id));
+
+    private void ApplyTicketFilter()
+    {
+        FilteredTickets.Clear();
+        foreach (var ticket in Tickets.Where(ticket => MatchesTicketFilter(ticket.Ticket)))
+        {
+            FilteredTickets.Add(ticket);
+        }
+
+        UpdateListScopeSummary();
+    }
+
+    private void UpdateListScopeSummary()
+    {
+        var total = Tickets.Count;
+        var filtered = FilteredTickets.Count;
+        var hasSearch = !string.IsNullOrWhiteSpace(TicketFilterText);
+
+        ListScopeSummary = total switch
+        {
+            0 => "Keine Tickets geladen",
+            _ when hasSearch && filtered != total => $"{filtered} von {total} Tickets",
+            1 => "1 Ticket",
+            _ => $"{total} Tickets"
+        };
+    }
+
+    private bool MatchesTicketFilter(IssueDto ticket)
+    {
+        if (string.IsNullOrWhiteSpace(TicketFilterText))
+        {
+            return true;
+        }
+
+        var query = TicketFilterText.Trim();
+        return ticket.Id.ToString(CultureInfo.InvariantCulture).Contains(query, StringComparison.OrdinalIgnoreCase)
+            || ticket.Subject.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || (ticket.Project?.Name?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
 
     private TicketLoadFilter BuildCurrentFilter()
     {
