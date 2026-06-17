@@ -1,7 +1,5 @@
 namespace EasyRedmineTool.Core.Models.Tickets;
 
-using EasyRedmineTool.Core.Services;
-
 public class TicketLoadFilter
 {
     public TicketAssigneeFilter Assignee { get; set; } = TicketAssigneeFilter.Me;
@@ -12,5 +10,5 @@ public class TicketLoadFilter
 
     public bool IncludeTimeEntryTickets { get; set; }
 
-    public int TimeEntryLookbackMonths { get; set; } = TicketService.DefaultTimeEntryLookbackMonths;
+    public int TimeEntryLookbackMonths { get; set; } = TicketLoadFilterDefaults.DefaultTimeEntryLookbackMonths;
 }

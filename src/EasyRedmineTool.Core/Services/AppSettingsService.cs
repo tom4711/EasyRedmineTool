@@ -1,6 +1,7 @@
 namespace EasyRedmineTool.Core.Services;
 
 using EasyRedmineTool.Core.Configuration;
+using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using Microsoft.Extensions.Logging;
@@ -104,7 +105,7 @@ public sealed class AppSettingsService : IAppSettingsService
         TicketLoadStatusId = settings.TicketLoadStatusId,
         TicketLoadStatusName = settings.TicketLoadStatusName,
         TicketLoadIncludeTimeEntryTickets = settings.TicketLoadIncludeTimeEntryTickets,
-        TicketLoadTimeEntryLookbackMonths = TicketService.NormalizeTimeEntryLookbackMonths(
+        TicketLoadTimeEntryLookbackMonths = TicketLoadFilterDefaults.NormalizeTimeEntryLookbackMonths(
             settings.TicketLoadTimeEntryLookbackMonths),
         TimeEntryCustomFieldDefaults = settings.TimeEntryCustomFieldDefaults ?? [],
     };

@@ -23,7 +23,9 @@ public class TicketServiceTests
     [InlineData(0, 12)]
     [InlineData(5, 12)]
     [InlineData(3, 3)]
+    [InlineData(6, 6)]
     [InlineData(9, 9)]
+    [InlineData(12, 12)]
     public void NormalizeTimeEntryLookbackMonths_maps_to_supported_values(int input, int expected)
     {
         Assert.Equal(expected, TicketService.NormalizeTimeEntryLookbackMonths(input));
@@ -45,6 +47,25 @@ public class TicketServiceTests
         Assert.Single(result.Tickets);
         Assert.Equal(1, result.Tickets[0].Id);
         Assert.Equal(0, result.TimeEntryTicketCount);
+        Assert.False(apiClient.GetCurrentUserIdCalled);
+    }
+
+    [Fact]
+    public async Task GetTicketsForListAsync_skips_current_user_lookup_when_assignee_is_not_me()
+    {
+        var apiClient = new FilteringTicketApiClient(
+            primaryIssues: [new IssueDto { Id = 1, Subject = "Primary" }],
+            timeEntries: [CreateEntry(issueId: 99, spentOn: RedmineDates.FormatSpentOn(DateTime.Today))]);
+        var service = new TicketService(apiClient);
+        var filter = new TicketLoadFilter
+        {
+            IncludeTimeEntryTickets = true,
+            Assignee = TicketAssigneeFilter.All
+        };
+
+        await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
+
+        Assert.False(apiClient.GetCurrentUserIdCalled);
     }
 
     [Fact]
@@ -101,8 +122,13 @@ public class TicketServiceTests
         IReadOnlyList<IssueDto> primaryIssues,
         IReadOnlyList<TimeEntryDto> timeEntries) : IEasyRedmineApiClient
     {
-        public Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
-            Task.FromResult<int?>(1);
+        public bool GetCurrentUserIdCalled { get; private set; }
+
+        public Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default)
+        {
+            GetCurrentUserIdCalled = true;
+            return Task.FromResult<int?>(1);
+        }
 
         public Task<IReadOnlyList<IssueDto>> GetIssuesAsync(
             string baseUrl,

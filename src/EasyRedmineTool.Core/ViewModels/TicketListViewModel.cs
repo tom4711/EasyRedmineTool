@@ -7,7 +7,6 @@ using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.Tickets;
-using EasyRedmineTool.Core.Services;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
@@ -22,6 +21,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     private int? _pendingStatusId;
     private string? _pendingStatusName;
     private bool _isRestoringStatusFilter;
+    private bool _isReloadingSettings;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -45,7 +45,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     private bool includeTimeEntryTickets;
 
     [ObservableProperty]
-    private int timeEntryLookbackMonths = TicketService.DefaultTimeEntryLookbackMonths;
+    private int timeEntryLookbackMonths = TicketLoadFilterDefaults.DefaultTimeEntryLookbackMonths;
 
     public ObservableCollection<TicketListItemViewModel> Tickets { get; } = [];
 
@@ -93,7 +93,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
 
     partial void OnTimeEntryLookbackMonthsChanged(int value)
     {
-        var normalized = TicketService.NormalizeTimeEntryLookbackMonths(value);
+        var normalized = TicketLoadFilterDefaults.NormalizeTimeEntryLookbackMonths(value);
         if (normalized != value)
         {
             TimeEntryLookbackMonths = normalized;
@@ -129,18 +129,26 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             _favoriteTicketIds.Add(id);
         }
 
-        SelectedAssigneeFilter = AssigneeFilterOptions.First(option => option.Value == settings.TicketLoadAssigneeFilter);
-        _pendingStatusFilterKind = settings.TicketLoadStatusFilterKind;
-        _pendingStatusId = settings.TicketLoadStatusId;
-        _pendingStatusName = settings.TicketLoadStatusName;
-        IncludeTimeEntryTickets = settings.TicketLoadIncludeTimeEntryTickets;
-        TimeEntryLookbackMonths = TicketService.NormalizeTimeEntryLookbackMonths(
-            settings.TicketLoadTimeEntryLookbackMonths);
-        OnPropertyChanged(nameof(IsTimeEntryLookback3Months));
-        OnPropertyChanged(nameof(IsTimeEntryLookback6Months));
-        OnPropertyChanged(nameof(IsTimeEntryLookback9Months));
-        OnPropertyChanged(nameof(IsTimeEntryLookback12Months));
-        RestoreSelectedStatusFilter();
+        _isReloadingSettings = true;
+        try
+        {
+            SelectedAssigneeFilter = AssigneeFilterOptions.First(option => option.Value == settings.TicketLoadAssigneeFilter);
+            _pendingStatusFilterKind = settings.TicketLoadStatusFilterKind;
+            _pendingStatusId = settings.TicketLoadStatusId;
+            _pendingStatusName = settings.TicketLoadStatusName;
+            IncludeTimeEntryTickets = settings.TicketLoadIncludeTimeEntryTickets;
+            TimeEntryLookbackMonths = TicketLoadFilterDefaults.NormalizeTimeEntryLookbackMonths(
+                settings.TicketLoadTimeEntryLookbackMonths);
+            OnPropertyChanged(nameof(IsTimeEntryLookback3Months));
+            OnPropertyChanged(nameof(IsTimeEntryLookback6Months));
+            OnPropertyChanged(nameof(IsTimeEntryLookback9Months));
+            OnPropertyChanged(nameof(IsTimeEntryLookback12Months));
+            RestoreSelectedStatusFilter();
+        }
+        finally
+        {
+            _isReloadingSettings = false;
+        }
 
         Tickets.Clear();
         var lastLoadedIds = settings.LastLoadedTicketIds.Count > 0
@@ -516,6 +524,11 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
 
     private void PersistFilterSettings()
     {
+        if (_isReloadingSettings || _isRestoringStatusFilter)
+        {
+            return;
+        }
+
         var statusSelection = SelectedStatusFilter?.Value ?? TicketStatusFilterSelection.Open;
         _pendingStatusFilterKind = statusSelection.Kind;
         _pendingStatusId = statusSelection.StatusId;

@@ -8,16 +8,11 @@ using EasyRedmineTool.Core.Services.Interfaces;
 
 public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
 {
-    public const int DefaultTimeEntryLookbackMonths = 12;
+    public const int DefaultTimeEntryLookbackMonths = TicketLoadFilterDefaults.DefaultTimeEntryLookbackMonths;
     private static readonly TimeSpan TimeEntryCacheTtl = TimeSpan.FromMinutes(5);
 
-    public static int NormalizeTimeEntryLookbackMonths(int months) => months switch
-    {
-        3 => 3,
-        6 => 6,
-        9 => 9,
-        _ => DefaultTimeEntryLookbackMonths
-    };
+    public static int NormalizeTimeEntryLookbackMonths(int months) =>
+        TicketLoadFilterDefaults.NormalizeTimeEntryLookbackMonths(months);
 
     private readonly IEasyRedmineApiClient _apiClient = apiClient;
     private readonly object _timeEntryCacheLock = new();
@@ -64,7 +59,12 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
             };
         }
 
-        var currentUserId = await _apiClient.GetCurrentUserIdAsync(baseUrl, apiKey, cancellationToken);
+        int? currentUserId = null;
+        if (filter.Assignee == TicketAssigneeFilter.Me)
+        {
+            currentUserId = await _apiClient.GetCurrentUserIdAsync(baseUrl, apiKey, cancellationToken);
+        }
+
         var knownIds = new HashSet<int>(primaryIssues.Select(i => i.Id));
 
         var to = DateTime.Today;

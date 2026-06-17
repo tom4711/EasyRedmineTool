@@ -125,6 +125,44 @@ public class TicketListViewModelTests
     }
 
     [Fact]
+    public async Task ReloadSettings_preserves_saved_status_filter_when_time_entry_options_are_enabled()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            BaseUrl = "https://redmine.example/",
+            ApiKey = "secret",
+            TicketLoadAssigneeFilter = TicketAssigneeFilter.Unassigned,
+            TicketLoadStatusFilterKind = TicketStatusFilterKind.Specific,
+            TicketLoadStatusId = 3,
+            TicketLoadStatusName = "In Arbeit",
+            TicketLoadIncludeTimeEntryTickets = true,
+            TicketLoadTimeEntryLookbackMonths = 6
+        });
+
+        var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
+        await Task.Delay(50);
+
+        var settings = context.SettingsService.Load();
+        Assert.Equal(TicketStatusFilterKind.Specific, settings.TicketLoadStatusFilterKind);
+        Assert.Equal(3, settings.TicketLoadStatusId);
+        Assert.Equal("In Arbeit", settings.TicketLoadStatusName);
+        Assert.True(settings.TicketLoadIncludeTimeEntryTickets);
+        Assert.Equal(6, settings.TicketLoadTimeEntryLookbackMonths);
+        Assert.Equal(TicketStatusFilterKind.Specific, viewModel.SelectedStatusFilter?.Value.Kind);
+        Assert.Equal(3, viewModel.SelectedStatusFilter?.Value.StatusId);
+
+        viewModel.ReloadSettings();
+        await Task.Delay(50);
+
+        settings = context.SettingsService.Load();
+        Assert.Equal(TicketStatusFilterKind.Specific, settings.TicketLoadStatusFilterKind);
+        Assert.Equal(3, settings.TicketLoadStatusId);
+        Assert.Equal(TicketStatusFilterKind.Specific, viewModel.SelectedStatusFilter?.Value.Kind);
+        Assert.Equal(3, viewModel.SelectedStatusFilter?.Value.StatusId);
+    }
+
+    [Fact]
     public async Task LoadTicketsAsync_keeps_selected_status_filter_after_loading()
     {
         using var context = TestContext.Create();
