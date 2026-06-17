@@ -1,5 +1,6 @@
 namespace EasyRedmineTool.Tests;
 
+using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
@@ -12,6 +13,9 @@ using System.Net;
 
 public class TimeEntryServiceTests
 {
+    private static TimeEntryService CreateService(IEasyRedmineApiClient apiClient, ITicketService ticketService) =>
+        new(apiClient, ticketService, new NoOpAppSettingsService(), NullLogger<TimeEntryService>.Instance);
+
     [Fact]
     public async Task CreateTimeEntryAsync_invalidates_ticket_cache_on_success()
     {
@@ -20,7 +24,7 @@ public class TimeEntryServiceTests
             CreateResponse = new HttpResponseMessage(HttpStatusCode.Created)
         };
         var ticketService = new RecordingTicketService();
-        var service = new TimeEntryService(apiClient, ticketService, NullLogger<TimeEntryService>.Instance);
+        var service = CreateService(apiClient, ticketService);
 
         var result = await service.CreateTimeEntryAsync(
             "https://redmine.example/",
@@ -49,7 +53,7 @@ public class TimeEntryServiceTests
             }
         };
         var ticketService = new RecordingTicketService();
-        var service = new TimeEntryService(apiClient, ticketService, NullLogger<TimeEntryService>.Instance);
+        var service = CreateService(apiClient, ticketService);
 
         var result = await service.CreateTimeEntryAsync(
             "https://redmine.example/",
@@ -74,7 +78,7 @@ public class TimeEntryServiceTests
             CreateResponse = new HttpResponseMessage(HttpStatusCode.OK)
         };
         var ticketService = new RecordingTicketService();
-        var service = new TimeEntryService(apiClient, ticketService, NullLogger<TimeEntryService>.Instance);
+        var service = CreateService(apiClient, ticketService);
 
         var result = await service.UpdateTimeEntryAsync(
             "https://redmine.example/",
@@ -100,7 +104,7 @@ public class TimeEntryServiceTests
             CreateResponse = new HttpResponseMessage(HttpStatusCode.NoContent)
         };
         var ticketService = new RecordingTicketService();
-        var service = new TimeEntryService(apiClient, ticketService, NullLogger<TimeEntryService>.Instance);
+        var service = CreateService(apiClient, ticketService);
 
         var result = await service.DeleteTimeEntryAsync("https://redmine.example/", "secret", 7);
 
@@ -115,7 +119,7 @@ public class TimeEntryServiceTests
         {
             GetTimeEntriesException = new HttpRequestException("network down")
         };
-        var service = new TimeEntryService(apiClient, new RecordingTicketService(), NullLogger<TimeEntryService>.Instance);
+        var service = CreateService(apiClient, new RecordingTicketService());
 
         var result = await service.GetMyTimeEntriesAsync(
             "https://redmine.example/",
@@ -131,7 +135,7 @@ public class TimeEntryServiceTests
     public async Task GetActivitiesAsync_caches_per_issue_and_project()
     {
         var apiClient = new FakeApiClient();
-        var service = new TimeEntryService(apiClient, new RecordingTicketService(), NullLogger<TimeEntryService>.Instance);
+        var service = CreateService(apiClient, new RecordingTicketService());
 
         await service.GetActivitiesAsync("https://redmine.example/", "secret", issueId: 1, projectId: 5);
         await service.GetActivitiesAsync("https://redmine.example/", "secret", issueId: 1, projectId: 5);
@@ -218,7 +222,9 @@ public class TimeEntryServiceTests
         public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetTimeEntryCustomFieldDefinitionsAsync(
             string baseUrl,
             string apiKey,
+            int? issueId = null,
             int? projectId = null,
+            int? activityId = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>>([]);
 
@@ -243,6 +249,45 @@ public class TimeEntryServiceTests
             int timeEntryId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(CreateResponse);
+
+        public Task<IReadOnlyList<string>> ProbeRequiredTimeEntryCustomFieldNamesAsync(
+            string baseUrl,
+            string apiKey,
+            int issueId,
+            int activityId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>([]);
+
+        public Task<int?> TryResolveTimeEntryCustomFieldIdAsync(
+            string baseUrl,
+            string apiKey,
+            string fieldName,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<int?>(null);
+
+        public Task<IReadOnlyList<string>> SearchTimeEntryCustomFieldValuesAsync(
+            string baseUrl,
+            string apiKey,
+            int customFieldId,
+            string query,
+            int? issueId = null,
+            int? projectId = null,
+            int? activityId = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>([]);
+    }
+
+    private sealed class NoOpAppSettingsService : IAppSettingsService
+    {
+        public string SettingsFilePath => string.Empty;
+
+        public AppSettings Load() => new();
+
+        public void Save(AppSettings settings)
+        {
+        }
+
+        public void Update(Action<AppSettings> configure) => configure(new AppSettings());
     }
 
     private sealed class RecordingTicketService : ITicketService

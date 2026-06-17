@@ -73,6 +73,11 @@ internal sealed class TimeEntryFormDataCache
     public static string BuildActivitiesKey(string baseUrl, string apiKey, int? issueId, int? projectId) =>
         $"{baseUrl}|{apiKey}|issue:{issueId?.ToString(CultureInfo.InvariantCulture) ?? "-"}|project:{projectId?.ToString(CultureInfo.InvariantCulture) ?? "-"}";
 
-    public static string BuildCustomFieldDefinitionsKey(string baseUrl, string apiKey, int? projectId) =>
-        $"{baseUrl}|{apiKey}|project:{projectId?.ToString(CultureInfo.InvariantCulture) ?? "-"}";
+    public static string BuildCustomFieldDefinitionsKey(
+        string baseUrl,
+        string apiKey,
+        int? issueId,
+        int? projectId,
+        int? activityId) =>
+        $"{baseUrl}|{apiKey}|issue:{issueId?.ToString(CultureInfo.InvariantCulture) ?? "-"}|project:{projectId?.ToString(CultureInfo.InvariantCulture) ?? "-"}|activity:{activityId?.ToString(CultureInfo.InvariantCulture) ?? "-"}";
 }

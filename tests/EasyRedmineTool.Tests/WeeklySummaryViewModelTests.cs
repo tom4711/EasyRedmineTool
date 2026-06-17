@@ -181,6 +181,19 @@ public class WeeklySummaryViewModelTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(TimeEntryCustomFieldSupport.CreateRows([], [], settings, projectId, activityId, existingValues));
 
+        public Task ResolveCustomFieldIdsAsync(
+            AppSettings settings,
+            ICollection<TimeEntryCustomFieldRowViewModel> rows,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<string>> TryAddMissingCustomFieldsFromBookingErrorAsync(
+            AppSettings settings,
+            ICollection<TimeEntryCustomFieldRowViewModel> rows,
+            string bookingErrorMessage,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>([]);
+
         public async Task<TimeEntryLoadResult> GetMyTimeEntriesAsync(
             string baseUrl,
             string apiKey,

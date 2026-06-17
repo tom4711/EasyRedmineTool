@@ -18,6 +18,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
     private CancellationTokenSource? _customFieldsCts;
+    private bool _suppressActivityChangeHandler;
 
     [ObservableProperty]
     private string hours = AppConstants.DefaultHours;
@@ -75,6 +76,11 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
 
     partial void OnSelectedActivityChanged(TimeEntryActivityDto? value)
     {
+        if (_suppressActivityChangeHandler)
+        {
+            return;
+        }
+
         _ = LoadCustomFieldsAsync();
     }
 
@@ -98,18 +104,26 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             return;
         }
 
-        Activities.Clear();
-        foreach (var activity in loadedActivities.OrderBy(a => a.Name))
+        _suppressActivityChangeHandler = true;
+        try
         {
-            Activities.Add(activity);
-        }
+            Activities.Clear();
+            foreach (var activity in loadedActivities.OrderBy(a => a.Name))
+            {
+                Activities.Add(activity);
+            }
 
-        if (SelectedActivity is null || Activities.All(a => a.Id != SelectedActivity.Id))
+            if (SelectedActivity is null || Activities.All(a => a.Id != SelectedActivity.Id))
+            {
+                SelectedActivity = Activities.FirstOrDefault();
+            }
+
+            await LoadCustomFieldsAsync(cancellationToken);
+        }
+        finally
         {
-            SelectedActivity = Activities.FirstOrDefault();
+            _suppressActivityChangeHandler = false;
         }
-
-        await LoadCustomFieldsAsync(cancellationToken);
     }
 
     private async Task LoadCustomFieldsAsync(CancellationToken cancellationToken = default)
@@ -223,6 +237,8 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             IsSubmitting = true;
             _parent.SetStatusMessage($"Zeiteintrag für #{Ticket.Id} wird erstellt …");
 
+            await _timeEntryService.ResolveCustomFieldIdsAsync(settings, CustomFields);
+
             var result = await _timeEntryService.CreateTimeEntryAsync(
                 settings.BaseUrl,
                 settings.ApiKey,
@@ -236,13 +252,31 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
                     CustomFields = TimeEntryCustomFieldSupport.BuildValues(CustomFields).ToList()
                 });
 
-            _parent.SetStatusMessage(result.Message);
             if (result.Success)
             {
+                _parent.SetStatusMessage(result.Message);
                 TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, CustomFields);
                 Comments = string.Empty;
                 await _parent.HandleEntryCreatedAsync(this, SpentOn.Value);
+                return;
             }
+
+            var addedFields = await _timeEntryService.TryAddMissingCustomFieldsFromBookingErrorAsync(
+                settings,
+                CustomFields,
+                result.Message);
+
+            if (addedFields.Count > 0)
+            {
+                OnPropertyChanged(nameof(HasCustomFields));
+                var addedField = CustomFields.FirstOrDefault(row =>
+                    string.Equals(row.Name, addedFields[0], StringComparison.OrdinalIgnoreCase));
+                _parent.SetStatusMessage(
+                    $"Ticket #{Ticket.Id}: {TimeEntryCustomFieldSupport.FormatMissingFieldPrompt(addedFields[0], addedField?.Id ?? 0)}");
+                return;
+            }
+
+            _parent.SetStatusMessage(result.Message);
         }
         finally
         {

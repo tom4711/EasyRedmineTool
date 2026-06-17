@@ -20,6 +20,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     private readonly ITimeEntryService _timeEntryService;
     private CancellationTokenSource? _ticketDetailsCts;
     private CancellationTokenSource? _customFieldsCts;
+    private bool _suppressActivityChangeHandler;
     private CancellationTokenSource? _ticketFilterCts;
 
     [ObservableProperty]
@@ -466,6 +467,9 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
         var customFieldValues = TimeEntryCustomFieldSupport.BuildValues(CustomFields);
         ShowBookingConfirmation = false;
 
+        await _timeEntryService.ResolveCustomFieldIdsAsync(settings, CustomFields);
+        customFieldValues = TimeEntryCustomFieldSupport.BuildValues(CustomFields);
+
         try
         {
             IsBooking = true;
@@ -497,6 +501,23 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
                 }
                 else
                 {
+                    var addedFields = await _timeEntryService.TryAddMissingCustomFieldsFromBookingErrorAsync(
+                        settings,
+                        CustomFields,
+                        result.Message);
+
+                    if (addedFields.Count > 0)
+                    {
+                        OnPropertyChanged(nameof(HasCustomFields));
+                        var addedField = CustomFields.FirstOrDefault(row =>
+                            string.Equals(row.Name, addedFields[0], StringComparison.OrdinalIgnoreCase));
+                        StatusMessage = TimeEntryCustomFieldSupport.FormatMissingFieldPrompt(
+                            addedFields[0],
+                            addedField?.Id ?? 0);
+                        NotifyPreviewChanged();
+                        return;
+                    }
+
                     failureMessages.Add($"{row.DateLabel}: {result.Message}");
                 }
             }
@@ -621,15 +642,23 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            Activities.Clear();
-            foreach (var activity in loadedActivities.OrderBy(activity => activity.Name))
+            _suppressActivityChangeHandler = true;
+            try
             {
-                Activities.Add(activity);
+                Activities.Clear();
+                foreach (var activity in loadedActivities.OrderBy(activity => activity.Name))
+                {
+                    Activities.Add(activity);
+                }
+
+                SelectedActivity = Activities.FirstOrDefault();
+
+                await LoadCustomFieldsAsync(loadToken, ticketId, ticket.Project?.Id);
             }
-
-            SelectedActivity = Activities.FirstOrDefault();
-
-            await LoadCustomFieldsAsync(loadToken, ticketId, ticket.Project?.Id);
+            finally
+            {
+                _suppressActivityChangeHandler = false;
+            }
         }
         catch (OperationCanceledException) when (loadToken.IsCancellationRequested)
         {
@@ -642,7 +671,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectedActivityChanged(TimeEntryActivityDto? value)
     {
-        if (SelectedTicket is null)
+        if (_suppressActivityChangeHandler || SelectedTicket is null)
         {
             return;
         }

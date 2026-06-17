@@ -29,6 +29,17 @@ public interface ITimeEntryService
         IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
         CancellationToken cancellationToken = default);
 
+    Task ResolveCustomFieldIdsAsync(
+        AppSettings settings,
+        ICollection<TimeEntryCustomFieldRowViewModel> rows,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> TryAddMissingCustomFieldsFromBookingErrorAsync(
+        AppSettings settings,
+        ICollection<TimeEntryCustomFieldRowViewModel> rows,
+        string bookingErrorMessage,
+        CancellationToken cancellationToken = default);
+
     Task<TimeEntryLoadResult> GetMyTimeEntriesAsync(
         string baseUrl,
         string apiKey,

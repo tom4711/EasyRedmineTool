@@ -19,6 +19,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
     private readonly ITimeEntryService _timeEntryService;
     private readonly TimeEntryDto _entry;
     private CancellationTokenSource? _customFieldsCts;
+    private bool _suppressActivityChangeHandler;
 
     [ObservableProperty]
     private string hours = string.Empty;
@@ -110,10 +111,12 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
 
     partial void OnSelectedActivityChanged(TimeEntryActivityDto? value)
     {
-        if (IsEditing)
+        if (_suppressActivityChangeHandler || !IsEditing)
         {
-            _ = LoadCustomFieldsAsync();
+            return;
         }
+
+        _ = LoadCustomFieldsAsync();
     }
 
     [RelayCommand]
@@ -183,6 +186,8 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             IsBusy = true;
             _parent.SetStatusMessage($"Eintrag #{EntryId} wird aktualisiert …");
 
+            await _timeEntryService.ResolveCustomFieldIdsAsync(settings, CustomFields);
+
             var result = await _timeEntryService.UpdateTimeEntryAsync(
                 settings.BaseUrl,
                 settings.ApiKey,
@@ -197,13 +202,31 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
                     CustomFields = TimeEntryCustomFieldSupport.BuildValues(CustomFields).ToList()
                 });
 
-            _parent.SetStatusMessage(result.Message);
             if (result.Success)
             {
+                _parent.SetStatusMessage(result.Message);
                 TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, CustomFields);
                 IsEditing = false;
                 await _parent.ReloadTodayBookedHoursAsync();
+                return;
             }
+
+            var addedFields = await _timeEntryService.TryAddMissingCustomFieldsFromBookingErrorAsync(
+                settings,
+                CustomFields,
+                result.Message);
+
+            if (addedFields.Count > 0)
+            {
+                OnPropertyChanged(nameof(HasCustomFields));
+                var addedField = CustomFields.FirstOrDefault(row =>
+                    string.Equals(row.Name, addedFields[0], StringComparison.OrdinalIgnoreCase));
+                _parent.SetStatusMessage(
+                    $"Eintrag #{EntryId}: {TimeEntryCustomFieldSupport.FormatMissingFieldPrompt(addedFields[0], addedField?.Id ?? 0)}");
+                return;
+            }
+
+            _parent.SetStatusMessage(result.Message);
         }
         finally
         {
@@ -265,17 +288,25 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             IssueId,
             projectId);
 
-        Activities.Clear();
-        foreach (var activity in loadedActivities.OrderBy(activity => activity.Name))
+        _suppressActivityChangeHandler = true;
+        try
         {
-            Activities.Add(activity);
+            Activities.Clear();
+            foreach (var activity in loadedActivities.OrderBy(activity => activity.Name))
+            {
+                Activities.Add(activity);
+            }
+
+            SelectedActivity = Activities.FirstOrDefault(activity => activity.Id == _entry.Activity_Id)
+                ?? Activities.FirstOrDefault(activity => activity.Id == _entry.Activity?.Id)
+                ?? Activities.FirstOrDefault();
+
+            await LoadCustomFieldsAsync();
         }
-
-        SelectedActivity = Activities.FirstOrDefault(activity => activity.Id == _entry.Activity_Id)
-            ?? Activities.FirstOrDefault(activity => activity.Id == _entry.Activity?.Id)
-            ?? Activities.FirstOrDefault();
-
-        await LoadCustomFieldsAsync();
+        finally
+        {
+            _suppressActivityChangeHandler = false;
+        }
     }
 
     private async Task LoadCustomFieldsAsync()

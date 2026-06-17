@@ -395,30 +395,51 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
     public async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetTimeEntryCustomFieldDefinitionsAsync(
         string baseUrl,
         string apiKey,
+        int? issueId = null,
         int? projectId = null,
+        int? activityId = null,
         CancellationToken cancellationToken = default)
     {
-        if (projectId.HasValue)
+        foreach (var endpoint in BuildCustomFieldDefinitionEndpoints(issueId, projectId, activityId))
         {
-            var projectEndpoints = new[]
+            var definitions = await TryLoadCustomFieldDefinitionsAsync(baseUrl, apiKey, endpoint, cancellationToken);
+            if (definitions.Count > 0)
             {
-                $"projects/{projectId.Value}.json?include=time_entry_custom_fields",
-                $"projects/{projectId.Value}/time_entry_custom_fields.json"
-            };
-
-            foreach (var endpoint in projectEndpoints)
-            {
-                var projectDefinitions = await TryLoadCustomFieldDefinitionsAsync(baseUrl, apiKey, endpoint, cancellationToken);
-                if (projectDefinitions.Count > 0)
-                {
-                    return projectDefinitions;
-                }
+                return definitions;
             }
+        }
 
+        if (issueId.HasValue || projectId.HasValue)
+        {
             return [];
         }
 
         return await TryLoadCustomFieldDefinitionsAsync(baseUrl, apiKey, "custom_fields.json", cancellationToken);
+    }
+
+    private static IEnumerable<string> BuildCustomFieldDefinitionEndpoints(
+        int? issueId,
+        int? projectId,
+        int? activityId)
+    {
+        var activityQuery = activityId.HasValue
+            ? $"?activity_id={activityId.Value}"
+            : string.Empty;
+        var activityQueryAmp = activityId.HasValue
+            ? $"&activity_id={activityId.Value}"
+            : string.Empty;
+
+        if (issueId.HasValue)
+        {
+            yield return $"issues/{issueId.Value}/time_entry_custom_fields.json{activityQuery}";
+            yield return $"issues/{issueId.Value}.json?include=time_entry_custom_fields{activityQueryAmp}";
+        }
+
+        if (projectId.HasValue)
+        {
+            yield return $"projects/{projectId.Value}/time_entry_custom_fields.json{activityQuery}";
+            yield return $"projects/{projectId.Value}.json?include=time_entry_custom_fields{activityQueryAmp}";
+        }
     }
 
     private async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> TryLoadCustomFieldDefinitionsAsync(
@@ -436,6 +457,247 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return ParseCustomFieldDefinitions(json);
+    }
+
+    public async Task<IReadOnlyList<string>> ProbeRequiredTimeEntryCustomFieldNamesAsync(
+        string baseUrl,
+        string apiKey,
+        int issueId,
+        int activityId,
+        CancellationToken cancellationToken = default)
+    {
+        using var message = CreateRequest(HttpMethod.Post, baseUrl, apiKey, "time_entries.json");
+        message.Content = JsonContent.Create(new
+        {
+            time_entry = new
+            {
+                issue_id = issueId,
+                hours = 0.01,
+                spent_on = DateTime.Today.ToString("yyyy-MM-dd"),
+                activity_id = activityId,
+                comments = string.Empty
+            }
+        });
+
+        using var response = await _httpClient.SendAsync(message, cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            await TryDeleteProbeTimeEntryAsync(baseUrl, apiKey, response, cancellationToken);
+            return [];
+        }
+
+        if ((int)response.StatusCode != 422)
+        {
+            return [];
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        return TimeEntryCustomFieldProbe.ParseRequiredFieldNames(body);
+    }
+
+    private async Task TryDeleteProbeTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        HttpResponseMessage createResponse,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var json = await createResponse.Content.ReadAsStringAsync(cancellationToken);
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("time_entry", out var timeEntry)
+                || !timeEntry.TryGetProperty("id", out var idProperty)
+                || !idProperty.TryGetInt32(out var timeEntryId))
+            {
+                return;
+            }
+
+            using var deleteRequest = CreateRequest(HttpMethod.Delete, baseUrl, apiKey, $"time_entries/{timeEntryId}.json");
+            using var _ = await _httpClient.SendAsync(deleteRequest, cancellationToken);
+        }
+        catch
+        {
+            // Probe cleanup is best-effort.
+        }
+    }
+
+    public async Task<int?> TryResolveTimeEntryCustomFieldIdAsync(
+        string baseUrl,
+        string apiKey,
+        string fieldName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(fieldName))
+        {
+            return null;
+        }
+
+        var fromIndex = await TryResolveFromCustomFieldsIndexAsync(baseUrl, apiKey, fieldName, cancellationToken);
+        return fromIndex;
+    }
+
+    public async Task<IReadOnlyList<string>> SearchTimeEntryCustomFieldValuesAsync(
+        string baseUrl,
+        string apiKey,
+        int customFieldId,
+        string query,
+        int? issueId = null,
+        int? projectId = null,
+        int? activityId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        var encodedQuery = Uri.EscapeDataString(query);
+        var endpoints = new List<string>
+        {
+            $"auto_completes/easy_dependent_enumeration_custom_field_values.json?custom_field_id={customFieldId}&q={encodedQuery}",
+            $"auto_completes/easy_custom_field_enumerations.json?custom_field_id={customFieldId}&q={encodedQuery}",
+            $"auto_completes/custom_field_enumerations.json?custom_field_id={customFieldId}&q={encodedQuery}",
+            $"custom_fields/{customFieldId}/enumerations.json?term={encodedQuery}",
+        };
+
+        if (issueId.HasValue)
+        {
+            endpoints.Add(
+                $"auto_completes/easy_dependent_enumeration_custom_field_values.json?custom_field_id={customFieldId}&issue_id={issueId.Value}&q={encodedQuery}");
+        }
+
+        if (projectId.HasValue)
+        {
+            endpoints.Add(
+                $"auto_completes/easy_dependent_enumeration_custom_field_values.json?custom_field_id={customFieldId}&project_id={projectId.Value}&q={encodedQuery}");
+        }
+
+        if (activityId.HasValue)
+        {
+            endpoints.Add(
+                $"auto_completes/easy_dependent_enumeration_custom_field_values.json?custom_field_id={customFieldId}&activity_id={activityId.Value}&q={encodedQuery}");
+        }
+
+        foreach (var endpoint in endpoints)
+        {
+            using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                continue;
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            var values = ParseAutocompleteValues(json);
+            if (values.Count > 0)
+            {
+                return values;
+            }
+        }
+
+        return [];
+    }
+
+    private async Task<int?> TryResolveFromCustomFieldsIndexAsync(
+        string baseUrl,
+        string apiKey,
+        string fieldName,
+        CancellationToken cancellationToken)
+    {
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "custom_fields.json");
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("custom_fields", out var customFields)
+            || customFields.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var item in customFields.EnumerateArray())
+        {
+            if (!item.TryGetProperty("name", out var nameProperty))
+            {
+                continue;
+            }
+
+            if (!string.Equals(nameProperty.GetString(), fieldName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (item.TryGetProperty("customized_type", out var typeProperty)
+                && !IsTimeEntryCustomizedType(typeProperty.GetString()))
+            {
+                continue;
+            }
+
+            if (item.TryGetProperty("id", out var idProperty)
+                && idProperty.TryGetInt32(out var id))
+            {
+                return id;
+            }
+        }
+
+        return null;
+    }
+
+    private static List<string> ParseAutocompleteValues(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        var values = new List<string>();
+
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            CollectAutocompleteValues(root, values);
+            return values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        foreach (var propertyName in new[] { "results", "enumerations", "possible_values", "values", "items" })
+        {
+            if (root.TryGetProperty(propertyName, out var array) && array.ValueKind == JsonValueKind.Array)
+            {
+                CollectAutocompleteValues(array, values);
+            }
+        }
+
+        return values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static void CollectAutocompleteValues(JsonElement array, List<string> values)
+    {
+        foreach (var item in array.EnumerateArray())
+        {
+            switch (item.ValueKind)
+            {
+                case JsonValueKind.String:
+                    AddAutocompleteValue(values, item.GetString());
+                    break;
+                case JsonValueKind.Object when item.TryGetProperty("name", out var nameProperty):
+                    AddAutocompleteValue(values, nameProperty.GetString());
+                    break;
+                case JsonValueKind.Object when item.TryGetProperty("value", out var valueProperty):
+                    AddAutocompleteValue(values, valueProperty.GetString());
+                    break;
+                case JsonValueKind.Object when item.TryGetProperty("label", out var labelProperty):
+                    AddAutocompleteValue(values, labelProperty.GetString());
+                    break;
+            }
+        }
+    }
+
+    private static void AddAutocompleteValue(List<string> values, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            values.Add(value);
+        }
     }
 
     public async Task<HttpResponseMessage> CreateTimeEntryAsync(
@@ -661,8 +923,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
     {
         definitions = [];
 
-        if (!TryGetArray(source, "time_entry_custom_fields", out var array)
-            && !TryGetArray(source, "custom_fields", out array))
+        if (!TryGetArray(source, "time_entry_custom_fields", out var array))
         {
             return false;
         }
@@ -687,13 +948,16 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
                 continue;
             }
 
-            if (requireTimeEntryType)
+            if (item.TryGetProperty("customized_type", out var typeProperty))
             {
-                if (!item.TryGetProperty("customized_type", out var typeProperty)
-                    || !IsTimeEntryCustomizedType(typeProperty.GetString()))
+                if (!IsTimeEntryCustomizedType(typeProperty.GetString()))
                 {
                     continue;
                 }
+            }
+            else if (requireTimeEntryType)
+            {
+                continue;
             }
 
             var name = item.TryGetProperty("name", out var nameProperty)
@@ -754,7 +1018,8 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
     {
         if (TryGetIntArray(item, "activity_ids", out var activityIds)
             || TryGetIntArray(item, "time_entry_activity_ids", out activityIds)
-            || TryGetIntArray(item, "visible_for_activity_ids", out activityIds))
+            || TryGetIntArray(item, "visible_for_activity_ids", out activityIds)
+            || TryGetIntArray(item, "time_entry_activities", out activityIds))
         {
             return activityIds;
         }

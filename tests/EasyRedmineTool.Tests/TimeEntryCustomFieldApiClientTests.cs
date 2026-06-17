@@ -97,6 +97,83 @@ public class TimeEntryCustomFieldApiClientTests
         Assert.True(definitions[0].HasPossibleValues);
     }
 
+    [Fact]
+    public async Task GetTimeEntryCustomFieldDefinitionsAsync_ignores_issue_custom_fields_on_project_payload()
+    {
+        const string projectJson = """
+            {
+              "project": {
+                "id": 42,
+                "custom_fields": [
+                  {
+                    "id": 1,
+                    "name": "Issue Feld",
+                    "customized_type": "issue",
+                    "field_format": "string"
+                  },
+                  {
+                    "id": 2,
+                    "name": "Projektzuordnung",
+                    "customized_type": "issue",
+                    "field_format": "list"
+                  }
+                ]
+              }
+            }
+            """;
+
+        var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(projectJson, Encoding.UTF8, "application/json")
+        });
+
+        var definitions = await client.GetTimeEntryCustomFieldDefinitionsAsync(
+            "https://redmine.example/",
+            "secret",
+            projectId: 42);
+
+        Assert.Empty(definitions);
+    }
+
+    [Fact]
+    public async Task GetTimeEntryCustomFieldDefinitionsAsync_requests_activity_specific_issue_endpoint()
+    {
+        string? requestedPath = null;
+        const string json = """
+            {
+              "time_entry_custom_fields": [
+                {
+                  "id": 5,
+                  "name": "Produktdaten Hierarchie",
+                  "field_format": "depending_enumeration",
+                  "activity_ids": [100]
+                }
+              ]
+            }
+            """;
+
+        var client = CreateClient(request =>
+        {
+            requestedPath = request.RequestUri!.PathAndQuery;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+        });
+
+        var definitions = await client.GetTimeEntryCustomFieldDefinitionsAsync(
+            "https://redmine.example/",
+            "secret",
+            issueId: 22658,
+            projectId: 42,
+            activityId: 100);
+
+        Assert.Equal("/issues/22658/time_entry_custom_fields.json?activity_id=100", requestedPath);
+        Assert.Single(definitions);
+        Assert.Equal(5, definitions[0].Id);
+        Assert.Equal([100], definitions[0].ActivityIds);
+    }
+
     private static EasyRedmineApiClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> handler) =>
         new(new HttpClient(new StubHttpMessageHandler(handler))
         {

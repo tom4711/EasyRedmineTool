@@ -12,10 +12,12 @@ using Microsoft.Extensions.Logging;
 public class TimeEntryService(
     IEasyRedmineApiClient apiClient,
     ITicketService ticketService,
+    IAppSettingsService appSettingsService,
     ILogger<TimeEntryService> logger) : ITimeEntryService
 {
     private readonly IEasyRedmineApiClient _apiClient = apiClient;
     private readonly ITicketService _ticketService = ticketService;
+    private readonly IAppSettingsService _appSettingsService = appSettingsService;
     private readonly ILogger<TimeEntryService> _logger = logger;
     private readonly TimeEntryFormDataCache _formDataCache = new();
 
@@ -44,8 +46,20 @@ public class TimeEntryService(
         var definitions = await GetCustomFieldDefinitionsAsync(
             settings.BaseUrl,
             settings.ApiKey,
+            issueId,
             projectId,
+            activityId,
             cancellationToken);
+
+        if (definitions.Count == 0 && issueId.HasValue && activityId.HasValue)
+        {
+            definitions = await ProbeCustomFieldDefinitionsAsync(
+                settings,
+                issueId.Value,
+                projectId,
+                activityId.Value,
+                cancellationToken);
+        }
 
         IReadOnlyList<TimeEntryCustomFieldValueDto> recentValues = [];
         try
@@ -84,19 +98,98 @@ public class TimeEntryService(
             existingValues);
     }
 
+    public Task ResolveCustomFieldIdsAsync(
+        AppSettings settings,
+        ICollection<TimeEntryCustomFieldRowViewModel> rows,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var row in rows.ToList())
+        {
+            if (row.Id > 0)
+            {
+                continue;
+            }
+
+            var resolvedId = ResolveKnownCustomFieldId(settings, row.Name);
+            if (resolvedId is not > 0)
+            {
+                continue;
+            }
+
+            rows.Remove(row);
+            rows.Add(TimeEntryCustomFieldSupport.CreateProbedRow(resolvedId.Value, row.Name, row.Value));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<string>> TryAddMissingCustomFieldsFromBookingErrorAsync(
+        AppSettings settings,
+        ICollection<TimeEntryCustomFieldRowViewModel> rows,
+        string bookingErrorMessage,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            return Task.FromResult<IReadOnlyList<string>>([]);
+        }
+
+        var requiredNames = TimeEntryCustomFieldProbe.ParseRequiredFieldNamesFromMessage(bookingErrorMessage);
+        if (requiredNames.Count == 0)
+        {
+            return Task.FromResult<IReadOnlyList<string>>([]);
+        }
+
+        var hintId = TimeEntryCustomFieldProbe.TryParseFieldIdFromError(bookingErrorMessage);
+        var addedNames = new List<string>();
+
+        foreach (var name in requiredNames)
+        {
+            if (rows.Any(row => string.Equals(row.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            var resolvedId = hintId ?? ResolveKnownCustomFieldId(settings, name) ?? 0;
+
+            if (resolvedId > 0)
+            {
+                PersistResolvedCustomFieldId(name, resolvedId);
+            }
+
+            rows.Add(TimeEntryCustomFieldSupport.CreateProbedRow(resolvedId, name));
+            addedNames.Add(name);
+        }
+
+        return Task.FromResult<IReadOnlyList<string>>(addedNames);
+    }
+
     private async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
         string baseUrl,
         string apiKey,
+        int? issueId,
         int? projectId,
+        int? activityId,
         CancellationToken cancellationToken)
     {
-        var cacheKey = TimeEntryFormDataCache.BuildCustomFieldDefinitionsKey(baseUrl, apiKey, projectId);
+        var cacheKey = TimeEntryFormDataCache.BuildCustomFieldDefinitionsKey(
+            baseUrl,
+            apiKey,
+            issueId,
+            projectId,
+            activityId);
 
         try
         {
             return await _formDataCache.GetOrLoadCustomFieldDefinitionsAsync(
                 cacheKey,
-                token => _apiClient.GetTimeEntryCustomFieldDefinitionsAsync(baseUrl, apiKey, projectId, token),
+                token => _apiClient.GetTimeEntryCustomFieldDefinitionsAsync(
+                    baseUrl,
+                    apiKey,
+                    issueId,
+                    projectId,
+                    activityId,
+                    token),
                 cancellationToken);
         }
         catch (OperationCanceledException)
@@ -111,6 +204,80 @@ public class TimeEntryService(
                 projectId);
             return [];
         }
+    }
+
+    private async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> ProbeCustomFieldDefinitionsAsync(
+        AppSettings settings,
+        int issueId,
+        int? projectId,
+        int activityId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var requiredNames = await _apiClient.ProbeRequiredTimeEntryCustomFieldNamesAsync(
+                settings.BaseUrl,
+                settings.ApiKey,
+                issueId,
+                activityId,
+                cancellationToken);
+
+            if (requiredNames.Count == 0)
+            {
+                return [];
+            }
+
+            var definitions = new List<TimeEntryCustomFieldDefinitionDto>();
+            foreach (var name in requiredNames)
+            {
+                var id = ResolveKnownCustomFieldId(settings, name) ?? 0;
+
+                if (id > 0)
+                {
+                    PersistResolvedCustomFieldId(name, id);
+                }
+
+                definitions.Add(TimeEntryCustomFieldDefinitionFactory.CreateProbedDefinition(id, name, activityId));
+            }
+
+            return definitions;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Pflicht-Custom-Fields konnten nicht per Validierung ermittelt werden (Issue {IssueId}, Aktivität {ActivityId}).",
+                issueId,
+                activityId);
+            return [];
+        }
+    }
+
+    private static int? ResolveKnownCustomFieldId(AppSettings settings, string fieldName) =>
+        settings.TimeEntryCustomFieldIdMappings
+            .FirstOrDefault(mapping => string.Equals(mapping.Name, fieldName, StringComparison.OrdinalIgnoreCase))
+            ?.Id;
+
+    private void PersistResolvedCustomFieldId(string fieldName, int id)
+    {
+        _appSettingsService.Update(settings =>
+        {
+            if (settings.TimeEntryCustomFieldIdMappings.Any(
+                    mapping => string.Equals(mapping.Name, fieldName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            settings.TimeEntryCustomFieldIdMappings.Add(new TimeEntryCustomFieldIdMapping
+            {
+                Name = fieldName,
+                Id = id
+            });
+        });
     }
 
     public async Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(

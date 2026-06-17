@@ -105,13 +105,31 @@ public static class TimeEntryCustomFieldSupport
 
     public static IReadOnlyList<TimeEntryCustomFieldValue> BuildValues(IEnumerable<TimeEntryCustomFieldRowViewModel> rows) =>
         rows
-            .Where(row => !string.IsNullOrWhiteSpace(row.Value))
+            .Where(row => row.Id > 0 && !string.IsNullOrWhiteSpace(row.Value))
             .Select(row => new TimeEntryCustomFieldValue
             {
                 Id = row.Id,
                 Value = row.Value.Trim()
             })
             .ToList();
+
+    public static TimeEntryCustomFieldRowViewModel CreateProbedRow(
+        int id,
+        string name,
+        string value = "") =>
+        new(
+            id,
+            name,
+            isRequired: true,
+            hasPossibleValues: id > 0,
+            isSearchableList: false,
+            possibleValues: [],
+            value: value);
+
+    public static string FormatMissingFieldPrompt(string fieldName, int fieldId) =>
+        fieldId > 0
+            ? $"Bitte „{fieldName}“ ausfüllen und erneut buchen."
+            : $"Bitte „{fieldName}“ ausfüllen und erneut buchen. (Feld-ID konnte nicht automatisch ermittelt werden – ggf. in settings.json unter TimeEntryCustomFieldIdMappings eintragen.)";
 
     public static void SaveDefaults(IAppSettingsService settingsService, IEnumerable<TimeEntryCustomFieldRowViewModel> rows)
     {
