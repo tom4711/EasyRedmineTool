@@ -7,10 +7,10 @@ using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.Tickets;
+using EasyRedmineTool.Core.Services;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
-using System.Globalization;
 
 public partial class TicketListViewModel : ViewModelBase, IDisposable
 {
@@ -42,13 +42,10 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     private TicketFilterOption<TicketStatusFilterSelection>? selectedStatusFilter;
 
     [ObservableProperty]
-    private DateTime? lastBookedUntil;
-
-    [ObservableProperty]
-    private DateTime calendarDisplayDate = DateTime.Today;
-
-    [ObservableProperty]
     private bool includeTimeEntryTickets;
+
+    [ObservableProperty]
+    private int timeEntryLookbackMonths = TicketService.DefaultTimeEntryLookbackMonths;
 
     public ObservableCollection<TicketListItemViewModel> Tickets { get; } = [];
 
@@ -70,21 +67,13 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         _ = ReloadStatusFilterOptionsAsync();
     }
 
-    public string LastBookedUntilLabel =>
-        LastBookedUntil.HasValue
-            ? LastBookedUntil.Value.ToString("dddd, dd.MM.yyyy", CultureInfo.GetCultureInfo("de-DE"))
-            : "Kein Filter";
+    public bool IsTimeEntryLookback3Months => TimeEntryLookbackMonths == 3;
 
-    public bool HasLastBookedUntilFilter => LastBookedUntil.HasValue;
+    public bool IsTimeEntryLookback6Months => TimeEntryLookbackMonths == 6;
 
-    public bool IsLastBookedUntilFilterEnabled => IncludeTimeEntryTickets;
+    public bool IsTimeEntryLookback9Months => TimeEntryLookbackMonths == 9;
 
-    partial void OnLastBookedUntilChanged(DateTime? value)
-    {
-        OnPropertyChanged(nameof(LastBookedUntilLabel));
-        OnPropertyChanged(nameof(HasLastBookedUntilFilter));
-        PersistFilterSettings();
-    }
+    public bool IsTimeEntryLookback12Months => TimeEntryLookbackMonths == 12;
 
     partial void OnSelectedAssigneeFilterChanged(TicketFilterOption<TicketAssigneeFilter>? value) =>
         PersistFilterSettings();
@@ -99,11 +88,36 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         PersistFilterSettings();
     }
 
-    partial void OnIncludeTimeEntryTicketsChanged(bool value)
+    partial void OnIncludeTimeEntryTicketsChanged(bool value) =>
+        PersistFilterSettings();
+
+    partial void OnTimeEntryLookbackMonthsChanged(int value)
     {
-        OnPropertyChanged(nameof(IsLastBookedUntilFilterEnabled));
+        var normalized = TicketService.NormalizeTimeEntryLookbackMonths(value);
+        if (normalized != value)
+        {
+            TimeEntryLookbackMonths = normalized;
+            return;
+        }
+
+        OnPropertyChanged(nameof(IsTimeEntryLookback3Months));
+        OnPropertyChanged(nameof(IsTimeEntryLookback6Months));
+        OnPropertyChanged(nameof(IsTimeEntryLookback9Months));
+        OnPropertyChanged(nameof(IsTimeEntryLookback12Months));
         PersistFilterSettings();
     }
+
+    [RelayCommand]
+    private void SelectTimeEntryLookback3Months() => TimeEntryLookbackMonths = 3;
+
+    [RelayCommand]
+    private void SelectTimeEntryLookback6Months() => TimeEntryLookbackMonths = 6;
+
+    [RelayCommand]
+    private void SelectTimeEntryLookback9Months() => TimeEntryLookbackMonths = 9;
+
+    [RelayCommand]
+    private void SelectTimeEntryLookback12Months() => TimeEntryLookbackMonths = 12;
 
     public void ReloadSettings()
     {
@@ -119,9 +133,13 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         _pendingStatusFilterKind = settings.TicketLoadStatusFilterKind;
         _pendingStatusId = settings.TicketLoadStatusId;
         _pendingStatusName = settings.TicketLoadStatusName;
-        LastBookedUntil = RedmineDates.TryParseSpentOn(settings.TicketLoadLastBookedUntil);
         IncludeTimeEntryTickets = settings.TicketLoadIncludeTimeEntryTickets;
-        OnPropertyChanged(nameof(IsLastBookedUntilFilterEnabled));
+        TimeEntryLookbackMonths = TicketService.NormalizeTimeEntryLookbackMonths(
+            settings.TicketLoadTimeEntryLookbackMonths);
+        OnPropertyChanged(nameof(IsTimeEntryLookback3Months));
+        OnPropertyChanged(nameof(IsTimeEntryLookback6Months));
+        OnPropertyChanged(nameof(IsTimeEntryLookback9Months));
+        OnPropertyChanged(nameof(IsTimeEntryLookback12Months));
         RestoreSelectedStatusFilter();
 
         Tickets.Clear();
@@ -178,12 +196,6 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         {
             CompleteOperation(operationCts);
         }
-    }
-
-    [RelayCommand]
-    private void ClearLastBookedUntilFilter()
-    {
-        LastBookedUntil = null;
     }
 
     [RelayCommand]
@@ -421,7 +433,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             StatusKind = statusSelection.Kind,
             StatusId = statusSelection.StatusId,
             IncludeTimeEntryTickets = IncludeTimeEntryTickets,
-            LastBookedUntil = IncludeTimeEntryTickets ? LastBookedUntil : null
+            TimeEntryLookbackMonths = TimeEntryLookbackMonths
         };
     }
 
@@ -441,7 +453,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             return $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} aus Filter{filterSummary}).";
         }
 
-        return $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} aus Filter, {result.TimeEntryTicketCount} mit Zeiteinträgen im letzten Jahr{filterSummary}).";
+        return $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} aus Filter, {result.TimeEntryTicketCount} mit Zeiteinträgen in den letzten {filter.TimeEntryLookbackMonths} Monaten{filterSummary}).";
     }
 
     private static string BuildFilterSummary(
@@ -454,9 +466,9 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             DescribeStatusFilter(filter, statusSelection)
         };
 
-        if (filter.LastBookedUntil.HasValue)
+        if (filter.IncludeTimeEntryTickets)
         {
-            parts.Add($"zuletzt gebucht bis {filter.LastBookedUntil:dd.MM.yyyy}");
+            parts.Add($"Zeiteinträge der letzten {filter.TimeEntryLookbackMonths} Monate");
         }
 
         return $"; Filter: {string.Join(", ", parts)}";
@@ -515,10 +527,8 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             settings.TicketLoadStatusFilterKind = statusSelection.Kind;
             settings.TicketLoadStatusId = statusSelection.StatusId;
             settings.TicketLoadStatusName = _pendingStatusName;
-            settings.TicketLoadLastBookedUntil = LastBookedUntil.HasValue
-                ? RedmineDates.FormatSpentOn(LastBookedUntil.Value)
-                : null;
             settings.TicketLoadIncludeTimeEntryTickets = IncludeTimeEntryTickets;
+            settings.TicketLoadTimeEntryLookbackMonths = TimeEntryLookbackMonths;
         });
     }
 

@@ -6,44 +6,6 @@ using EasyRedmineTool.Core.Models.Tickets;
 public class TicketLoadFilterMatcherTests
 {
     [Fact]
-    public void MatchesLastBookedUntil_includes_unbooked_and_tickets_on_or_before_date()
-    {
-        var until = new DateTime(2025, 3, 1);
-
-        Assert.True(TicketLoadFilterMatcher.MatchesLastBookedUntil(new IssueDto { Id = 1 }, until));
-        Assert.True(TicketLoadFilterMatcher.MatchesLastBookedUntil(
-            new IssueDto { Id = 2, LastTimeEntryOn = new DateTime(2025, 3, 1) },
-            until));
-        Assert.False(TicketLoadFilterMatcher.MatchesLastBookedUntil(
-            new IssueDto { Id = 3, LastTimeEntryOn = new DateTime(2025, 3, 2) },
-            until));
-    }
-
-    [Fact]
-    public void MatchesLastBookedUntil_with_booking_data_excludes_unbooked_and_recently_booked_issues()
-    {
-        var until = new DateTime(2026, 6, 10);
-        var bookedAfterFilter = new HashSet<int> { 2, 5 };
-
-        Assert.False(TicketLoadFilterMatcher.MatchesLastBookedUntil(
-            new IssueDto { Id = 1 },
-            until,
-            bookedAfterFilter));
-        Assert.False(TicketLoadFilterMatcher.MatchesLastBookedUntil(
-            new IssueDto { Id = 2, LastTimeEntryOn = new DateTime(2026, 6, 11) },
-            until,
-            bookedAfterFilter));
-        Assert.True(TicketLoadFilterMatcher.MatchesLastBookedUntil(
-            new IssueDto { Id = 3, LastTimeEntryOn = new DateTime(2026, 6, 9) },
-            until,
-            bookedAfterFilter));
-        Assert.True(TicketLoadFilterMatcher.MatchesLastBookedUntil(
-            new IssueDto { Id = 4, LastTimeEntryOn = new DateTime(2026, 6, 10) },
-            until,
-            bookedAfterFilter));
-    }
-
-    [Fact]
     public void MatchesAssignee_respects_me_unassigned_and_all()
     {
         var issueAssignedToMe = new IssueDto { Assigned_To = new NamedEntityDto { Id = 7 } };
@@ -92,40 +54,30 @@ public class TicketLoadFilterMatcherTests
     }
 
     [Fact]
-    public void Matches_combines_all_filters()
+    public void Matches_combines_assignee_and_status_filters()
     {
         var filter = new TicketLoadFilter
         {
             Assignee = TicketAssigneeFilter.Me,
-            StatusKind = TicketStatusFilterKind.Open,
-            LastBookedUntil = new DateTime(2025, 6, 1)
+            StatusKind = TicketStatusFilterKind.Open
         };
 
         var matchingIssue = new IssueDto
         {
             Assigned_To = new NamedEntityDto { Id = 5 },
-            Status = new StatusDto { Is_Closed = false },
-            LastTimeEntryOn = new DateTime(2025, 5, 1)
+            Status = new StatusDto { Is_Closed = false }
         };
 
         Assert.True(TicketLoadFilterMatcher.Matches(matchingIssue, filter, 5));
         Assert.False(TicketLoadFilterMatcher.Matches(new IssueDto
         {
             Assigned_To = new NamedEntityDto { Id = 8 },
-            Status = new StatusDto { Is_Closed = false },
-            LastTimeEntryOn = new DateTime(2025, 5, 1)
+            Status = new StatusDto { Is_Closed = false }
         }, filter, 5));
         Assert.False(TicketLoadFilterMatcher.Matches(new IssueDto
         {
             Assigned_To = new NamedEntityDto { Id = 5 },
-            Status = new StatusDto { Is_Closed = true },
-            LastTimeEntryOn = new DateTime(2025, 5, 1)
-        }, filter, 5));
-        Assert.False(TicketLoadFilterMatcher.Matches(new IssueDto
-        {
-            Assigned_To = new NamedEntityDto { Id = 5 },
-            Status = new StatusDto { Is_Closed = false },
-            LastTimeEntryOn = new DateTime(2025, 6, 2)
+            Status = new StatusDto { Is_Closed = true }
         }, filter, 5));
     }
 }

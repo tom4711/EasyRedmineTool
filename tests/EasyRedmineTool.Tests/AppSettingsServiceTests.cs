@@ -37,7 +37,8 @@ public class AppSettingsServiceTests
             TicketLoadStatusFilterKind = TicketStatusFilterKind.Specific,
             TicketLoadStatusId = 7,
             TicketLoadStatusName = "In Progress",
-            TicketLoadLastBookedUntil = "2026-05-01",
+            TicketLoadIncludeTimeEntryTickets = true,
+            TicketLoadTimeEntryLookbackMonths = 6,
             TimeEntryCustomFieldDefaults =
             [
                 new TimeEntryCustomFieldDefault { Id = 3, Name = "Produktdaten Hierarchie", Value = "A > B" }
@@ -50,7 +51,8 @@ public class AppSettingsServiceTests
         Assert.Equal(TicketStatusFilterKind.Specific, normalized.TicketLoadStatusFilterKind);
         Assert.Equal(7, normalized.TicketLoadStatusId);
         Assert.Equal("In Progress", normalized.TicketLoadStatusName);
-        Assert.Equal("2026-05-01", normalized.TicketLoadLastBookedUntil);
+        Assert.True(normalized.TicketLoadIncludeTimeEntryTickets);
+        Assert.Equal(6, normalized.TicketLoadTimeEntryLookbackMonths);
         Assert.Single(normalized.TimeEntryCustomFieldDefaults);
         Assert.Equal("A > B", normalized.TimeEntryCustomFieldDefaults[0].Value);
     }
@@ -100,7 +102,8 @@ public class AppSettingsServiceTests
                 ApiKey = "secret",
                 TicketLoadAssigneeFilter = TicketAssigneeFilter.All,
                 TicketLoadStatusFilterKind = TicketStatusFilterKind.Closed,
-                TicketLoadLastBookedUntil = "2026-06-01",
+                TicketLoadIncludeTimeEntryTickets = true,
+                TicketLoadTimeEntryLookbackMonths = 9,
                 TimeEntryCustomFieldDefaults =
                 [
                     new TimeEntryCustomFieldDefault { Id = 1, Name = "Field", Value = "x" }
@@ -113,7 +116,8 @@ public class AppSettingsServiceTests
             Assert.True(loaded.IsDarkMode);
             Assert.Equal(TicketAssigneeFilter.All, loaded.TicketLoadAssigneeFilter);
             Assert.Equal(TicketStatusFilterKind.Closed, loaded.TicketLoadStatusFilterKind);
-            Assert.Equal("2026-06-01", loaded.TicketLoadLastBookedUntil);
+            Assert.True(loaded.TicketLoadIncludeTimeEntryTickets);
+            Assert.Equal(9, loaded.TicketLoadTimeEntryLookbackMonths);
             Assert.Single(loaded.TimeEntryCustomFieldDefaults);
             Assert.Equal("x", loaded.TimeEntryCustomFieldDefaults[0].Value);
         }

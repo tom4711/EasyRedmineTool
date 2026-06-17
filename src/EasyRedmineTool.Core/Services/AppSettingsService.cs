@@ -103,8 +103,9 @@ public sealed class AppSettingsService : IAppSettingsService
         TicketLoadStatusFilterKind = settings.TicketLoadStatusFilterKind,
         TicketLoadStatusId = settings.TicketLoadStatusId,
         TicketLoadStatusName = settings.TicketLoadStatusName,
-        TicketLoadLastBookedUntil = settings.TicketLoadLastBookedUntil,
         TicketLoadIncludeTimeEntryTickets = settings.TicketLoadIncludeTimeEntryTickets,
+        TicketLoadTimeEntryLookbackMonths = TicketService.NormalizeTimeEntryLookbackMonths(
+            settings.TicketLoadTimeEntryLookbackMonths),
         TimeEntryCustomFieldDefaults = settings.TimeEntryCustomFieldDefaults ?? [],
     };
 
