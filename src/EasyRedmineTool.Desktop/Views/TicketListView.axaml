@@ -153,9 +153,17 @@
       <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
     </StackPanel>
 
-    <ListBox Grid.Row="1"
-             Margin="24,0,24,24"
-             ItemsSource="{Binding Tickets}"
+    <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="24,0,24,24">
+      <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
+        <TextBox Text="{Binding TicketFilterText}"
+                 PlaceholderText="{Binding SearchPlaceholder}" />
+        <TextBlock Text="{Binding ListScopeSummary}"
+                   FontSize="12"
+                   Opacity="0.75" />
+      </StackPanel>
+
+      <ListBox Grid.Row="1"
+             ItemsSource="{Binding FilteredTickets}"
              SelectedItem="{Binding SelectedTicket}">
       <ListBox.ItemTemplate>
         <DataTemplate x:DataType="vm:TicketListItemViewModel">
@@ -225,6 +233,7 @@
           </Border>
         </DataTemplate>
       </ListBox.ItemTemplate>
-    </ListBox>
+      </ListBox>
+    </Grid>
   </Grid>
 </UserControl>
