@@ -1,6 +1,8 @@
 namespace EasyRedmineTool.Core.Services.Interfaces;
 
+using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
+using EasyRedmineTool.Core.ViewModels;
 
 public interface ITimeEntryService
 {
@@ -16,6 +18,27 @@ public interface ITimeEntryService
         string apiKey,
         int? issueId = null,
         int? projectId = null,
+        int? activityId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TimeEntryCustomFieldRowViewModel>> GetCustomFieldRowsAsync(
+        AppSettings settings,
+        int? issueId = null,
+        int? projectId = null,
+        int? activityId = null,
+        string? activityName = null,
+        IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
+        CancellationToken cancellationToken = default);
+
+    Task ResolveCustomFieldIdsAsync(
+        AppSettings settings,
+        ICollection<TimeEntryCustomFieldRowViewModel> rows,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> TryAddMissingCustomFieldsFromBookingErrorAsync(
+        AppSettings settings,
+        ICollection<TimeEntryCustomFieldRowViewModel> rows,
+        string bookingErrorMessage,
         CancellationToken cancellationToken = default);
 
     Task<TimeEntryLoadResult> GetMyTimeEntriesAsync(
