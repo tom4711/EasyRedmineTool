@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EasyRedmineTool.Core.ViewModels"
+             x:Class="EasyRedmineTool.Desktop.Views.TimeEntryCustomFieldEditor"
+             x:DataType="vm:TimeEntryCustomFieldRowViewModel">
+  <StackPanel Spacing="6">
+    <ComboBox IsVisible="{Binding HasCompactPossibleValues}"
+              ItemsSource="{Binding PossibleValues}"
+              SelectedItem="{Binding SelectedValue}"
+              HorizontalAlignment="Stretch"
+              PlaceholderText="Bitte wählen …" />
+    <StackPanel IsVisible="{Binding ShowSearchablePicker}" Spacing="6">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBox Grid.Column="0"
+                 Text="{Binding SearchText}"
+                 PlaceholderText="Suchen …"
+                 HorizontalAlignment="Stretch" />
+        <Button Grid.Column="1"
+                Classes="secondary compact"
+                Margin="8,0,0,0"
+                IsVisible="{Binding IsMultiple}"
+                Command="{Binding AddSearchSelectionCommand}"
+                Content="+" />
+      </Grid>
+      <ListBox ItemsSource="{Binding FilteredPossibleValues}"
+               SelectedItem="{Binding SelectedSearchResult, Mode=TwoWay}"
+               MaxHeight="220"
+               HorizontalAlignment="Stretch">
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+      <ItemsControl IsVisible="{Binding IsMultiple}"
+                    ItemsSource="{Binding SelectedValueChips}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:TimeEntryCustomFieldSelectedChipViewModel">
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+              <TextBlock Grid.Column="0"
+                         Text="{Binding Value}"
+                         TextWrapping="Wrap" />
+              <Button Grid.Column="1"
+                      Classes="secondary compact"
+                      Command="{Binding RemoveCommand}"
+                      Content="×" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+    <ListBox IsVisible="{Binding HasMultipleCompactList}"
+             ItemsSource="{Binding PossibleValues}"
+             SelectionMode="Multiple"
+             SelectedItems="{Binding SelectedValues}"
+             MaxHeight="180"
+             HorizontalAlignment="Stretch" />
+    <TextBox IsVisible="{Binding !HasPossibleValues}"
+             Text="{Binding Value}"
+             Classes="row-field"
+             HorizontalAlignment="Stretch"
+             PlaceholderText="Wert eingeben …" />
+  </StackPanel>
+</UserControl>

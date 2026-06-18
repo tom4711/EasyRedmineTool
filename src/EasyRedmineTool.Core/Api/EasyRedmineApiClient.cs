@@ -788,7 +788,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
                 custom_fields = customFields.Select(field => new
                 {
                     id = field.Id,
-                    value = field.Value
+                    value = field.GetApiValue()
                 }).ToArray()
             }
         };
@@ -970,6 +970,8 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
                 && requiredProperty.ValueKind == JsonValueKind.True;
             var isForAll = !item.TryGetProperty("is_for_all", out var forAllProperty)
                 || forAllProperty.ValueKind == JsonValueKind.True;
+            var isMultiple = item.TryGetProperty("multiple", out var multipleProperty)
+                && multipleProperty.ValueKind == JsonValueKind.True;
 
             definitions.Add(new TimeEntryCustomFieldDefinitionDto
             {
@@ -979,6 +981,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
                 IsRequired = isRequired,
                 IsForAll = isForAll,
                 IsProjectScoped = isProjectScoped,
+                Multiple = isMultiple,
                 ProjectIds = ParseProjectIds(item),
                 ActivityIds = ParseActivityIds(item),
                 PossibleValues = ParsePossibleValues(item)

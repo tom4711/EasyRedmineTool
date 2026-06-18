@@ -16,7 +16,7 @@ public class TimeEntryCustomFieldApiClientTests
               "custom_fields": [
                 {
                   "id": 4,
-                  "name": "Kostenstelle",
+                  "name": "Cost center",
                   "customized_type": "time_entry",
                   "field_format": "list",
                   "is_required": true,
@@ -46,7 +46,7 @@ public class TimeEntryCustomFieldApiClientTests
 
         Assert.Single(definitions);
         Assert.Equal(4, definitions[0].Id);
-        Assert.Equal("Kostenstelle", definitions[0].Name);
+        Assert.Equal("Cost center", definitions[0].Name);
         Assert.True(definitions[0].IsRequired);
         Assert.False(definitions[0].IsForAll);
         Assert.Equal([42], definitions[0].ProjectIds);
@@ -144,7 +144,7 @@ public class TimeEntryCustomFieldApiClientTests
               "time_entry_custom_fields": [
                 {
                   "id": 5,
-                  "name": "Produktdaten Hierarchie",
+                  "name": "Product Category",
                   "field_format": "depending_enumeration",
                   "activity_ids": [100]
                 }
@@ -164,11 +164,11 @@ public class TimeEntryCustomFieldApiClientTests
         var definitions = await client.GetTimeEntryCustomFieldDefinitionsAsync(
             "https://redmine.example/",
             "secret",
-            issueId: 22658,
+            issueId: 1001,
             projectId: 42,
             activityId: 100);
 
-        Assert.Equal("/issues/22658/time_entry_custom_fields.json?activity_id=100", requestedPath);
+        Assert.Equal("/issues/1001/time_entry_custom_fields.json?activity_id=100", requestedPath);
         Assert.Single(definitions);
         Assert.Equal(5, definitions[0].Id);
         Assert.Equal([100], definitions[0].ActivityIds);

@@ -152,6 +152,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             Ticket.Id,
             Ticket.Project?.Id,
             SelectedActivity.Id,
+            SelectedActivity.Name,
             cancellationToken: loadToken);
 
         if (loadToken.IsCancellationRequested)

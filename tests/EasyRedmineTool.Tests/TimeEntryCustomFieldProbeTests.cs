@@ -8,16 +8,16 @@ public class TimeEntryCustomFieldProbeTests
     public void ParseRequiredFieldNamesFromMessage_extracts_from_full_error_text()
     {
         var names = TimeEntryCustomFieldProbe.ParseRequiredFieldNamesFromMessage(
-            "Zeiteintrag fehlgeschlagen: 422 Unprocessable Content {\"errors\":[\"Produktdaten Hierarchie darf nicht leer sein\"]}");
+            $$"""Zeiteintrag fehlgeschlagen: 422 Unprocessable Content {"errors":["{{CustomFieldTestData.ListFieldName}} cannot be blank"]}""");
 
         Assert.Single(names);
-        Assert.Equal("Produktdaten Hierarchie", names[0]);
+        Assert.Equal(CustomFieldTestData.ListFieldName, names[0]);
     }
 
     [Theory]
-    [InlineData("{\"errors\":[\"Produktdaten Hierarchie darf nicht leer sein\"]}", "Produktdaten Hierarchie")]
+    [InlineData("{\"errors\":[\"Product Category cannot be blank\"]}", "Product Category")]
     [InlineData("{\"errors\":[\"Support Project cannot be blank\"]}", "Support Project")]
-    [InlineData("{\"errors\":[\"Kostenstelle muss ausgefüllt werden\"]}", "Kostenstelle")]
+    [InlineData("{\"errors\":[\"Cost center cannot be blank\"]}", "Cost center")]
     public void ParseRequiredFieldNames_extracts_field_name(string body, string expectedName)
     {
         var names = TimeEntryCustomFieldProbe.ParseRequiredFieldNames(body);

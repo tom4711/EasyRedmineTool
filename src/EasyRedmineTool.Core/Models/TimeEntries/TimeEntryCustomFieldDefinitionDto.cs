@@ -20,6 +20,8 @@ public class TimeEntryCustomFieldDefinitionDto
 
     public IReadOnlyList<string> PossibleValues { get; set; } = [];
 
+    public bool Multiple { get; set; }
+
     public bool HasPossibleValues =>
         PossibleValues.Count > 0 && IsListFormat();
 

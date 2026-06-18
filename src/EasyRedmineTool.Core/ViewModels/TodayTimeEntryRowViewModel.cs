@@ -336,6 +336,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             IssueId,
             projectId,
             SelectedActivity.Id,
+            SelectedActivity.Name,
             _entry.Custom_Fields,
             loadToken);
 

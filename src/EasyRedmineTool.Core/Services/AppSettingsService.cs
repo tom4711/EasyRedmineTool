@@ -109,6 +109,7 @@ public sealed class AppSettingsService : IAppSettingsService
             settings.TicketLoadTimeEntryLookbackMonths),
         TimeEntryCustomFieldDefaults = settings.TimeEntryCustomFieldDefaults ?? [],
         TimeEntryCustomFieldIdMappings = settings.TimeEntryCustomFieldIdMappings ?? [],
+        TimeEntryCustomFieldActivityRules = settings.TimeEntryCustomFieldActivityRules ?? [],
     };
 
     private static AppSettings CreateDefault() => new()

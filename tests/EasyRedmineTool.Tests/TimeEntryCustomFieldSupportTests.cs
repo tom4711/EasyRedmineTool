@@ -3,6 +3,9 @@ namespace EasyRedmineTool.Tests;
 using EasyRedmineTool.Core;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
+using EasyRedmineTool.Core.ViewModels;
+
+using System.Text.Json;
 
 public class TimeEntryCustomFieldSupportTests
 {
@@ -29,7 +32,7 @@ public class TimeEntryCustomFieldSupportTests
     public void Validate_returns_message_for_missing_required_field()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
-            [CreateDefinition(5, "Produktdaten Hierarchie", isRequired: true, projectIds: [42])],
+            [CreateDefinition(5, CustomFieldTestData.ListFieldName, isRequired: true, projectIds: [42])],
             [],
             new AppSettings(),
             projectId: 42,
@@ -37,27 +40,27 @@ public class TimeEntryCustomFieldSupportTests
 
         var message = TimeEntryCustomFieldSupport.Validate(rows);
 
-        Assert.Contains("Produktdaten Hierarchie", message, StringComparison.Ordinal);
+        Assert.Contains(CustomFieldTestData.ListFieldName, message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void CreateRows_prefers_existing_entry_values_over_defaults()
     {
         var rows = TimeEntryCustomFieldSupport.CreateRows(
-            [CreateDefinition(5, "Produktdaten Hierarchie", projectIds: [42])],
+            [CreateDefinition(5, CustomFieldTestData.ListFieldName, projectIds: [42])],
             [],
             new AppSettings
             {
                 TimeEntryCustomFieldDefaults =
                 [
-                    new TimeEntryCustomFieldDefault { Id = 5, Name = "Produktdaten Hierarchie", Value = "A" }
+                    new TimeEntryCustomFieldDefault { Id = 5, Name = CustomFieldTestData.ListFieldName, Value = "A" }
                 ]
             },
             projectId: 42,
             activityId: 10,
             existingValues:
             [
-                new TimeEntryCustomFieldValueDto { Id = 5, Name = "Produktdaten Hierarchie", Value = "B" }
+                new TimeEntryCustomFieldValueDto { Id = 5, Name = CustomFieldTestData.ListFieldName, Value = "B" }
             ]);
 
         Assert.Single(rows);
@@ -73,8 +76,8 @@ public class TimeEntryCustomFieldSupportTests
                 new TimeEntryCustomFieldValueDto
                 {
                     Id = 5,
-                    Name = "Produktdaten Hierarchie",
-                    Value = "Projekt A"
+                    Name = CustomFieldTestData.ListFieldName,
+                    Value = "Value A"
                 }
             ],
             new AppSettings(),
@@ -92,7 +95,7 @@ public class TimeEntryCustomFieldSupportTests
                 new TimeEntryCustomFieldDefinitionDto
                 {
                     Id = 7,
-                    Name = "Kostenstelle",
+                    Name = "Cost center",
                     FieldFormat = "list",
                     IsRequired = true,
                     IsForAll = false,
@@ -119,13 +122,13 @@ public class TimeEntryCustomFieldSupportTests
                 new TimeEntryCustomFieldDefinitionDto
                 {
                     Id = 1,
-                    Name = "Projekt A Feld",
+                    Name = "Project A field",
                     ProjectIds = [10]
                 },
                 new TimeEntryCustomFieldDefinitionDto
                 {
                     Id = 2,
-                    Name = "Projekt B Feld",
+                    Name = "Project B field",
                     ProjectIds = [20]
                 }
             ],
@@ -145,14 +148,14 @@ public class TimeEntryCustomFieldSupportTests
                 new TimeEntryCustomFieldDefinitionDto
                 {
                     Id = 5,
-                    Name = "Produktdaten Hierarchie",
+                    Name = CustomFieldTestData.ListFieldName,
                     IsProjectScoped = true,
                     ActivityIds = [100]
                 },
                 new TimeEntryCustomFieldDefinitionDto
                 {
                     Id = 6,
-                    Name = "Anderes Feld",
+                    Name = "Other field",
                     IsProjectScoped = true,
                     ActivityIds = [200]
                 }
@@ -211,5 +214,92 @@ public class TimeEntryCustomFieldSupportTests
         Assert.Single(values);
         Assert.Equal(1, values[0].Id);
         Assert.Equal("x", values[0].Value);
+    }
+
+    [Fact]
+    public void Searchable_row_filters_possible_values_by_contains()
+    {
+        var row = new TimeEntryCustomFieldRowViewModel(
+            id: 12,
+            name: CustomFieldTestData.ListFieldName,
+            isRequired: true,
+            hasPossibleValues: true,
+            isSearchableList: true,
+            isMultiple: true,
+            possibleValues: CustomFieldTestData.ThreeOptions);
+
+        row.SearchText = "Alpha";
+
+        Assert.Equal([CustomFieldTestData.OptionAlpha], row.FilteredPossibleValues);
+    }
+
+    [Fact]
+    public void BuildValues_serializes_multiple_selection_as_array()
+    {
+        var row = new TimeEntryCustomFieldRowViewModel(
+            id: 12,
+            name: CustomFieldTestData.ListFieldName,
+            isRequired: true,
+            hasPossibleValues: true,
+            isSearchableList: true,
+            isMultiple: true,
+            possibleValues: CustomFieldTestData.TwoOptions,
+            selectedValues: CustomFieldTestData.TwoOptions);
+
+        var values = TimeEntryCustomFieldSupport.BuildValues([row]);
+
+        Assert.Single(values);
+        Assert.True(values[0].IsMultiple);
+        Assert.Equal(CustomFieldTestData.TwoOptions, values[0].Values);
+    }
+
+    [Fact]
+    public void CreateRows_loads_multiple_values_from_existing_entry()
+    {
+        var rows = TimeEntryCustomFieldSupport.CreateRows(
+            [
+                new TimeEntryCustomFieldDefinitionDto
+                {
+                    Id = 12,
+                    Name = CustomFieldTestData.ListFieldName,
+                    FieldFormat = "list",
+                    Multiple = true,
+                    IsProjectScoped = true,
+                    PossibleValues = CustomFieldTestData.TwoOptions
+                }
+            ],
+            [],
+            new AppSettings(),
+            projectId: 42,
+            activityId: CustomFieldTestData.ActivityId,
+            existingValues:
+            [
+                new TimeEntryCustomFieldValueDto
+                {
+                    Id = 12,
+                    Name = CustomFieldTestData.ListFieldName,
+                    Multiple = true,
+                    SelectedValues = CustomFieldTestData.TwoOptions.ToList()
+                }
+            ]);
+
+        Assert.Single(rows);
+        Assert.True(rows[0].IsMultiple);
+        Assert.Equal(2, rows[0].SelectedValues.Count);
+    }
+
+    [Fact]
+    public void Deserialize_custom_field_value_supports_string_or_array()
+    {
+        var single = JsonSerializer.Deserialize<TimeEntryCustomFieldValueDto>(
+            $$"""{"id":12,"value":"{{CustomFieldTestData.OptionAlpha}}"}""",
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        var multiple = JsonSerializer.Deserialize<TimeEntryCustomFieldValueDto>(
+            $$"""{"id":12,"multiple":true,"value":["{{CustomFieldTestData.OptionAlpha}}","{{CustomFieldTestData.OptionBeta}}"]}""",
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.Equal([CustomFieldTestData.OptionAlpha], single!.SelectedValues);
+        Assert.Equal(CustomFieldTestData.TwoOptions, multiple!.SelectedValues);
     }
 }

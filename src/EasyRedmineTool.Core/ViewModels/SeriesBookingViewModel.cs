@@ -710,6 +710,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             ticketId,
             projectId,
             SelectedActivity.Id,
+            SelectedActivity.Name,
             cancellationToken: loadToken);
 
         if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))

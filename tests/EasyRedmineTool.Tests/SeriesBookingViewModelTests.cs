@@ -230,6 +230,7 @@ public class SeriesBookingViewModelTests
             int? issueId = null,
             int? projectId = null,
             int? activityId = null,
+            string? activityName = null,
             IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(TimeEntryCustomFieldSupport.CreateRows([], [], settings, projectId, activityId, existingValues));

@@ -35,6 +35,7 @@ public class TimeEntryService(
         int? issueId = null,
         int? projectId = null,
         int? activityId = null,
+        string? activityName = null,
         IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
         CancellationToken cancellationToken = default)
     {
@@ -43,51 +44,71 @@ public class TimeEntryService(
             return [];
         }
 
-        var definitions = await GetCustomFieldDefinitionsAsync(
-            settings.BaseUrl,
-            settings.ApiKey,
-            issueId,
-            projectId,
+        var settingsDirectory = Path.GetDirectoryName(_appSettingsService.SettingsFilePath);
+        var configuredRules = TimeEntryCustomFieldSettingsRules.Resolve(
+            settings,
             activityId,
-            cancellationToken);
+            activityName,
+            settingsDirectory);
+        IReadOnlyList<TimeEntryCustomFieldDefinitionDto> definitions;
 
-        if (definitions.Count == 0 && issueId.HasValue && activityId.HasValue)
+        if (configuredRules.Definitions.Count > 0)
         {
-            definitions = await ProbeCustomFieldDefinitionsAsync(
-                settings,
-                issueId.Value,
-                projectId,
-                activityId.Value,
-                cancellationToken);
+            definitions = configuredRules.Definitions;
         }
-
-        IReadOnlyList<TimeEntryCustomFieldValueDto> recentValues = [];
-        try
+        else
         {
-            recentValues = await GetRecentCustomFieldValuesAsync(
+            definitions = await GetCustomFieldDefinitionsAsync(
                 settings.BaseUrl,
                 settings.ApiKey,
                 issueId,
                 projectId,
                 activityId,
                 cancellationToken);
+
+            if (definitions.Count == 0 && issueId.HasValue && activityId.HasValue)
+            {
+                definitions = await ProbeCustomFieldDefinitionsAsync(
+                    settings,
+                    issueId.Value,
+                    projectId,
+                    activityId.Value,
+                    cancellationToken);
+            }
         }
-        catch (OperationCanceledException)
+
+        IReadOnlyList<TimeEntryCustomFieldValueDto> recentValues = [];
+        if (configuredRules.Definitions.Count == 0)
         {
-            throw;
+            try
+            {
+                recentValues = await GetRecentCustomFieldValuesAsync(
+                    settings.BaseUrl,
+                    settings.ApiKey,
+                    issueId,
+                    projectId,
+                    activityId,
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (RedmineApiException)
+            {
+                // Recent values are optional when definitions are available.
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Letzte Custom-Field-Werte konnten nicht geladen werden (Issue {IssueId}, Projekt {ProjectId}).",
+                    issueId,
+                    projectId);
+            }
         }
-        catch (RedmineApiException)
-        {
-            // Recent values are optional when definitions are available.
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Letzte Custom-Field-Werte konnten nicht geladen werden (Issue {IssueId}, Projekt {ProjectId}).",
-                issueId,
-                projectId);
-        }
+
+        var mergedExisting = MergeConfiguredValues(existingValues, configuredRules.DefaultValues);
 
         return TimeEntryCustomFieldSupport.CreateRows(
             definitions,
@@ -95,7 +116,7 @@ public class TimeEntryService(
             settings,
             projectId,
             activityId,
-            existingValues);
+            mergedExisting);
     }
 
     public Task ResolveCustomFieldIdsAsync(
@@ -117,7 +138,7 @@ public class TimeEntryService(
             }
 
             rows.Remove(row);
-            rows.Add(TimeEntryCustomFieldSupport.CreateProbedRow(resolvedId.Value, row.Name, row.Value));
+            rows.Add(TimeEntryCustomFieldSupport.CreateProbedRow(resolvedId.Value, row.Name, row.Value, row.IsMultiple));
         }
 
         return Task.CompletedTask;
@@ -157,12 +178,19 @@ public class TimeEntryService(
                 PersistResolvedCustomFieldId(name, resolvedId);
             }
 
-            rows.Add(TimeEntryCustomFieldSupport.CreateProbedRow(resolvedId, name));
+            var isMultiple = ResolveIsMultipleFromSettings(settings, name);
+            rows.Add(TimeEntryCustomFieldSupport.CreateProbedRow(resolvedId, name, isMultiple: isMultiple));
             addedNames.Add(name);
         }
 
         return Task.FromResult<IReadOnlyList<string>>(addedNames);
     }
+
+    private static bool ResolveIsMultipleFromSettings(AppSettings settings, string fieldName) =>
+        settings.TimeEntryCustomFieldActivityRules
+            .SelectMany(rule => rule.Fields)
+            .FirstOrDefault(field => string.Equals(field.Name, fieldName, StringComparison.OrdinalIgnoreCase))
+            ?.IsMultiple ?? false;
 
     private async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(
         string baseUrl,
@@ -260,7 +288,29 @@ public class TimeEntryService(
     private static int? ResolveKnownCustomFieldId(AppSettings settings, string fieldName) =>
         settings.TimeEntryCustomFieldIdMappings
             .FirstOrDefault(mapping => string.Equals(mapping.Name, fieldName, StringComparison.OrdinalIgnoreCase))
-            ?.Id;
+            ?.Id
+        ?? TimeEntryCustomFieldSettingsRules.ResolveFieldId(settings, fieldName);
+
+    private static IReadOnlyList<TimeEntryCustomFieldValueDto>? MergeConfiguredValues(
+        IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues,
+        IReadOnlyList<TimeEntryCustomFieldValueDto> configuredValues)
+    {
+        if (configuredValues.Count == 0)
+        {
+            return existingValues;
+        }
+
+        var merged = existingValues?.ToList() ?? [];
+        foreach (var value in configuredValues)
+        {
+            if (merged.All(existing => existing.Id != value.Id))
+            {
+                merged.Add(value);
+            }
+        }
+
+        return merged;
+    }
 
     private void PersistResolvedCustomFieldId(string fieldName, int id)
     {

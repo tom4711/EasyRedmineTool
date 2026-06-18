@@ -24,4 +24,6 @@ public class AppSettings
     public List<TimeEntryCustomFieldDefault> TimeEntryCustomFieldDefaults { get; set; } = [];
 
     public List<TimeEntryCustomFieldIdMapping> TimeEntryCustomFieldIdMappings { get; set; } = [];
+
+    public List<TimeEntryCustomFieldActivityRule> TimeEntryCustomFieldActivityRules { get; set; } = [];
 }

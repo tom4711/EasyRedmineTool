@@ -144,11 +144,55 @@ public class TimeEntryServiceTests
         Assert.Equal(2, apiClient.ActivityLoadCount);
     }
 
+    [Fact]
+    public async Task GetCustomFieldRowsAsync_uses_activity_rules_without_api_lookup()
+    {
+        var apiClient = new FakeApiClient();
+        var service = CreateService(apiClient, new RecordingTicketService());
+        var settings = new AppSettings
+        {
+            ApiKey = "secret",
+            TimeEntryCustomFieldActivityRules =
+            [
+                new TimeEntryCustomFieldActivityRule
+                {
+                    ActivityName = CustomFieldTestData.ActivityName,
+                    Fields =
+                    [
+                        new TimeEntryCustomFieldActivityRuleField
+                        {
+                            Name = CustomFieldTestData.ListFieldName,
+                            Id = 55,
+                            DefaultValue = "Category > Item",
+                            IsRequired = true
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var rows = await service.GetCustomFieldRowsAsync(
+            settings,
+            issueId: 42,
+            projectId: 7,
+            activityId: CustomFieldTestData.ActivityId,
+            activityName: CustomFieldTestData.ActivityName);
+
+        Assert.Equal(0, apiClient.CustomFieldDefinitionLoadCount);
+        Assert.Equal(0, apiClient.RecentCustomFieldValuesLoadCount);
+        Assert.Single(rows);
+        Assert.Equal(55, rows[0].Id);
+        Assert.True(string.IsNullOrWhiteSpace(rows[0].Value));
+        Assert.Empty(rows[0].SelectedValues);
+    }
+
     private sealed class FakeApiClient : Core.Api.IEasyRedmineApiClient
     {
         public HttpResponseMessage CreateResponse { get; set; } = new(HttpStatusCode.OK);
         public Exception? GetTimeEntriesException { get; set; }
         public int ActivityLoadCount { get; private set; }
+        public int CustomFieldDefinitionLoadCount { get; private set; }
+        public int RecentCustomFieldValuesLoadCount { get; private set; }
 
         public Task<HttpResponseMessage> GetCurrentUserAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
@@ -216,8 +260,11 @@ public class TimeEntryServiceTests
             int? issueId = null,
             int? projectId = null,
             int? activityId = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<TimeEntryCustomFieldValueDto>>([]);
+            CancellationToken cancellationToken = default)
+        {
+            RecentCustomFieldValuesLoadCount++;
+            return Task.FromResult<IReadOnlyList<TimeEntryCustomFieldValueDto>>([]);
+        }
 
         public Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetTimeEntryCustomFieldDefinitionsAsync(
             string baseUrl,
@@ -225,8 +272,11 @@ public class TimeEntryServiceTests
             int? issueId = null,
             int? projectId = null,
             int? activityId = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>>([]);
+            CancellationToken cancellationToken = default)
+        {
+            CustomFieldDefinitionLoadCount++;
+            return Task.FromResult<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>>([]);
+        }
 
         public Task<HttpResponseMessage> CreateTimeEntryAsync(
             string baseUrl,
