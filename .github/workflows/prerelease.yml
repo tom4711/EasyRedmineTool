@@ -35,13 +35,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -71,13 +71,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -99,7 +99,7 @@ jobs:
           echo "ARCHIVE_NAME=$archive" >> $env:GITHUB_ENV
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: EasyRedmineTool-${{ needs.prepare.outputs.version_label }}-win-x64
           path: ${{ env.ARCHIVE_NAME }}
@@ -116,13 +116,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -144,7 +144,7 @@ jobs:
           echo "ARCHIVE_NAME=${archive}" >> "$GITHUB_ENV"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: EasyRedmineTool-${{ needs.prepare.outputs.version_label }}-${{ matrix.rid }}
           path: ${{ env.ARCHIVE_NAME }}
@@ -161,13 +161,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -188,7 +188,7 @@ jobs:
           echo "ARCHIVE_NAME=${archive}" >> "$GITHUB_ENV"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: EasyRedmineTool-${{ needs.prepare.outputs.version_label }}-${{ matrix.rid }}
           path: ${{ env.ARCHIVE_NAME }}
@@ -201,14 +201,14 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: EasyRedmineTool-${{ needs.prepare.outputs.version_label }}-*
           merge-multiple: true
           path: release-assets
 
       - name: Create GitHub prerelease
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.version_label }}
           name: EasyRedmineTool ${{ needs.prepare.outputs.version_label }}
