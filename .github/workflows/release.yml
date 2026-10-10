@@ -73,11 +73,7 @@ jobs:
 
   release-macos:
     needs: validate
-    runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        rid: [osx-x64, osx-arm64]
+    runs-on: macos-14
 
     steps:
       - name: Checkout
@@ -90,27 +86,63 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Publish macOS ${{ matrix.rid }}
-        run: >
-          dotnet publish src/EasyRedmineTool.Desktop/EasyRedmineTool.Desktop.csproj
-          --configuration Release
-          --runtime ${{ matrix.rid }}
-          --self-contained true
-          -p:PublishSingleFile=false
-          --output publish/${{ matrix.rid }}
+      - name: Publish macOS arm64 and x64 (single-file)
+        run: |
+          set -euo pipefail
+          for rid in osx-arm64 osx-x64; do
+            dotnet publish src/EasyRedmineTool.Desktop/EasyRedmineTool.Desktop.csproj \
+              --configuration Release \
+              --runtime "$rid" \
+              --self-contained true \
+              -p:PublishSingleFile=true \
+              --output "publish/$rid"
+          done
+
+      - name: Create universal binary
+        run: |
+          set -euo pipefail
+          rm -rf publish/osx-universal
+          cp -R publish/osx-arm64 publish/osx-universal
+          lipo -create \
+            publish/osx-arm64/EasyRedmineTool.Desktop \
+            publish/osx-x64/EasyRedmineTool.Desktop \
+            -output publish/osx-universal/EasyRedmineTool.Desktop
+          chmod +x publish/osx-universal/EasyRedmineTool.Desktop
+          lipo -info publish/osx-universal/EasyRedmineTool.Desktop
+          rm -rf publish/osx-arm64 publish/osx-x64
+
+      - name: Sign and notarize
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPLE_CERTIFICATE_BASE64}" || -z "${APPLE_API_KEY_BASE64}" ]]; then
+            echo "::error::macOS signing secrets missing. See docs/MACOS_SIGNING.md"
+            exit 1
+          fi
+          export APP_VERSION="${GITHUB_REF_NAME#v}"
+          chmod +x scripts/macos-sign-notarize.sh
+          scripts/macos-sign-notarize.sh "publish/osx-universal"
 
       - name: Create ZIP archive
         run: |
+          set -euo pipefail
           version="${{ github.ref_name }}"
-          archive="EasyRedmineTool-${version}-${{ matrix.rid }}.zip"
-          cd "publish/${{ matrix.rid }}"
-          zip -r "../../${archive}" .
+          archive="EasyRedmineTool-${version}-osx-universal.zip"
+          cp docs/macos-starten.txt publish/osx-universal/macos-starten.txt
+          (cd publish/osx-universal && zip -ry "../../${archive}" EasyRedmineTool.app macos-starten.txt)
           echo "ARCHIVE_NAME=${archive}" >> "$GITHUB_ENV"
+          ls -lh "${archive}"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v6
         with:
-          name: EasyRedmineTool-${{ github.ref_name }}-${{ matrix.rid }}
+          name: EasyRedmineTool-${{ github.ref_name }}-osx-universal
           path: ${{ env.ARCHIVE_NAME }}
           retention-days: 90
 
