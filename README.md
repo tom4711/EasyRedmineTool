@@ -178,8 +178,7 @@ Der [Release-Workflow](.github/workflows/release.yml) führt Tests aus und verö
 | Plattform | Artefakt |
 |-----------|----------|
 | **Windows** | `EasyRedmineTool-v*-win-x64.zip` |
-| **macOS Intel** | `EasyRedmineTool-v*-osx-x64.zip` |
-| **macOS Apple Silicon** | `EasyRedmineTool-v*-osx-arm64.zip` |
+| **macOS (Universal)** | `EasyRedmineTool-v*-osx-universal.zip` |
 | **Linux x64** | `EasyRedmineTool-v*-linux-x64.tar.gz` |
 | **Linux ARM64** | `EasyRedmineTool-v*-linux-arm64.tar.gz` |
 
@@ -189,20 +188,16 @@ Vorab-Versionen (`v1.0.0-beta.1`) werden als Pre-Release markiert.
 
 ZIP entpacken und `EasyRedmineTool.Desktop.exe` starten.
 
-### macOS (unsigned)
+### macOS
 
-Die macOS-Builds sind **nicht** mit Apple signiert oder notarisiert. Beim ersten Start kann Gatekeeper warnen (*„App kann nicht geprüft werden“*).
-
-- Rechtsklick auf `EasyRedmineTool.Desktop` → **Öffnen**, oder
-- Systemeinstellungen → Datenschutz & Sicherheit → **Trotzdem öffnen**
-
-Für breite Verteilung ohne Warnungen wäre ein Apple Developer Program und Notarisierung nötig.
+ZIP entpacken und `EasyRedmineTool.app` per Doppelklick starten (signiert, notarisiert und stapled).
 
 ```bash
-unzip EasyRedmineTool-v*-osx-arm64.zip -d EasyRedmineTool
-chmod +x EasyRedmineTool/EasyRedmineTool.Desktop
-./EasyRedmineTool/EasyRedmineTool.Desktop
+unzip EasyRedmineTool-v*-osx-universal.zip -d EasyRedmineTool
+open EasyRedmineTool/EasyRedmineTool.app
 ```
+
+Universal Binary: läuft auf Apple Silicon und Intel. Details zur Signierung: [docs/MACOS_SIGNING.md](docs/MACOS_SIGNING.md).
 
 ### Linux
 
@@ -217,6 +212,7 @@ chmod +x EasyRedmineTool/EasyRedmineTool.Desktop
 ## Weitere Dokumentation
 
 - [Redmine Time-Entries API (Referenz)](docs/API-TimeEntries.md)
+- [macOS-Signierung und Notarisierung](docs/MACOS_SIGNING.md)
 
 ---
 
