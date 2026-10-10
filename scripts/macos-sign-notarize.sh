@@ -86,8 +86,32 @@ if [[ -f "$ICON_SRC" ]]; then
   cp "$ICON_SRC" "$RES_DIR/AppIcon.icns"
 fi
 
-sed "s/__VERSION__/${APP_VERSION//\//\\/}/g" "$PLIST_TEMPLATE" \
+# CFBundleVersion must be numeric (dot-separated integers); strip any prerelease suffix
+# (e.g. 1.0.0-beta.1 -> 1.0.0). CFBundleShortVersionString keeps the full version.
+BUILD_VERSION="${APP_VERSION%%-*}"
+if [[ ! "$BUILD_VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+  echo "Invalid numeric build version '$BUILD_VERSION' derived from APP_VERSION='$APP_VERSION'" >&2
+  exit 1
+fi
+sed -e "s/__BUILD_VERSION__/${BUILD_VERSION//\//\\/}/g" \
+    -e "s/__VERSION__/${APP_VERSION//\//\\/}/g" "$PLIST_TEMPLATE" \
   > "$STAGING/EasyRedmineTool.app/Contents/Info.plist"
+
+# Guard: with PublishSingleFile + IncludeNativeLibrariesForSelfExtract the main executable
+# is the only Mach-O in the bundle. Any other Mach-O (e.g. loose Avalonia .dylib) would be
+# unsigned and fail notarization, so fail early with a clear message.
+EXTRA_MACHO=()
+while IFS= read -r -d '' f; do
+  [[ "$f" == "$MACOS_DIR/EasyRedmineTool.Desktop" ]] && continue
+  if file -b "$f" | grep -q 'Mach-O'; then
+    EXTRA_MACHO+=("${f#"$STAGING/"}")
+  fi
+done < <(find "$STAGING/EasyRedmineTool.app" -type f -print0)
+if [[ ${#EXTRA_MACHO[@]} -gt 0 ]]; then
+  echo "Unexpected unsigned Mach-O file(s) in bundle (publish with -p:IncludeNativeLibrariesForSelfExtract=true):" >&2
+  printf '  %s\n' "${EXTRA_MACHO[@]}" >&2
+  exit 1
+fi
 
 codesign --force --options runtime --timestamp \
   --keychain "$KEYCHAIN" \

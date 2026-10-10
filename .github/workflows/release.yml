@@ -95,6 +95,7 @@ jobs:
               --runtime "$rid" \
               --self-contained true \
               -p:PublishSingleFile=true \
+              -p:IncludeNativeLibrariesForSelfExtract=true \
               --output "publish/$rid"
           done
 
@@ -109,6 +110,23 @@ jobs:
             -output publish/osx-universal/EasyRedmineTool.Desktop
           chmod +x publish/osx-universal/EasyRedmineTool.Desktop
           lipo -info publish/osx-universal/EasyRedmineTool.Desktop
+          # Every Mach-O in the universal output must contain both architectures.
+          macho_count=0
+          while IFS= read -r -d '' f; do
+            if file -b "$f" | grep -q 'Mach-O'; then
+              macho_count=$((macho_count + 1))
+              archs=$(lipo -archs "$f")
+              echo "$f: $archs"
+              if [[ " $archs " != *" x86_64 "* || " $archs " != *" arm64 "* ]]; then
+                echo "::error::Not a universal binary (archs: $archs): $f"
+                exit 1
+              fi
+            fi
+          done < <(find publish/osx-universal -type f -print0)
+          if [[ "$macho_count" -eq 0 ]]; then
+            echo "::error::No Mach-O files found in publish/osx-universal"
+            exit 1
+          fi
           rm -rf publish/osx-arm64 publish/osx-x64
 
       - name: Sign and notarize
@@ -125,6 +143,8 @@ jobs:
             echo "::error::macOS signing secrets missing. See docs/MACOS_SIGNING.md"
             exit 1
           fi
+          # Full version (e.g. 1.0.0-beta.1) -> CFBundleShortVersionString;
+          # the script derives a numeric-only CFBundleVersion (1.0.0) from it.
           export APP_VERSION="${GITHUB_REF_NAME#v}"
           chmod +x scripts/macos-sign-notarize.sh
           scripts/macos-sign-notarize.sh "publish/osx-universal"
