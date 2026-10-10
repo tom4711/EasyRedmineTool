@@ -1,0 +1,13 @@
+EasyRedmineTool auf macOS starten
+=================================
+
+1. ZIP entpacken
+2. EasyRedmineTool.app per Doppelklick starten
+   (signiert + notarized + stapled — kein Gatekeeper-„Papierkorb“-Dialog)
+
+Einstellungen/API-Schlüssel:
+  ~/Library/Application Support/EasyRedmineTool/settings.json
+
+Universal Binary (Apple Silicon + Intel): EasyRedmineTool-*-osx-universal.zip
+
+Details: docs/MACOS_SIGNING.md
