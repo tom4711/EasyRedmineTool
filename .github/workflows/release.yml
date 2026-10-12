@@ -65,7 +65,7 @@ jobs:
           echo "ARCHIVE_NAME=$archive" >> $env:GITHUB_ENV
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: EasyRedmineTool-${{ github.ref_name }}-win-x64
           path: ${{ env.ARCHIVE_NAME }}
@@ -160,7 +160,7 @@ jobs:
           ls -lh "${archive}"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: EasyRedmineTool-${{ github.ref_name }}-osx-universal
           path: ${{ env.ARCHIVE_NAME }}
@@ -202,7 +202,7 @@ jobs:
           echo "ARCHIVE_NAME=${archive}" >> "$GITHUB_ENV"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: EasyRedmineTool-${{ github.ref_name }}-${{ matrix.rid }}
           path: ${{ env.ARCHIVE_NAME }}
@@ -214,7 +214,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: EasyRedmineTool-*
           merge-multiple: true
