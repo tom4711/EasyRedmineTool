@@ -61,6 +61,38 @@ public interface IEasyRedmineApiClient
         string apiKey,
         int? issueId = null,
         int? projectId = null,
+        int? activityId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetTimeEntryCustomFieldDefinitionsAsync(
+        string baseUrl,
+        string apiKey,
+        int? issueId = null,
+        int? projectId = null,
+        int? activityId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> ProbeRequiredTimeEntryCustomFieldNamesAsync(
+        string baseUrl,
+        string apiKey,
+        int issueId,
+        int activityId,
+        CancellationToken cancellationToken = default);
+
+    Task<int?> TryResolveTimeEntryCustomFieldIdAsync(
+        string baseUrl,
+        string apiKey,
+        string fieldName,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> SearchTimeEntryCustomFieldValuesAsync(
+        string baseUrl,
+        string apiKey,
+        int customFieldId,
+        string query,
+        int? issueId = null,
+        int? projectId = null,
+        int? activityId = null,
         CancellationToken cancellationToken = default);
 
     Task<HttpResponseMessage> CreateTimeEntryAsync(

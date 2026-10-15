@@ -21,7 +21,10 @@ public static class ServiceCollectionExtensions
             builder.SetMinimumLevel(LogLevel.Information);
         });
 
-        services.AddHttpClient<IEasyRedmineApiClient, EasyRedmineApiClient>();
+        services.AddHttpClient<IEasyRedmineApiClient, EasyRedmineApiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
 
         services.AddHttpClient<IUpdateCheckService, UpdateCheckService>(client =>
         {

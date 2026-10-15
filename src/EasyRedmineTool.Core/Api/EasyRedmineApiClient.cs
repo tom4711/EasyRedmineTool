@@ -341,21 +341,26 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         string apiKey,
         int? issueId = null,
         int? projectId = null,
+        int? activityId = null,
         CancellationToken cancellationToken = default)
     {
         var endpoints = new List<string>();
+        var activityQuery = activityId.HasValue ? $"&activity_id={activityId.Value}" : string.Empty;
 
         if (issueId.HasValue)
         {
-            endpoints.Add($"time_entries.json?issue_id={issueId.Value}&user_id=me&limit=1");
+            endpoints.Add($"time_entries.json?issue_id={issueId.Value}&user_id=me&limit=1{activityQuery}");
         }
 
         if (projectId.HasValue)
         {
-            endpoints.Add($"time_entries.json?project_id={projectId.Value}&user_id=me&limit=1");
+            endpoints.Add($"time_entries.json?project_id={projectId.Value}&user_id=me&limit=1{activityQuery}");
         }
 
-        endpoints.Add("time_entries.json?user_id=me&limit=1");
+        if (!activityId.HasValue)
+        {
+            endpoints.Add("time_entries.json?user_id=me&limit=1");
+        }
 
         RedmineApiException? lastFailure = null;
         var hadSuccessfulResponse = false;
@@ -385,6 +390,314 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         }
 
         return [];
+    }
+
+    public async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> GetTimeEntryCustomFieldDefinitionsAsync(
+        string baseUrl,
+        string apiKey,
+        int? issueId = null,
+        int? projectId = null,
+        int? activityId = null,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var endpoint in BuildCustomFieldDefinitionEndpoints(issueId, projectId, activityId))
+        {
+            var definitions = await TryLoadCustomFieldDefinitionsAsync(baseUrl, apiKey, endpoint, cancellationToken);
+            if (definitions.Count > 0)
+            {
+                return definitions;
+            }
+        }
+
+        if (issueId.HasValue || projectId.HasValue)
+        {
+            return [];
+        }
+
+        return await TryLoadCustomFieldDefinitionsAsync(baseUrl, apiKey, "custom_fields.json", cancellationToken);
+    }
+
+    private static IEnumerable<string> BuildCustomFieldDefinitionEndpoints(
+        int? issueId,
+        int? projectId,
+        int? activityId)
+    {
+        var activityQuery = activityId.HasValue
+            ? $"?activity_id={activityId.Value}"
+            : string.Empty;
+        var activityQueryAmp = activityId.HasValue
+            ? $"&activity_id={activityId.Value}"
+            : string.Empty;
+
+        if (issueId.HasValue)
+        {
+            yield return $"issues/{issueId.Value}/time_entry_custom_fields.json{activityQuery}";
+            yield return $"issues/{issueId.Value}.json?include=time_entry_custom_fields{activityQueryAmp}";
+        }
+
+        if (projectId.HasValue)
+        {
+            yield return $"projects/{projectId.Value}/time_entry_custom_fields.json{activityQuery}";
+            yield return $"projects/{projectId.Value}.json?include=time_entry_custom_fields{activityQueryAmp}";
+        }
+    }
+
+    private async Task<IReadOnlyList<TimeEntryCustomFieldDefinitionDto>> TryLoadCustomFieldDefinitionsAsync(
+        string baseUrl,
+        string apiKey,
+        string endpoint,
+        CancellationToken cancellationToken)
+    {
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        return ParseCustomFieldDefinitions(json);
+    }
+
+    public async Task<IReadOnlyList<string>> ProbeRequiredTimeEntryCustomFieldNamesAsync(
+        string baseUrl,
+        string apiKey,
+        int issueId,
+        int activityId,
+        CancellationToken cancellationToken = default)
+    {
+        using var message = CreateRequest(HttpMethod.Post, baseUrl, apiKey, "time_entries.json");
+        message.Content = JsonContent.Create(new
+        {
+            time_entry = new
+            {
+                issue_id = issueId,
+                hours = 0.01,
+                spent_on = DateTime.Today.ToString("yyyy-MM-dd"),
+                activity_id = activityId,
+                comments = string.Empty
+            }
+        });
+
+        using var response = await _httpClient.SendAsync(message, cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            await TryDeleteProbeTimeEntryAsync(baseUrl, apiKey, response, cancellationToken);
+            return [];
+        }
+
+        if ((int)response.StatusCode != 422)
+        {
+            return [];
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        return TimeEntryCustomFieldProbe.ParseRequiredFieldNames(body);
+    }
+
+    private async Task TryDeleteProbeTimeEntryAsync(
+        string baseUrl,
+        string apiKey,
+        HttpResponseMessage createResponse,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var json = await createResponse.Content.ReadAsStringAsync(cancellationToken);
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("time_entry", out var timeEntry)
+                || !timeEntry.TryGetProperty("id", out var idProperty)
+                || !idProperty.TryGetInt32(out var timeEntryId))
+            {
+                return;
+            }
+
+            using var deleteRequest = CreateRequest(HttpMethod.Delete, baseUrl, apiKey, $"time_entries/{timeEntryId}.json");
+            using var _ = await _httpClient.SendAsync(deleteRequest, cancellationToken);
+        }
+        catch
+        {
+            // Probe cleanup is best-effort.
+        }
+    }
+
+    public async Task<int?> TryResolveTimeEntryCustomFieldIdAsync(
+        string baseUrl,
+        string apiKey,
+        string fieldName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(fieldName))
+        {
+            return null;
+        }
+
+        var fromIndex = await TryResolveFromCustomFieldsIndexAsync(baseUrl, apiKey, fieldName, cancellationToken);
+        return fromIndex;
+    }
+
+    public async Task<IReadOnlyList<string>> SearchTimeEntryCustomFieldValuesAsync(
+        string baseUrl,
+        string apiKey,
+        int customFieldId,
+        string query,
+        int? issueId = null,
+        int? projectId = null,
+        int? activityId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        var encodedQuery = Uri.EscapeDataString(query);
+        var endpoints = new List<string>
+        {
+            $"auto_completes/easy_dependent_enumeration_custom_field_values.json?custom_field_id={customFieldId}&q={encodedQuery}",
+            $"auto_completes/easy_custom_field_enumerations.json?custom_field_id={customFieldId}&q={encodedQuery}",
+            $"auto_completes/custom_field_enumerations.json?custom_field_id={customFieldId}&q={encodedQuery}",
+            $"custom_fields/{customFieldId}/enumerations.json?term={encodedQuery}",
+        };
+
+        if (issueId.HasValue)
+        {
+            endpoints.Add(
+                $"auto_completes/easy_dependent_enumeration_custom_field_values.json?custom_field_id={customFieldId}&issue_id={issueId.Value}&q={encodedQuery}");
+        }
+
+        if (projectId.HasValue)
+        {
+            endpoints.Add(
+                $"auto_completes/easy_dependent_enumeration_custom_field_values.json?custom_field_id={customFieldId}&project_id={projectId.Value}&q={encodedQuery}");
+        }
+
+        if (activityId.HasValue)
+        {
+            endpoints.Add(
+                $"auto_completes/easy_dependent_enumeration_custom_field_values.json?custom_field_id={customFieldId}&activity_id={activityId.Value}&q={encodedQuery}");
+        }
+
+        foreach (var endpoint in endpoints)
+        {
+            using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                continue;
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            var values = ParseAutocompleteValues(json);
+            if (values.Count > 0)
+            {
+                return values;
+            }
+        }
+
+        return [];
+    }
+
+    private async Task<int?> TryResolveFromCustomFieldsIndexAsync(
+        string baseUrl,
+        string apiKey,
+        string fieldName,
+        CancellationToken cancellationToken)
+    {
+        using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, "custom_fields.json");
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("custom_fields", out var customFields)
+            || customFields.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var item in customFields.EnumerateArray())
+        {
+            if (!item.TryGetProperty("name", out var nameProperty))
+            {
+                continue;
+            }
+
+            if (!string.Equals(nameProperty.GetString(), fieldName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (item.TryGetProperty("customized_type", out var typeProperty)
+                && !IsTimeEntryCustomizedType(typeProperty.GetString()))
+            {
+                continue;
+            }
+
+            if (item.TryGetProperty("id", out var idProperty)
+                && idProperty.TryGetInt32(out var id))
+            {
+                return id;
+            }
+        }
+
+        return null;
+    }
+
+    private static List<string> ParseAutocompleteValues(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        var values = new List<string>();
+
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            CollectAutocompleteValues(root, values);
+            return values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        foreach (var propertyName in new[] { "results", "enumerations", "possible_values", "values", "items" })
+        {
+            if (root.TryGetProperty(propertyName, out var array) && array.ValueKind == JsonValueKind.Array)
+            {
+                CollectAutocompleteValues(array, values);
+            }
+        }
+
+        return values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static void CollectAutocompleteValues(JsonElement array, List<string> values)
+    {
+        foreach (var item in array.EnumerateArray())
+        {
+            switch (item.ValueKind)
+            {
+                case JsonValueKind.String:
+                    AddAutocompleteValue(values, item.GetString());
+                    break;
+                case JsonValueKind.Object when item.TryGetProperty("name", out var nameProperty):
+                    AddAutocompleteValue(values, nameProperty.GetString());
+                    break;
+                case JsonValueKind.Object when item.TryGetProperty("value", out var valueProperty):
+                    AddAutocompleteValue(values, valueProperty.GetString());
+                    break;
+                case JsonValueKind.Object when item.TryGetProperty("label", out var labelProperty):
+                    AddAutocompleteValue(values, labelProperty.GetString());
+                    break;
+            }
+        }
+    }
+
+    private static void AddAutocompleteValue(List<string> values, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            values.Add(value);
+        }
     }
 
     public async Task<HttpResponseMessage> CreateTimeEntryAsync(
@@ -475,7 +788,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
                 custom_fields = customFields.Select(field => new
                 {
                     id = field.Id,
-                    value = field.Value
+                    value = field.GetApiValue()
                 }).ToArray()
             }
         };
@@ -578,7 +891,253 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return true;
     }
 
-    private static bool TryGetArray(JsonElement source, string propertyName, out JsonElement value) 
+    private static List<TimeEntryCustomFieldDefinitionDto> ParseCustomFieldDefinitions(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        if (root.TryGetProperty("project", out var project)
+            && TryReadCustomFieldDefinitionsArray(project, requireTimeEntryType: false, isProjectScoped: true, out var projectFields))
+        {
+            return projectFields;
+        }
+
+        if (TryGetArray(root, "time_entry_custom_fields", out var timeEntryFields))
+        {
+            return ParseCustomFieldDefinitionArray(timeEntryFields, requireTimeEntryType: false, isProjectScoped: true);
+        }
+
+        if (TryGetArray(root, "custom_fields", out var customFields))
+        {
+            return ParseCustomFieldDefinitionArray(customFields, requireTimeEntryType: true, isProjectScoped: false);
+        }
+
+        return [];
+    }
+
+    private static bool TryReadCustomFieldDefinitionsArray(
+        JsonElement source,
+        bool requireTimeEntryType,
+        bool isProjectScoped,
+        out List<TimeEntryCustomFieldDefinitionDto> definitions)
+    {
+        definitions = [];
+
+        if (!TryGetArray(source, "time_entry_custom_fields", out var array))
+        {
+            return false;
+        }
+
+        definitions = ParseCustomFieldDefinitionArray(array, requireTimeEntryType, isProjectScoped);
+        return definitions.Count > 0;
+    }
+
+    private static List<TimeEntryCustomFieldDefinitionDto> ParseCustomFieldDefinitionArray(
+        JsonElement array,
+        bool requireTimeEntryType,
+        bool isProjectScoped)
+    {
+        var definitions = new List<TimeEntryCustomFieldDefinitionDto>();
+
+        foreach (var item in array.EnumerateArray())
+        {
+            if (!item.TryGetProperty("id", out var idProperty)
+                || idProperty.ValueKind != JsonValueKind.Number
+                || !idProperty.TryGetInt32(out var id))
+            {
+                continue;
+            }
+
+            if (item.TryGetProperty("customized_type", out var typeProperty))
+            {
+                if (!IsTimeEntryCustomizedType(typeProperty.GetString()))
+                {
+                    continue;
+                }
+            }
+            else if (requireTimeEntryType)
+            {
+                continue;
+            }
+
+            var name = item.TryGetProperty("name", out var nameProperty)
+                ? nameProperty.GetString() ?? string.Empty
+                : string.Empty;
+            var fieldFormat = item.TryGetProperty("field_format", out var formatProperty)
+                ? formatProperty.GetString() ?? "string"
+                : "string";
+            var isRequired = item.TryGetProperty("is_required", out var requiredProperty)
+                && requiredProperty.ValueKind == JsonValueKind.True;
+            var isForAll = !item.TryGetProperty("is_for_all", out var forAllProperty)
+                || forAllProperty.ValueKind == JsonValueKind.True;
+            var isMultiple = item.TryGetProperty("multiple", out var multipleProperty)
+                && multipleProperty.ValueKind == JsonValueKind.True;
+
+            definitions.Add(new TimeEntryCustomFieldDefinitionDto
+            {
+                Id = id,
+                Name = name,
+                FieldFormat = fieldFormat,
+                IsRequired = isRequired,
+                IsForAll = isForAll,
+                IsProjectScoped = isProjectScoped,
+                Multiple = isMultiple,
+                ProjectIds = ParseProjectIds(item),
+                ActivityIds = ParseActivityIds(item),
+                PossibleValues = ParsePossibleValues(item)
+            });
+        }
+
+        return definitions;
+    }
+
+    private static bool IsTimeEntryCustomizedType(string? customizedType) =>
+        customizedType?.Equals("time_entry", StringComparison.OrdinalIgnoreCase) == true
+        || customizedType?.Equals("TimeEntry", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static List<int> ParseProjectIds(JsonElement item)
+    {
+        var projectIds = new List<int>();
+
+        if (!TryGetArray(item, "projects", out var projects))
+        {
+            return projectIds;
+        }
+
+        foreach (var project in projects.EnumerateArray())
+        {
+            if (project.TryGetProperty("id", out var idProperty)
+                && idProperty.ValueKind == JsonValueKind.Number
+                && idProperty.TryGetInt32(out var projectId))
+            {
+                projectIds.Add(projectId);
+            }
+        }
+
+        return projectIds;
+    }
+
+    private static List<int> ParseActivityIds(JsonElement item)
+    {
+        if (TryGetIntArray(item, "activity_ids", out var activityIds)
+            || TryGetIntArray(item, "time_entry_activity_ids", out activityIds)
+            || TryGetIntArray(item, "visible_for_activity_ids", out activityIds)
+            || TryGetIntArray(item, "time_entry_activities", out activityIds))
+        {
+            return activityIds;
+        }
+
+        if (!TryGetArray(item, "activities", out var activities))
+        {
+            return [];
+        }
+
+        var ids = new List<int>();
+        foreach (var activity in activities.EnumerateArray())
+        {
+            if (activity.TryGetProperty("id", out var idProperty)
+                && idProperty.ValueKind == JsonValueKind.Number
+                && idProperty.TryGetInt32(out var activityId))
+            {
+                ids.Add(activityId);
+            }
+        }
+
+        return ids;
+    }
+
+    private static bool TryGetIntArray(JsonElement item, string propertyName, out List<int> values)
+    {
+        values = [];
+        if (!TryGetArray(item, propertyName, out var array))
+        {
+            return false;
+        }
+
+        foreach (var value in array.EnumerateArray())
+        {
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var id))
+            {
+                values.Add(id);
+            }
+        }
+
+        return values.Count > 0;
+    }
+
+    private static List<string> ParsePossibleValues(JsonElement item)
+    {
+        var values = new List<string>();
+        values.AddRange(ParsePossibleValuesFromArray(item, "possible_values"));
+        values.AddRange(ParseEnumerationNames(item));
+        return values
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IEnumerable<string> ParseEnumerationNames(JsonElement item)
+    {
+        if (!TryGetArray(item, "enumerations", out var enumerations))
+        {
+            yield break;
+        }
+
+        foreach (var enumeration in enumerations.EnumerateArray())
+        {
+            if (!enumeration.TryGetProperty("name", out var nameProperty))
+            {
+                continue;
+            }
+
+            var name = nameProperty.GetString();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                yield return name;
+            }
+        }
+    }
+
+    private static IEnumerable<string> ParsePossibleValuesFromArray(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var possibleValues)
+            || possibleValues.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var possibleValue in possibleValues.EnumerateArray())
+        {
+            switch (possibleValue.ValueKind)
+            {
+                case JsonValueKind.String:
+                    var stringValue = possibleValue.GetString();
+                    if (!string.IsNullOrWhiteSpace(stringValue))
+                    {
+                        yield return stringValue;
+                    }
+
+                    break;
+                case JsonValueKind.Object when possibleValue.TryGetProperty("value", out var valueProperty):
+                    var objectValue = valueProperty.GetString();
+                    if (!string.IsNullOrWhiteSpace(objectValue))
+                    {
+                        yield return objectValue;
+                    }
+
+                    break;
+                case JsonValueKind.Object when possibleValue.TryGetProperty("name", out var nameProperty):
+                    var nameValue = nameProperty.GetString();
+                    if (!string.IsNullOrWhiteSpace(nameValue))
+                    {
+                        yield return nameValue;
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static bool TryGetArray(JsonElement source, string propertyName, out JsonElement value)
         => source.TryGetProperty(propertyName, out value) && value.ValueKind == JsonValueKind.Array;
 
     private static bool IsLastPage(int pageItemCount, int pageLimit, int totalLoaded, int? totalCount) =>

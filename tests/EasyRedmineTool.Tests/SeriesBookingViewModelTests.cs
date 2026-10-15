@@ -221,8 +221,32 @@ public class SeriesBookingViewModelTests
             string apiKey,
             int? issueId = null,
             int? projectId = null,
+            int? activityId = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TimeEntryCustomFieldValueDto>>([]);
+
+        public Task<IReadOnlyList<TimeEntryCustomFieldRowViewModel>> GetCustomFieldRowsAsync(
+            AppSettings settings,
+            int? issueId = null,
+            int? projectId = null,
+            int? activityId = null,
+            string? activityName = null,
+            IReadOnlyList<TimeEntryCustomFieldValueDto>? existingValues = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(TimeEntryCustomFieldSupport.CreateRows([], [], settings, projectId, activityId, existingValues));
+
+        public Task ResolveCustomFieldIdsAsync(
+            AppSettings settings,
+            ICollection<TimeEntryCustomFieldRowViewModel> rows,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<string>> TryAddMissingCustomFieldsFromBookingErrorAsync(
+            AppSettings settings,
+            ICollection<TimeEntryCustomFieldRowViewModel> rows,
+            string bookingErrorMessage,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>([]);
 
         public Task<TimeEntryLoadResult> GetMyTimeEntriesAsync(
             string baseUrl,
