@@ -41,7 +41,7 @@ public class AppSettingsServiceTests
             TicketLoadTimeEntryLookbackMonths = 6,
             TimeEntryCustomFieldDefaults =
             [
-                new TimeEntryCustomFieldDefault { Id = 3, Name = "Produktdaten Hierarchie", Value = "A > B" }
+                new TimeEntryCustomFieldDefault { Id = 3, Name = CustomFieldTestData.ListFieldName, Value = "Alpha > Beta" }
             ]
         };
 
@@ -54,7 +54,7 @@ public class AppSettingsServiceTests
         Assert.True(normalized.TicketLoadIncludeTimeEntryTickets);
         Assert.Equal(6, normalized.TicketLoadTimeEntryLookbackMonths);
         Assert.Single(normalized.TimeEntryCustomFieldDefaults);
-        Assert.Equal("A > B", normalized.TimeEntryCustomFieldDefaults[0].Value);
+        Assert.Equal("Alpha > Beta", normalized.TimeEntryCustomFieldDefaults[0].Value);
     }
 
     [Fact]
