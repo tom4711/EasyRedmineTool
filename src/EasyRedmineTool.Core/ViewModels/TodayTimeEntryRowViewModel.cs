@@ -143,7 +143,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             return;
         }
 
-        if (!double.TryParse(Hours, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedHours) || parsedHours <= 0)
+        if (!TimeEntryHours.TryParsePositive(Hours, out var parsedHours))
         {
             _parent.SetStatusMessage($"Eintrag #{EntryId}: Bitte gültige Stunden eingeben.");
             return;

@@ -8,7 +8,7 @@ public class TicketLoadFilter
 
     public int? StatusId { get; set; }
 
-    public bool IncludeTimeEntryTickets { get; set; }
+    public bool OnlyTimeEntryTickets { get; set; }
 
     public int TimeEntryLookbackMonths { get; set; } = TicketLoadFilterDefaults.DefaultTimeEntryLookbackMonths;
 }

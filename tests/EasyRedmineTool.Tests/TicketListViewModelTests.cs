@@ -209,7 +209,7 @@ public class TicketListViewModelTests
         var viewModel = new TicketListViewModel(context.TicketService, context.SettingsService);
         viewModel.SelectedAssigneeFilter = viewModel.AssigneeFilterOptions.First(option => option.Value == TicketAssigneeFilter.Unassigned);
         viewModel.SelectedStatusFilter = viewModel.StatusFilterOptions.First(option => option.Value.Kind == TicketStatusFilterKind.Specific);
-        viewModel.IncludeTimeEntryTickets = true;
+        viewModel.OnlyTimeEntryTickets = true;
         viewModel.TimeEntryLookbackMonths = 6;
 
         await viewModel.LoadTicketsCommand.ExecuteAsync(null);
@@ -218,7 +218,7 @@ public class TicketListViewModelTests
         Assert.Equal(TicketAssigneeFilter.Unassigned, context.TicketService.LastFilter!.Assignee);
         Assert.Equal(TicketStatusFilterKind.Specific, context.TicketService.LastFilter.StatusKind);
         Assert.Equal(3, context.TicketService.LastFilter.StatusId);
-        Assert.True(context.TicketService.LastFilter.IncludeTimeEntryTickets);
+        Assert.True(context.TicketService.LastFilter.OnlyTimeEntryTickets);
         Assert.Equal(6, context.TicketService.LastFilter.TimeEntryLookbackMonths);
     }
 

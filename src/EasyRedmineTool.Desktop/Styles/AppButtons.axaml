@@ -9,6 +9,10 @@
           <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#1D4ED8" />
           <SolidColorBrush x:Key="AppAccentPressedBrush" Color="#1E40AF" />
           <SolidColorBrush x:Key="AppAccentForegroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppDestructiveBrush" Color="#DC2626" />
+          <SolidColorBrush x:Key="AppDestructiveHoverBrush" Color="#B91C1C" />
+          <SolidColorBrush x:Key="AppDestructivePressedBrush" Color="#991B1B" />
+          <SolidColorBrush x:Key="AppDestructiveForegroundBrush" Color="#FFFFFF" />
           <SolidColorBrush x:Key="AppSecondaryBackgroundBrush" Color="#FFFFFF" />
           <SolidColorBrush x:Key="AppSecondaryBorderBrush" Color="#D1D5DB" />
           <SolidColorBrush x:Key="AppSecondaryForegroundBrush" Color="#374151" />
@@ -24,6 +28,10 @@
           <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#60A5FA" />
           <SolidColorBrush x:Key="AppAccentPressedBrush" Color="#2563EB" />
           <SolidColorBrush x:Key="AppAccentForegroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppDestructiveBrush" Color="#991B1B" />
+          <SolidColorBrush x:Key="AppDestructiveHoverBrush" Color="#B91C1C" />
+          <SolidColorBrush x:Key="AppDestructivePressedBrush" Color="#7F1D1D" />
+          <SolidColorBrush x:Key="AppDestructiveForegroundBrush" Color="#FFFFFF" />
           <SolidColorBrush x:Key="AppSecondaryBackgroundBrush" Color="#2A2A2A" />
           <SolidColorBrush x:Key="AppSecondaryBorderBrush" Color="#525252" />
           <SolidColorBrush x:Key="AppSecondaryForegroundBrush" Color="#F3F4F6" />
@@ -73,6 +81,30 @@
     <Setter Property="BorderBrush" Value="{DynamicResource AppAccentPressedBrush}" />
   </Style>
 
+  <Style Selector="Button.destructive">
+    <Setter Property="Background" Value="{DynamicResource AppDestructiveBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AppDestructiveForegroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppDestructiveBrush}" />
+  </Style>
+
+  <Style Selector="Button.destructive:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppDestructiveHoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppDestructiveHoverBrush}" />
+  </Style>
+
+  <Style Selector="Button.destructive:pressed">
+    <Setter Property="Background" Value="{DynamicResource AppDestructivePressedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppDestructivePressedBrush}" />
+  </Style>
+
+  <Style Selector="Button.destructive:focus">
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+
+  <Style Selector="Button.destructive:disabled">
+    <Setter Property="Opacity" Value="0.55" />
+  </Style>
+
   <Style Selector="Button.primary.stretch">
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -113,6 +145,11 @@
 
   <Style Selector="Button.nav:pointerover">
     <Setter Property="Background" Value="{DynamicResource AppNavHoverBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="Button.nav.active">
+    <Setter Property="Background" Value="{DynamicResource AppNavPressedBackgroundBrush}" />
+    <Setter Property="FontWeight" Value="Bold" />
   </Style>
 
   <Style Selector="Button.nav:pressed">

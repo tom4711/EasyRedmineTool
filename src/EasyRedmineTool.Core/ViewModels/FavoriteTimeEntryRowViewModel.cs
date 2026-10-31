@@ -10,6 +10,7 @@ using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 
 public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
@@ -34,7 +35,26 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
     private string comments = string.Empty;
 
     [ObservableProperty]
+    private bool areDetailsExpanded;
+
+    [ObservableProperty]
     private bool isSubmitting;
+
+    [ObservableProperty]
+    private string rowStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private string validationMessage = string.Empty;
+
+    public bool HasValidationMessage => !string.IsNullOrWhiteSpace(ValidationMessage);
+
+    public bool HasRowStatusMessage => !string.IsNullOrWhiteSpace(RowStatusMessage);
+
+    public bool HasEntryDetails =>
+        !string.IsNullOrWhiteSpace(Comments) || CustomFields.Any(customField => !string.IsNullOrWhiteSpace(customField.Value));
+
+    public string EntryDetailsHeader =>
+        HasEntryDetails ? "Kommentar und Zusatzfelder · ausgefüllt" : "Kommentar und Zusatzfelder (optional)";
 
     [ObservableProperty]
     private bool isFocused;
@@ -70,7 +90,29 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         }
 
         OnPropertyChanged(nameof(SelectedDateLabel));
+        ValidationMessage = string.Empty;
     }
+
+    partial void OnHoursChanged(string value)
+    {
+        ValidationMessage = string.Empty;
+        RowStatusMessage = string.Empty;
+    }
+
+    partial void OnCommentsChanged(string value) =>
+        OnPropertyChanged(nameof(EntryDetailsHeader));
+
+    partial void OnSelectedActivityChanged(TimeEntryActivityDto? value)
+    {
+        ValidationMessage = string.Empty;
+        RowStatusMessage = string.Empty;
+    }
+
+    partial void OnValidationMessageChanged(string value) =>
+        OnPropertyChanged(nameof(HasValidationMessage));
+
+    partial void OnRowStatusMessageChanged(string value) =>
+        OnPropertyChanged(nameof(HasRowStatusMessage));
 
     public async Task LoadActivitiesAsync(CancellationToken cancellationToken = default)
     {
@@ -118,10 +160,26 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
 
         foreach (var row in TimeEntryCustomFieldSupport.CreateRows(recentValues, settings))
         {
+            row.PropertyChanged += OnCustomFieldChanged;
             CustomFields.Add(row);
         }
 
         OnPropertyChanged(nameof(HasCustomFields));
+        OnPropertyChanged(nameof(HasEntryDetails));
+        OnPropertyChanged(nameof(EntryDetailsHeader));
+        if (CustomFields.Any(field => field.IsRequired))
+        {
+            AreDetailsExpanded = true;
+        }
+    }
+
+    private void OnCustomFieldChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(TimeEntryCustomFieldRowViewModel.Value) or nameof(TimeEntryCustomFieldRowViewModel.SelectedValue))
+        {
+            OnPropertyChanged(nameof(HasEntryDetails));
+            OnPropertyChanged(nameof(EntryDetailsHeader));
+        }
     }
 
     [RelayCommand]
@@ -157,28 +215,28 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             return;
         }
 
-        if (!double.TryParse(Hours, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedHours) || parsedHours <= 0)
+        if (!TimeEntryHours.TryParsePositive(Hours, out var parsedHours))
         {
-            _parent.SetStatusMessage($"Ticket #{Ticket.Id}: Bitte gültige Stunden eingeben.");
+            ValidationMessage = "Bitte gültige Stunden eingeben.";
             return;
         }
 
         if (SelectedActivity is null)
         {
-            _parent.SetStatusMessage($"Ticket #{Ticket.Id}: Bitte eine Aktivität auswählen.");
+            ValidationMessage = "Bitte eine Aktivität auswählen.";
             return;
         }
 
         if (SpentOn is null)
         {
-            _parent.SetStatusMessage($"Ticket #{Ticket.Id}: Bitte ein Datum auswählen.");
+            ValidationMessage = "Bitte ein Datum auswählen.";
             return;
         }
 
         var customFieldError = TimeEntryCustomFieldSupport.Validate(CustomFields);
         if (customFieldError is not null)
         {
-            _parent.SetStatusMessage($"Ticket #{Ticket.Id}: {customFieldError}");
+            ValidationMessage = customFieldError;
             return;
         }
 
@@ -189,10 +247,12 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             return;
         }
 
+        var submittedDate = SpentOn.Value;
         try
         {
             IsSubmitting = true;
-            _parent.SetStatusMessage($"Zeiteintrag für #{Ticket.Id} wird erstellt …");
+            ValidationMessage = string.Empty;
+            RowStatusMessage = "Zeiteintrag wird erstellt …";
 
             var result = await _timeEntryService.CreateTimeEntryAsync(
                 settings.BaseUrl,
@@ -201,19 +261,27 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
                 {
                     IssueId = Ticket.Id,
                     Hours = parsedHours,
-                    SpentOn = RedmineDates.FormatSpentOn(SpentOn.Value),
+                    SpentOn = RedmineDates.FormatSpentOn(submittedDate),
                     ActivityId = SelectedActivity.Id,
                     Comments = Comments,
                     CustomFields = TimeEntryCustomFieldSupport.BuildValues(CustomFields).ToList()
                 });
 
+            RowStatusMessage = result.Success
+                ? $"{parsedHours.ToString("0.##", CultureInfo.GetCultureInfo("de-DE"))} h für {submittedDate:dd.MM.yyyy} gebucht."
+                : result.Message;
             _parent.SetStatusMessage(result.Message);
             if (result.Success)
             {
                 TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, CustomFields);
                 Comments = string.Empty;
-                await _parent.HandleEntryCreatedAsync(this, SpentOn.Value);
+                await _parent.HandleEntryCreatedAsync(this, submittedDate);
             }
+        }
+        catch (Exception ex)
+        {
+            RowStatusMessage = ex.Message;
+            _parent.SetStatusMessage($"Ticket #{Ticket.Id}: {ex.Message}");
         }
         finally
         {

@@ -106,6 +106,7 @@ public class SeriesBookingViewModelTests
         viewModel.Activities.Add(viewModel.SelectedActivity);
 
         await viewModel.RefreshPreviewCommand.ExecuteAsync(null);
+        viewModel.RequestBookSeriesCommand.Execute(null);
         await viewModel.ConfirmBookSeriesCommand.ExecuteAsync(null);
 
         Assert.Single(context.TimeEntryService.CreatedRequests);
@@ -146,6 +147,31 @@ public class SeriesBookingViewModelTests
 
         Assert.Equal(200, viewModel.SelectedActivity?.Id);
         Assert.Equal("Activity-200", viewModel.SelectedActivity?.Name);
+    }
+
+    [Fact]
+    public async Task RefreshPreview_discards_response_after_inputs_change()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            ApiKey = "secret", FavoriteTicketIds = [42],
+            CachedTickets = [new IssueDto { Id = 42, Subject = "Task" }]
+        });
+        var pending = new TaskCompletionSource<TimeEntryLoadResult>();
+        context.TimeEntryService.PendingPreview = pending;
+        using var viewModel = new SeriesBookingViewModel(context.SettingsService, context.TimeEntryService);
+        viewModel.PrepareView();
+        viewModel.FromDate = GetPreviousMonday(DateTime.Today);
+        viewModel.ToDate = viewModel.FromDate;
+        viewModel.SelectedActivity = new TimeEntryActivityDto { Id = 1 };
+        var request = viewModel.RefreshPreviewCommand.ExecuteAsync(null);
+        viewModel.FromDate = viewModel.FromDate.Value.AddDays(-7);
+        pending.SetResult(new TimeEntryLoadResult { Success = true, Entries = [] });
+        await request;
+        Assert.False(viewModel.HasPreview);
+        Assert.Empty(viewModel.PreviewRows);
+        Assert.False(viewModel.CanBook);
     }
 
     private static DateTime GetPreviousMonday(DateTime date)
@@ -196,6 +222,8 @@ public class SeriesBookingViewModelTests
 
         public List<TimeEntryCreateRequest> CreatedRequests { get; } = [];
 
+        public TaskCompletionSource<TimeEntryLoadResult>? PendingPreview { get; set; }
+
         public TimeSpan ActivitiesDelay { get; set; }
 
         public Func<int?, IReadOnlyList<TimeEntryActivityDto>> ActivityFactory { get; set; } = _ => [];
@@ -230,7 +258,7 @@ public class SeriesBookingViewModelTests
             DateTime from,
             DateTime to,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(new TimeEntryLoadResult { Success = true, Entries = Entries });
+            PendingPreview?.Task ?? Task.FromResult(new TimeEntryLoadResult { Success = true, Entries = Entries });
 
         public Task<TimeEntryOperationResult> CreateTimeEntryAsync(
             string baseUrl,

@@ -13,7 +13,7 @@ public class TicketServiceCacheTests
         var apiClient = new CountingTimeEntryApiClient();
         var service = new TicketService(apiClient);
 
-        var filter = new TicketLoadFilter { IncludeTimeEntryTickets = true };
+        var filter = new TicketLoadFilter { OnlyTimeEntryTickets = true };
         await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
         await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
         service.InvalidateTimeEntryCache();
@@ -31,7 +31,7 @@ public class TicketServiceCacheTests
         await service.GetTicketsForListAsync(
             "https://redmine.example/",
             "secret",
-            new TicketLoadFilter { IncludeTimeEntryTickets = false });
+            new TicketLoadFilter { OnlyTimeEntryTickets = false });
 
         Assert.Equal(0, apiClient.TimeEntryRequestCount);
     }

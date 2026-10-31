@@ -18,6 +18,9 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
     private string currentQuarterLabel = string.Empty;
 
     [ObservableProperty]
+    private DateTime selectedQuarterStart = GetStartOfQuarter(DateTime.Today);
+
+    [ObservableProperty]
     private string statusMessage = string.Empty;
 
     [ObservableProperty]
@@ -33,6 +36,8 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
 
     public bool HasLoadedData { get; private set; }
 
+    public bool IsCurrentQuarter => SelectedQuarterStart == GetStartOfQuarter(DateTime.Today);
+
     public string LoadActionLabel => HasLoadedData ? "Aktualisieren" : "Daten laden";
 
     public WeeklySummaryViewModel(IAppSettingsService appSettingsService, ITimeEntryService timeEntryService)
@@ -47,13 +52,28 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
 
     public void PrepareView()
     {
-        var (_, _, label) = GetCurrentQuarterRange();
-        CurrentQuarterLabel = label;
+        UpdateQuarterLabel();
 
         if (!HasLoadedData)
         {
-            StatusMessage = "Klicke auf „Daten laden“, um die Auswertung abzurufen.";
+            StatusMessage = $"{CurrentQuarterLabel}: Klicke auf „Daten laden“, um die Auswertung abzurufen.";
         }
+    }
+
+    partial void OnSelectedQuarterStartChanged(DateTime value)
+    {
+        var normalized = GetStartOfQuarter(value);
+        if (normalized != value)
+        {
+            SelectedQuarterStart = normalized;
+            return;
+        }
+
+        OnPropertyChanged(nameof(IsCurrentQuarter));
+        UpdateQuarterLabel();
+        CancelReload();
+        ClearLoadedData();
+        StatusMessage = $"{CurrentQuarterLabel}: Klicke auf „Daten laden“, um die Auswertung abzurufen.";
     }
 
     [RelayCommand]
@@ -66,10 +86,8 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
-            StatusMessage = "API-Key fehlt. Bitte zuerst Einstellungen speichern.";
-            WeeklyHours.Clear();
-            WeeklyTotalHours = 0;
-            MaxWeeklyHours = 1;
+            StatusMessage = $"{GetQuarterName(SelectedQuarterStart)}: API-Key fehlt. Bitte zuerst Einstellungen speichern.";
+            ClearLoadedData();
             CompleteReload(reloadCts);
             return;
         }
@@ -79,8 +97,8 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
             IsBusy = true;
             StatusMessage = "Auswertung wird geladen …";
 
-            var (from, to, label) = GetCurrentQuarterRange();
-            CurrentQuarterLabel = label;
+            var requestedQuarter = SelectedQuarterStart;
+            var (from, to, label) = GetSelectedQuarterRange(requestedQuarter);
 
             var result = await _timeEntryService.GetMyTimeEntriesAsync(
                 settings.BaseUrl,
@@ -89,17 +107,15 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
                 to,
                 cancellationToken);
 
-            if (cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested || requestedQuarter != SelectedQuarterStart)
             {
                 return;
             }
 
             if (!result.Success)
             {
-                StatusMessage = result.Message;
-                WeeklyHours.Clear();
-                WeeklyTotalHours = 0;
-                MaxWeeklyHours = 1;
+                StatusMessage = $"{GetQuarterName(requestedQuarter)}: {result.Message}";
+                ClearLoadedData();
                 return;
             }
 
@@ -120,7 +136,7 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
             HasLoadedData = true;
             OnPropertyChanged(nameof(LoadActionLabel));
             StatusMessage = grouped.Count == 0
-                ? "Keine Zeiteinträge im aktuellen Quartal."
+                ? $"Keine Zeiteinträge im {GetQuarterName(requestedQuarter)}."
                 : string.Empty;
         }
         catch (OperationCanceledException)
@@ -133,16 +149,44 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private static (DateTime From, DateTime To, string Label) GetCurrentQuarterRange()
-    {
-        var today = DateTime.Today;
-        var quarter = ((today.Month - 1) / 3) + 1;
-        var fromMonth = (quarter - 1) * 3 + 1;
+    [RelayCommand]
+    private void PreviousQuarter() => SelectedQuarterStart = SelectedQuarterStart.AddMonths(-3);
 
-        var from = new DateTime(today.Year, fromMonth, 1);
+    [RelayCommand]
+    private void NextQuarter()
+    {
+        if (!IsCurrentQuarter)
+        {
+            SelectedQuarterStart = SelectedQuarterStart.AddMonths(3);
+        }
+    }
+
+    [RelayCommand]
+    private void SelectCurrentQuarter() => SelectedQuarterStart = GetStartOfQuarter(DateTime.Today);
+
+    private void UpdateQuarterLabel() => CurrentQuarterLabel = GetSelectedQuarterRange(SelectedQuarterStart).Label;
+
+    private static (DateTime From, DateTime To, string Label) GetSelectedQuarterRange(DateTime quarterStart)
+    {
+        var from = GetStartOfQuarter(quarterStart);
         var to = from.AddMonths(3).AddDays(-1);
 
-        return (from, to, $"Q{quarter} {today.Year} ({RedmineDates.FormatSpentOn(from)} – {RedmineDates.FormatSpentOn(to)})");
+        return (from, to, $"{GetQuarterName(from)} ({RedmineDates.FormatSpentOn(from)} – {RedmineDates.FormatSpentOn(to)})");
+    }
+
+    private static string GetQuarterName(DateTime quarterStart) =>
+        $"Q{((quarterStart.Month - 1) / 3) + 1} {quarterStart.Year}";
+
+    private static DateTime GetStartOfQuarter(DateTime date) =>
+        new(date.Year, (((date.Month - 1) / 3) * 3) + 1, 1);
+
+    private void ClearLoadedData()
+    {
+        WeeklyHours.Clear();
+        WeeklyTotalHours = 0;
+        MaxWeeklyHours = 1;
+        HasLoadedData = false;
+        OnPropertyChanged(nameof(LoadActionLabel));
     }
 
     [RelayCommand]
@@ -158,9 +202,14 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
 
     private void CancelReload()
     {
-        _reloadCts?.Cancel();
-        _reloadCts?.Dispose();
+        var reloadCts = _reloadCts;
         _reloadCts = null;
+        if (reloadCts is not null)
+        {
+            IsBusy = false;
+            reloadCts.Cancel();
+            reloadCts.Dispose();
+        }
     }
 
     private CancellationTokenSource BeginReload()

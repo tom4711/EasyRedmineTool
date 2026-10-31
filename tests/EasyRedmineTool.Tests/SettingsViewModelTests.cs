@@ -42,7 +42,7 @@ public class SettingsViewModelTests
         viewModel.SaveSettingsCommand.Execute(null);
 
         Assert.True(eventRaised);
-        Assert.Equal("Einstellungen gespeichert.", viewModel.StatusMessage);
+        Assert.Equal("Einstellungen gespeichert.", viewModel.SaveStatusMessage);
 
         var loaded = context.SettingsService.Load();
         Assert.Equal("https://new.example/", loaded.BaseUrl);
@@ -50,12 +50,13 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void ApiKeyStorageHint_contains_settings_file_path()
+    public void ApiKeyStorageDetails_expose_warning_and_settings_file_path_separately()
     {
         using var context = TestContext.Create();
         var viewModel = new SettingsViewModel(context.ConnectionTestService, context.SettingsService);
 
-        Assert.Contains(context.SettingsService.SettingsFilePath, viewModel.ApiKeyStorageHint, StringComparison.Ordinal);
+        Assert.Contains("unverschlüsselt", viewModel.ApiKeyStorageWarning, StringComparison.Ordinal);
+        Assert.Equal(context.SettingsService.SettingsFilePath, viewModel.ApiKeyStoragePath);
     }
 
     [Fact]
@@ -77,7 +78,7 @@ public class SettingsViewModelTests
         await viewModel.TestConnectionCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsBusy);
-        Assert.Equal("Verbindung erfolgreich.", viewModel.StatusMessage);
+        Assert.Equal("Verbindung erfolgreich.", viewModel.ConnectionStatusMessage);
     }
 
     [Fact]
@@ -106,7 +107,7 @@ public class SettingsViewModelTests
         await viewModel.TestConnectionCommand.ExecuteAsync(null);
         await firstCall;
 
-        Assert.Equal("second", viewModel.StatusMessage);
+        Assert.Equal("second", viewModel.ConnectionStatusMessage);
         Assert.Equal(2, context.ConnectionTestService.CallCount);
         Assert.False(viewModel.IsBusy);
     }
