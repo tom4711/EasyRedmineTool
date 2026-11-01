@@ -20,21 +20,33 @@
                     Orientation="Horizontal"
                     Spacing="8">
           <Button Classes="nav"
+                  Classes.active="{Binding IsTicketListVisible}"
+                  AutomationProperties.ItemStatus="{Binding IsTicketListVisible}"
                   Command="{Binding OpenTicketListCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=ClipboardListOutline, Text=Tickets}" />
           <Button Classes="nav"
+                  Classes.active="{Binding IsTimeEntriesVisible}"
+                  AutomationProperties.ItemStatus="{Binding IsTimeEntriesVisible}"
                   Command="{Binding OpenTimeEntriesCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=ClockOutline, Text=Zeiteinträge}" />
           <Button Classes="nav"
+                  Classes.active="{Binding IsSeriesBookingVisible}"
+                  AutomationProperties.ItemStatus="{Binding IsSeriesBookingVisible}"
                   Command="{Binding OpenSeriesBookingCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=CalendarSync, Text=Serienbuchung}" />
           <Button Classes="nav"
+                  Classes.active="{Binding IsWeeklySummaryVisible}"
+                  AutomationProperties.ItemStatus="{Binding IsWeeklySummaryVisible}"
                   Command="{Binding OpenWeeklySummaryCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=ChartTimelineVariant, Text=Auswertung}" />
           <Button Classes="nav"
+                  Classes.active="{Binding IsSettingsVisible}"
+                  AutomationProperties.ItemStatus="{Binding IsSettingsVisible}"
                   Command="{Binding OpenSettingsCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=CogOutline, Text=Einstellungen}" />
           <Button Classes="nav"
+                  Classes.active="{Binding IsAboutVisible}"
+                  AutomationProperties.ItemStatus="{Binding IsAboutVisible}"
                   Command="{Binding OpenAboutCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=InformationOutline, Text=Info}" />
         </StackPanel>

@@ -301,6 +301,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void ShowSettings()
     {
         HideAllViews();
+        SettingsViewModel.PrepareView();
         IsSettingsVisible = true;
     }
 

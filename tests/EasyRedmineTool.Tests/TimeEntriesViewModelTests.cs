@@ -221,6 +221,33 @@ public class TimeEntriesViewModelTests
         Assert.Contains("Support Task", viewModel.TodayTimeEntries[0].TicketLabel, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Booking_keeps_visible_row_and_reports_submitted_date()
+    {
+        using var context = TestContext.Create();
+        context.SettingsService.Save(new AppSettings
+        {
+            ApiKey = "secret", FavoriteTicketIds = [42],
+            CachedTickets = [new IssueDto { Id = 42, Subject = "Task" }]
+        });
+        var pending = new TaskCompletionSource<TimeEntryOperationResult>();
+        context.TimeEntryService.PendingCreate = pending;
+        var viewModel = new TimeEntriesViewModel(context.SettingsService, context.TimeEntryService);
+        viewModel.ReloadFavorites();
+        var row = Assert.Single(viewModel.FavoriteRows);
+        var submittedDate = new DateTime(2026, 10, 20);
+        row.SpentOn = submittedDate;
+        row.SelectedActivity = new TimeEntryActivityDto { Id = 1 };
+        var request = row.CreateTimeEntryCommand.ExecuteAsync(null);
+        row.SpentOn = submittedDate.AddDays(1);
+        pending.SetResult(new TimeEntryOperationResult { Success = true });
+        await request;
+        Assert.Same(row, Assert.Single(viewModel.FavoriteRows));
+        Assert.Contains("20.10.2026", row.RowStatusMessage, StringComparison.Ordinal);
+        Assert.Equal(RedmineDates.FormatSpentOn(submittedDate), Assert.Single(context.TimeEntryService.CreatedRequests).SpentOn);
+        Assert.False(row.IsSubmitting);
+    }
+
     private sealed class TestContext : IDisposable
     {
         private readonly string _settingsPath;
@@ -261,6 +288,10 @@ public class TimeEntriesViewModelTests
     {
         public IReadOnlyList<TimeEntryDto> Entries { get; set; } = [];
 
+        public TaskCompletionSource<TimeEntryOperationResult>? PendingCreate { get; set; }
+
+        public List<TimeEntryCreateRequest> CreatedRequests { get; } = [];
+
         public bool LoadSuccess { get; set; } = true;
 
         public Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
@@ -293,8 +324,11 @@ public class TimeEntriesViewModelTests
             string baseUrl,
             string apiKey,
             TimeEntryCreateRequest request,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new TimeEntryOperationResult { Success = true });
+            CancellationToken cancellationToken = default)
+        {
+            CreatedRequests.Add(request);
+            return PendingCreate?.Task ?? Task.FromResult(new TimeEntryOperationResult { Success = true });
+        }
 
         public Task<TimeEntryOperationResult> UpdateTimeEntryAsync(
             string baseUrl,

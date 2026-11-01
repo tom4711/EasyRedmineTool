@@ -41,15 +41,15 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
         TicketLoadFilter filter,
         CancellationToken cancellationToken = default)
     {
-        var primaryIssues = await _apiClient.GetIssuesAsync(
-            baseUrl,
-            apiKey,
-            filter.Assignee,
-            filter.StatusKind,
-            filter.StatusId,
-            cancellationToken);
-        if (!filter.IncludeTimeEntryTickets)
+        if (!filter.OnlyTimeEntryTickets)
         {
+            var primaryIssues = await _apiClient.GetIssuesAsync(
+                baseUrl,
+                apiKey,
+                filter.Assignee,
+                filter.StatusKind,
+                filter.StatusId,
+                cancellationToken);
             var primaryOnly = primaryIssues.OrderBy(ticket => ticket.Id).ToList();
             return new TicketListLoadResult
             {
@@ -59,34 +59,23 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
             };
         }
 
-        int? currentUserId = null;
-        if (filter.Assignee == TicketAssigneeFilter.Me)
-        {
-            currentUserId = await _apiClient.GetCurrentUserIdAsync(baseUrl, apiKey, cancellationToken);
-        }
-
-        var knownIds = new HashSet<int>(primaryIssues.Select(i => i.Id));
-
         var to = DateTime.Today;
         var from = GetTimeEntryFetchFrom(to, filter.TimeEntryLookbackMonths);
         var timeEntries = await GetTimeEntriesWithCacheAsync(baseUrl, apiKey, from, to, cancellationToken);
 
-        var additionalIssueIds = timeEntries
+        var issueIds = timeEntries
             .Select(entry => entry.GetIssueId())
-            .Where(id => id > 0 && knownIds.Add(id))
+            .Where(id => id > 0)
             .Distinct()
             .ToList();
 
-        var additionalIssues = additionalIssueIds.Count == 0
+        List<IssueDto> tickets = issueIds.Count == 0
             ? []
-            : await _apiClient.GetIssuesByIdsAsync(baseUrl, apiKey, additionalIssueIds, cancellationToken);
+            : (await _apiClient.GetIssuesByIdsAsync(baseUrl, apiKey, issueIds, cancellationToken)).ToList();
 
         var lastTimeEntryByIssue = BuildLastTimeEntryLookup(timeEntries);
 
-        var tickets = primaryIssues
-            .Concat(additionalIssues)
-            .OrderBy(ticket => ticket.Id)
-            .ToList();
+        tickets = tickets.OrderBy(ticket => ticket.Id).ToList();
 
         foreach (var ticket in tickets)
         {
@@ -96,20 +85,11 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
             }
         }
 
-        var primaryIds = primaryIssues.Select(issue => issue.Id).ToHashSet();
-        var filteredTickets = tickets
-            .Where(ticket => primaryIds.Contains(ticket.Id)
-                || TicketLoadFilterMatcher.Matches(ticket, filter, currentUserId))
-            .ToList();
-
-        var primaryTicketCount = filteredTickets.Count(ticket => primaryIds.Contains(ticket.Id));
-        var timeEntryTicketCount = filteredTickets.Count - primaryTicketCount;
-
         return new TicketListLoadResult
         {
-            Tickets = filteredTickets,
-            OpenTicketCount = primaryTicketCount,
-            TimeEntryTicketCount = timeEntryTicketCount
+            Tickets = tickets,
+            OpenTicketCount = 0,
+            TimeEntryTicketCount = tickets.Count
         };
     }
 

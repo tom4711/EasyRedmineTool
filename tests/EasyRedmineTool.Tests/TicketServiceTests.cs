@@ -42,7 +42,7 @@ public class TicketServiceTests
         var result = await service.GetTicketsForListAsync(
             "https://redmine.example/",
             "secret",
-            new TicketLoadFilter { IncludeTimeEntryTickets = false });
+            new TicketLoadFilter { OnlyTimeEntryTickets = false });
 
         Assert.Single(result.Tickets);
         Assert.Equal(1, result.Tickets[0].Id);
@@ -59,7 +59,7 @@ public class TicketServiceTests
         var service = new TicketService(apiClient);
         var filter = new TicketLoadFilter
         {
-            IncludeTimeEntryTickets = true,
+            OnlyTimeEntryTickets = true,
             Assignee = TicketAssigneeFilter.All
         };
 
@@ -69,7 +69,7 @@ public class TicketServiceTests
     }
 
     [Fact]
-    public async Task GetTicketsForListAsync_includes_all_primary_tickets_when_time_entries_enabled()
+    public async Task GetTicketsForListAsync_returns_only_tickets_with_time_entries_when_enabled()
     {
         var yesterday = DateTime.Today.AddDays(-1);
         var apiClient = new FilteringTicketApiClient(
@@ -85,12 +85,13 @@ public class TicketServiceTests
                 CreateEntry(issueId: 2, spentOn: RedmineDates.FormatSpentOn(yesterday)),
             ]);
         var service = new TicketService(apiClient);
-        var filter = new TicketLoadFilter { IncludeTimeEntryTickets = true };
+        var filter = new TicketLoadFilter { OnlyTimeEntryTickets = true };
 
         var result = await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
 
-        Assert.Equal(3, result.Tickets.Count);
-        Assert.Equal(3, result.OpenTicketCount);
+        Assert.Equal(new[] { 1, 2 }, result.Tickets.Select(ticket => ticket.Id));
+        Assert.Equal(0, result.OpenTicketCount);
+        Assert.Equal(2, result.TimeEntryTicketCount);
     }
 
     [Fact]
@@ -152,7 +153,7 @@ public class TicketServiceTests
             string apiKey,
             IReadOnlyList<int> issueIds,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<IssueDto>>([]);
+            Task.FromResult<IReadOnlyList<IssueDto>>(primaryIssues.Where(issue => issueIds.Contains(issue.Id)).ToList());
 
         public Task<HttpResponseMessage> GetCurrentUserAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();

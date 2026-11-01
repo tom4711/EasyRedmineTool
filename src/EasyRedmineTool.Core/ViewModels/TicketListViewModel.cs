@@ -43,7 +43,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     private TicketFilterOption<TicketStatusFilterSelection>? selectedStatusFilter;
 
     [ObservableProperty]
-    private bool includeTimeEntryTickets;
+    private bool onlyTimeEntryTickets;
 
     [ObservableProperty]
     private int timeEntryLookbackMonths = TicketLoadFilterDefaults.DefaultTimeEntryLookbackMonths;
@@ -84,6 +84,8 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
 
     public bool IsTimeEntryLookback12Months => TimeEntryLookbackMonths == 12;
 
+    public bool AreTicketFiltersEnabled => !OnlyTimeEntryTickets;
+
     public string SearchPlaceholder => "In Tickets suchen (Nr., Betreff, Projekt) …";
 
     partial void OnTicketFilterTextChanged(string value) =>
@@ -102,8 +104,11 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         PersistFilterSettings();
     }
 
-    partial void OnIncludeTimeEntryTicketsChanged(bool value) =>
+    partial void OnOnlyTimeEntryTicketsChanged(bool value)
+    {
+        OnPropertyChanged(nameof(AreTicketFiltersEnabled));
         PersistFilterSettings();
+    }
 
     partial void OnTimeEntryLookbackMonthsChanged(int value)
     {
@@ -150,7 +155,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             _pendingStatusFilterKind = settings.TicketLoadStatusFilterKind;
             _pendingStatusId = settings.TicketLoadStatusId;
             _pendingStatusName = settings.TicketLoadStatusName;
-            IncludeTimeEntryTickets = settings.TicketLoadIncludeTimeEntryTickets;
+            OnlyTimeEntryTickets = settings.TicketLoadIncludeTimeEntryTickets;
             TimeEntryLookbackMonths = TicketLoadFilterDefaults.NormalizeTimeEntryLookbackMonths(
                 settings.TicketLoadTimeEntryLookbackMonths);
             OnPropertyChanged(nameof(IsTimeEntryLookback3Months));
@@ -165,9 +170,19 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         }
 
         Tickets.Clear();
-        var lastLoadedIds = settings.LastLoadedTicketIds.Count > 0
-            ? settings.LastLoadedTicketIds.ToHashSet()
-            : settings.CachedTickets.Select(ticket => ticket.Id).ToHashSet();
+        HashSet<int> lastLoadedIds;
+        if (settings.LastLoadedTicketIds.Count > 0)
+        {
+            lastLoadedIds = settings.LastLoadedTicketIds.ToHashSet();
+        }
+        else if (settings.TicketLoadIncludeTimeEntryTickets)
+        {
+            lastLoadedIds = [];
+        }
+        else
+        {
+            lastLoadedIds = settings.CachedTickets.Select(ticket => ticket.Id).ToHashSet();
+        }
 
         foreach (var ticket in settings.CachedTickets.Where(ticket => lastLoadedIds.Contains(ticket.Id)))
         {
@@ -502,7 +517,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             Assignee = SelectedAssigneeFilter?.Value ?? TicketAssigneeFilter.Me,
             StatusKind = statusSelection.Kind,
             StatusId = statusSelection.StatusId,
-            IncludeTimeEntryTickets = IncludeTimeEntryTickets,
+            OnlyTimeEntryTickets = OnlyTimeEntryTickets,
             TimeEntryLookbackMonths = TimeEntryLookbackMonths
         };
     }
@@ -513,17 +528,12 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         TicketStatusFilterSelection? statusSelection)
     {
         var filterSummary = BuildFilterSummary(filter, statusSelection);
-        if (!filter.IncludeTimeEntryTickets)
+        if (filter.OnlyTimeEntryTickets)
         {
-            return $"{result.Tickets.Count} Ticket(s) geladen (nur Zuweisung/Status{filterSummary}).";
+            return $"{result.Tickets.Count} Ticket(s) geladen (nur eigene Zeitbuchungen der letzten {filter.TimeEntryLookbackMonths} Monate).";
         }
 
-        if (result.TimeEntryTicketCount == 0)
-        {
-            return $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} aus Filter{filterSummary}).";
-        }
-
-        return $"{result.Tickets.Count} Ticket(s) geladen ({result.OpenTicketCount} aus Filter, {result.TimeEntryTicketCount} mit Zeiteinträgen in den letzten {filter.TimeEntryLookbackMonths} Monaten{filterSummary}).";
+        return $"{result.Tickets.Count} Ticket(s) geladen (nur Zuweisung/Status{filterSummary}).";
     }
 
     private static string BuildFilterSummary(
@@ -535,11 +545,6 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             DescribeAssigneeFilter(filter.Assignee),
             DescribeStatusFilter(filter, statusSelection)
         };
-
-        if (filter.IncludeTimeEntryTickets)
-        {
-            parts.Add($"Zeiteinträge der letzten {filter.TimeEntryLookbackMonths} Monate");
-        }
 
         return $"; Filter: {string.Join(", ", parts)}";
     }
@@ -602,7 +607,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             settings.TicketLoadStatusFilterKind = statusSelection.Kind;
             settings.TicketLoadStatusId = statusSelection.StatusId;
             settings.TicketLoadStatusName = _pendingStatusName;
-            settings.TicketLoadIncludeTimeEntryTickets = IncludeTimeEntryTickets;
+            settings.TicketLoadIncludeTimeEntryTickets = OnlyTimeEntryTickets;
             settings.TicketLoadTimeEntryLookbackMonths = TimeEntryLookbackMonths;
         });
     }

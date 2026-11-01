@@ -64,102 +64,73 @@
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,*">
-    <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="12">
+    <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="10">
       <TextBlock Text="Meine Tickets" FontSize="22" FontWeight="Bold" />
 
-      <Border Classes="filter-card"
-              Padding="16"
-              HorizontalAlignment="Stretch">
-        <StackPanel Spacing="12">
-          <TextBlock Text="Lade-Filter"
-                     FontSize="14"
-                     FontWeight="SemiBold" />
-          <TextBlock Text="Standardmäßig werden nur Tickets nach Zuweisung und Status geladen. Fehlende Tickets können per ID ergänzt werden. Optional lassen sich zusätzliche Tickets aus Zeiteinträgen nachladen."
-                     FontSize="12"
-                     Opacity="0.75"
-                     TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+        <TextBox Grid.Column="0"
+                 Text="{Binding TicketFilterText}"
+                 PlaceholderText="{Binding SearchPlaceholder}" />
+        <ComboBox Grid.Column="1"
+                  Classes="filter-field"
+                  IsEnabled="{Binding AreTicketFiltersEnabled}"
+                  ItemsSource="{Binding AssigneeFilterOptions}"
+                  SelectedItem="{Binding SelectedAssigneeFilter}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate><TextBlock Text="{Binding Label}" /></DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <ComboBox Grid.Column="2"
+                  Classes="filter-field"
+                  IsEnabled="{Binding AreTicketFiltersEnabled}"
+                  ItemsSource="{Binding StatusFilterOptions}"
+                  SelectedItem="{Binding SelectedStatusFilter}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate><TextBlock Text="{Binding Label}" /></DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Grid.Column="3"
+                Classes="primary"
+                IsEnabled="{Binding !IsBusy}"
+                Command="{Binding LoadTicketsCommand}"
+                Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Laden}" />
+      </Grid>
 
-          <Grid ColumnDefinitions="*,*"
-                ColumnSpacing="12">
-            <StackPanel Grid.Column="0" Spacing="4">
-              <TextBlock Classes="filter-label" Text="Zugewiesen" />
-              <ComboBox Classes="filter-field"
-                        ItemsSource="{Binding AssigneeFilterOptions}"
-                        SelectedItem="{Binding SelectedAssigneeFilter}">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Text="{Binding Label}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <TextBlock Grid.Column="0" Text="{Binding ListScopeSummary}" FontSize="12" Opacity="0.75" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+      </Grid>
+
+      <Expander Header="Weitere Filter und Ticket hinzufügen">
+        <Border Classes="filter-card" Padding="12" Margin="0,8,0,0">
+          <StackPanel Spacing="10">
+            <CheckBox Content="Nur Tickets mit eigenen Zeitbuchungen anzeigen"
+                      IsChecked="{Binding OnlyTimeEntryTickets}" />
+            <StackPanel Spacing="4" IsVisible="{Binding OnlyTimeEntryTickets}">
+              <TextBlock Classes="filter-label" Text="Zeitraum Zeiteinträge" />
+              <Border Classes="filter-segment-group" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                  <Button Classes="filter-segment" Classes.active="{Binding IsTimeEntryLookback3Months}" Content="3 Monate" Command="{Binding SelectTimeEntryLookback3MonthsCommand}" />
+                  <Button Classes="filter-segment" Classes.active="{Binding IsTimeEntryLookback6Months}" Content="6 Monate" Command="{Binding SelectTimeEntryLookback6MonthsCommand}" />
+                  <Button Classes="filter-segment" Classes.active="{Binding IsTimeEntryLookback9Months}" Content="9 Monate" Command="{Binding SelectTimeEntryLookback9MonthsCommand}" />
+                  <Button Classes="filter-segment" Classes.active="{Binding IsTimeEntryLookback12Months}" Content="12 Monate" Command="{Binding SelectTimeEntryLookback12MonthsCommand}" />
+                </StackPanel>
+              </Border>
             </StackPanel>
-
-            <StackPanel Grid.Column="1" Spacing="4">
-              <TextBlock Classes="filter-label" Text="Status" />
-              <ComboBox Classes="filter-field"
-                        ItemsSource="{Binding StatusFilterOptions}"
-                        SelectedItem="{Binding SelectedStatusFilter}">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Text="{Binding Label}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBox Width="180" PlaceholderText="Ticket-ID" Text="{Binding TicketIdToAdd}" />
+              <Button Classes="secondary"
+                      Command="{Binding AddTicketByIdCommand}"
+                      Content="{materialIcons:MaterialIconTextExt Kind=Plus, Text=Ticket per ID hinzufügen}" />
             </StackPanel>
-          </Grid>
-
-          <CheckBox Content="Zusätzlich Tickets aus Zeiteinträgen laden (langsamer)"
-                    IsChecked="{Binding IncludeTimeEntryTickets}" />
-
-          <StackPanel Spacing="4"
-                      IsVisible="{Binding IncludeTimeEntryTickets}">
-            <TextBlock Classes="filter-label" Text="Zeitraum Zeiteinträge" />
-            <Border Classes="filter-segment-group"
-                    HorizontalAlignment="Left">
-              <StackPanel Orientation="Horizontal" Spacing="2">
-                <Button Classes="filter-segment"
-                        Classes.active="{Binding IsTimeEntryLookback3Months}"
-                        Content="3 Monate"
-                        Command="{Binding SelectTimeEntryLookback3MonthsCommand}" />
-                <Button Classes="filter-segment"
-                        Classes.active="{Binding IsTimeEntryLookback6Months}"
-                        Content="6 Monate"
-                        Command="{Binding SelectTimeEntryLookback6MonthsCommand}" />
-                <Button Classes="filter-segment"
-                        Classes.active="{Binding IsTimeEntryLookback9Months}"
-                        Content="9 Monate"
-                        Command="{Binding SelectTimeEntryLookback9MonthsCommand}" />
-                <Button Classes="filter-segment"
-                        Classes.active="{Binding IsTimeEntryLookback12Months}"
-                        Content="12 Monate"
-                        Command="{Binding SelectTimeEntryLookback12MonthsCommand}" />
-              </StackPanel>
-            </Border>
           </StackPanel>
-        </StackPanel>
-      </Border>
-
-      <Button Classes="primary"
-              Command="{Binding LoadTicketsCommand}"
-              Content="{materialIcons:MaterialIconTextExt Kind=Refresh, Text=Tickets laden}" />
-
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <TextBox Width="180" PlaceholderText="Ticket-ID" Text="{Binding TicketIdToAdd}" />
-        <Button Classes="secondary"
-                Command="{Binding AddTicketByIdCommand}"
-                Content="{materialIcons:MaterialIconTextExt Kind=Plus, Text=Ticket per ID hinzufügen}" />
-      </StackPanel>
-
-      <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+        </Border>
+      </Expander>
     </StackPanel>
 
     <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="24,0,24,24">
       <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
-        <TextBox Text="{Binding TicketFilterText}"
-                 PlaceholderText="{Binding SearchPlaceholder}" />
-        <TextBlock Text="{Binding ListScopeSummary}"
-                   FontSize="12"
-                   Opacity="0.75" />
+        <TextBlock Text="{Binding ListScopeSummary}" FontSize="12" Opacity="0.75" />
       </StackPanel>
 
       <ListBox Grid.Row="1"

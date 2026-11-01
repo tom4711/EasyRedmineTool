@@ -73,7 +73,7 @@
 
     <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Margin="24,0,24,24" Spacing="16">
-        <Border Classes="series-card">
+        <Border Classes="series-card" IsEnabled="{Binding !ShowBookingConfirmation}">
           <StackPanel Spacing="12">
             <TextBlock Text="Einstellungen" FontSize="16" FontWeight="SemiBold" />
 
@@ -228,7 +228,9 @@
           </StackPanel>
         </Border>
 
-        <Border Classes="series-card" IsVisible="{Binding HasPreview}">
+        <Border Classes="series-card"
+                IsVisible="{Binding HasPreview}"
+                IsEnabled="{Binding !ShowBookingConfirmation}">
           <StackPanel Spacing="12">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Grid.Column="0" Spacing="4">
@@ -295,7 +297,8 @@
             <StackPanel Orientation="Horizontal" Spacing="8">
               <Button Classes="primary"
                       Command="{Binding ConfirmBookSeriesCommand}"
-                      Content="Ja, buchen" />
+                      IsEnabled="{Binding !IsBooking}"
+                      Content="{Binding BookingConfirmationActionLabel}" />
               <Button Classes="secondary"
                       Command="{Binding CancelBookSeriesConfirmationCommand}"
                       Content="Abbrechen" />

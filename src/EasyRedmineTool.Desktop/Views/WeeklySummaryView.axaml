@@ -57,12 +57,31 @@
 
   <Grid RowDefinitions="Auto,*">
     <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="8">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
         <StackPanel Grid.Column="0" Spacing="4">
           <TextBlock Text="Auswertung" FontSize="22" FontWeight="Bold" />
           <TextBlock Text="{Binding CurrentQuarterLabel}" Opacity="0.85" TextWrapping="Wrap" />
         </StackPanel>
-        <Button Grid.Column="1"
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+          <Button Classes="ghost compact"
+                  Command="{Binding PreviousQuarterCommand}"
+                  ToolTip.Tip="Vorheriges Quartal"
+                  AutomationProperties.Name="Vorheriges Quartal">
+            <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Height="18" />
+          </Button>
+          <Button Classes="ghost compact"
+                  Command="{Binding NextQuarterCommand}"
+                  IsEnabled="{Binding !IsCurrentQuarter}"
+                  ToolTip.Tip="Nächstes Quartal"
+                  AutomationProperties.Name="Nächstes Quartal">
+            <materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Height="18" />
+          </Button>
+          <Button Classes="secondary compact"
+                  Command="{Binding SelectCurrentQuarterCommand}"
+                  IsEnabled="{Binding !IsCurrentQuarter}"
+                  Content="Aktuelles Quartal" />
+        </StackPanel>
+        <Button Grid.Column="2"
                 Classes.primary="{Binding !HasLoadedData}"
                 Classes.secondary="{Binding HasLoadedData}"
                 VerticalAlignment="Top"
@@ -72,6 +91,10 @@
       </Grid>
 
       <TextBlock Text="{Binding WeeklyTotalHours, StringFormat=Gesamtstunden im Zeitraum: {0}}" FontWeight="SemiBold" />
+      <TextBlock Text="Die längste Leiste entspricht der Woche mit den meisten gebuchten Stunden im ausgewählten Zeitraum."
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 Opacity="0.75" />
       <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Opacity="0.85" />
     </StackPanel>
 

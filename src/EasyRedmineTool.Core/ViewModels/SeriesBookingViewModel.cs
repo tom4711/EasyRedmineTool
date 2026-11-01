@@ -20,6 +20,13 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     private readonly ITimeEntryService _timeEntryService;
     private CancellationTokenSource? _ticketDetailsCts;
     private CancellationTokenSource? _ticketFilterCts;
+    private int _previewVersion;
+    private List<DateTime> _confirmedDates = [];
+    private IssueDto? _confirmedTicket;
+    private TimeEntryActivityDto? _confirmedActivity;
+    private double _confirmedHours;
+    private string _confirmedComments = string.Empty;
+    private IReadOnlyList<TimeEntryCustomFieldValue> _confirmedCustomFields = [];
 
     [ObservableProperty]
     private IssueDto? selectedTicket;
@@ -131,6 +138,10 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
     public bool CanBook => HasPreview && PreviewRows.Any(row => row.IsSelected) && !IsLoadingPreview && !IsBooking;
 
+    public string BookingConfirmationActionLabel => _confirmedDates.Count == 1
+        ? "1 Eintrag buchen"
+        : $"{_confirmedDates.Count} Einträge buchen";
+
     public void PrepareView()
     {
         ReloadTickets();
@@ -144,8 +155,15 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectedTicketChanged(IssueDto? value)
     {
+        ClearPreview();
         _ = LoadTicketDetailsAsync();
     }
+
+    partial void OnFromDateChanged(DateTimeOffset? value) => ClearPreview();
+    partial void OnToDateChanged(DateTimeOffset? value) => ClearPreview();
+    partial void OnHoursChanged(string value) => ClearPreview();
+    partial void OnSelectedActivityChanged(TimeEntryActivityDto? value) => InvalidateBookingConfirmation();
+    partial void OnCommentsChanged(string value) => InvalidateBookingConfirmation();
 
     partial void OnShowFavoritesOnlyChanged(bool value)
     {
@@ -277,7 +295,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        if (!double.TryParse(Hours, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedHours) || parsedHours <= 0)
+        if (!TimeEntryHours.TryParsePositive(Hours, out var parsedHours))
         {
             StatusMessage = "Bitte gültige Stunden eingeben.";
             return;
@@ -324,6 +342,8 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
         {
             IsLoadingPreview = true;
             StatusMessage = "Bestehende Einträge werden geprüft …";
+            var previewVersion = _previewVersion;
+            var ticketId = SelectedTicket.Id;
 
             var loadResult = await _timeEntryService.GetMyTimeEntriesAsync(
                 settings.BaseUrl,
@@ -331,13 +351,19 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
                 FromDate.Value.Date,
                 ToDate.Value.Date);
 
+            if (previewVersion != _previewVersion)
+            {
+                StatusMessage = "Eingaben geändert. Bitte Vorschau erneut laden.";
+                return;
+            }
+
             if (!loadResult.Success)
             {
                 StatusMessage = loadResult.Message;
                 return;
             }
 
-            var conflictDates = SeriesBookingPlanner.FindConflictDates(SelectedTicket.Id, loadResult.Entries);
+            var conflictDates = SeriesBookingPlanner.FindConflictDates(ticketId, loadResult.Entries);
 
             PreviewRows.Clear();
             foreach (var date in plannedDates)
@@ -407,16 +433,38 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var selectedCount = PreviewRows.Count(row => row.IsSelected);
-        if (!double.TryParse(Hours, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedHours) || parsedHours <= 0)
+        var selectedRows = PreviewRows.Where(row => row.IsSelected).OrderBy(row => row.Date).ToList();
+        var selectedCount = selectedRows.Count;
+        if (selectedCount == 0)
+        {
+            StatusMessage = "Keine Tage zum Buchen ausgewählt.";
+            return;
+        }
+
+        if (!TimeEntryHours.TryParsePositive(Hours, out var parsedHours))
         {
             StatusMessage = "Bitte gültige Stunden eingeben.";
             return;
         }
 
+        _confirmedDates = selectedRows.Select(row => row.Date).ToList();
+        _confirmedTicket = SelectedTicket;
+        _confirmedActivity = SelectedActivity;
+        _confirmedHours = parsedHours;
+        _confirmedComments = Comments;
+        _confirmedCustomFields = TimeEntryCustomFieldSupport.BuildValues(CustomFields).ToList();
+        OnPropertyChanged(nameof(BookingConfirmationActionLabel));
+        var hoursPerEntry = parsedHours.ToString("G", CultureInfo.InvariantCulture);
+        var totalHours = (selectedCount * parsedHours).ToString("G", CultureInfo.InvariantCulture);
+        var selectedConflictCount = selectedRows.Count(row => row.HasConflict);
+        var conflictSummary = selectedConflictCount == 0
+            ? "Keine Konflikttage ausgewählt."
+            : $"{selectedConflictCount} Konflikttage bewusst ausgewählt.";
         BookingConfirmationText =
-            $"{selectedCount} Zeiteinträge à {parsedHours.ToString("0.##", CultureInfo.InvariantCulture)} Stunden " +
-            $"für Ticket #{SelectedTicket.Id} buchen?";
+            $"{selectedCount} Einträge × {hoursPerEntry} h = {totalHours} h\n" +
+            $"Zeitraum: {selectedRows[0].DateLabel} – {selectedRows[^1].DateLabel}\n" +
+            $"Ticket #{SelectedTicket.Id}: {SelectedTicket.Subject}\n" +
+            conflictSummary;
         ShowBookingConfirmation = true;
     }
 
@@ -426,23 +474,22 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task ConfirmBookSeriesAsync()
     {
-        if (IsBooking || SelectedTicket is null || SelectedActivity is null)
+        if (!ShowBookingConfirmation || IsBooking || _confirmedTicket is null || _confirmedActivity is null)
         {
             return;
         }
 
-        var selectedRows = PreviewRows.Where(row => row.IsSelected).OrderBy(row => row.Date).ToList();
-        if (selectedRows.Count == 0)
+        var confirmedDates = _confirmedDates.ToHashSet();
+        var selectedRows = PreviewRows
+            .Where(row => row.IsSelected && confirmedDates.Contains(row.Date))
+            .OrderBy(row => row.Date)
+            .ToList();
+        if (selectedRows.Count == 0 || selectedRows.Count != _confirmedDates.Count)
         {
             ShowBookingConfirmation = false;
-            StatusMessage = "Keine Tage zum Buchen ausgewählt.";
-            return;
-        }
-
-        if (!double.TryParse(Hours, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedHours) || parsedHours <= 0)
-        {
-            ShowBookingConfirmation = false;
-            StatusMessage = "Bitte gültige Stunden eingeben.";
+            StatusMessage = selectedRows.Count == 0
+                ? "Keine Tage zum Buchen ausgewählt."
+                : "Die Vorschau hat sich geändert. Bitte erneut bestätigen.";
             return;
         }
 
@@ -462,7 +509,11 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var customFieldValues = TimeEntryCustomFieldSupport.BuildValues(CustomFields);
+        var bookingTicket = _confirmedTicket;
+        var bookingActivity = _confirmedActivity;
+        var parsedHours = _confirmedHours;
+        var comments = _confirmedComments;
+        var customFieldValues = _confirmedCustomFields;
         ShowBookingConfirmation = false;
 
         try
@@ -481,11 +532,11 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
                     settings.ApiKey,
                     new TimeEntryCreateRequest
                     {
-                        IssueId = SelectedTicket.Id,
+                        IssueId = bookingTicket.Id,
                         Hours = parsedHours,
                         SpentOn = RedmineDates.FormatSpentOn(row.Date),
-                        ActivityId = SelectedActivity.Id,
-                        Comments = Comments,
+                        ActivityId = bookingActivity.Id,
+                        Comments = comments,
                         CustomFields = customFieldValues.ToList()
                     });
 
@@ -647,6 +698,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             }
 
             OnPropertyChanged(nameof(HasCustomFields));
+            InvalidateBookingConfirmation();
         }
         catch (OperationCanceledException) when (loadToken.IsCancellationRequested)
         {
@@ -699,14 +751,25 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
     private void ClearPreview()
     {
+        _previewVersion++;
         HasPreview = false;
         PreviewRows.Clear();
+        InvalidateBookingConfirmation();
         NotifyPreviewChanged();
     }
 
     private void NotifyPreviewChanged()
     {
+        InvalidateBookingConfirmation();
         OnPropertyChanged(nameof(PreviewSummary));
         OnPropertyChanged(nameof(CanBook));
+    }
+
+    private void InvalidateBookingConfirmation()
+    {
+        if (ShowBookingConfirmation)
+        {
+            ShowBookingConfirmation = false;
+        }
     }
 }

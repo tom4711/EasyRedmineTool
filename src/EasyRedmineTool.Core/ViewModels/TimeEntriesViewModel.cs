@@ -95,7 +95,25 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         DateTime spentOn)
     {
         UpdateCachedTicketLastTimeEntry(row.Ticket.Id, spentOn);
-        ReloadFavorites();
+        foreach (var favoriteRow in FavoriteRows.Where(item => item.Ticket.Id == row.Ticket.Id))
+        {
+            if (favoriteRow.Ticket.LastTimeEntryOn is null || spentOn >= favoriteRow.Ticket.LastTimeEntryOn)
+            {
+                favoriteRow.Ticket.LastTimeEntryOn = spentOn;
+            }
+        }
+
+        var orderedRows = FavoriteRows
+            .OrderByDescending(item => item.Ticket.LastTimeEntryOn.HasValue)
+            .ThenByDescending(item => item.Ticket.LastTimeEntryOn)
+            .ThenBy(item => item.Ticket.Id)
+            .ToList();
+        for (var index = 0; index < orderedRows.Count; index++)
+        {
+            FavoriteRows.Move(FavoriteRows.IndexOf(orderedRows[index]), index);
+        }
+
+        ApplyFavoriteFilter();
         await ReloadTodayBookedHoursAsync();
     }
 
