@@ -244,6 +244,7 @@ public class TimeEntriesViewModelTests
         await request;
         Assert.Same(row, Assert.Single(viewModel.FavoriteRows));
         Assert.Contains("20.10.2026", row.RowStatusMessage, StringComparison.Ordinal);
+        Assert.Equal(RedmineDates.FormatSpentOn(submittedDate), Assert.Single(context.TimeEntryService.CreatedRequests).SpentOn);
         Assert.False(row.IsSubmitting);
     }
 
@@ -289,6 +290,8 @@ public class TimeEntriesViewModelTests
 
         public TaskCompletionSource<TimeEntryOperationResult>? PendingCreate { get; set; }
 
+        public List<TimeEntryCreateRequest> CreatedRequests { get; } = [];
+
         public bool LoadSuccess { get; set; } = true;
 
         public Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(
@@ -321,8 +324,11 @@ public class TimeEntriesViewModelTests
             string baseUrl,
             string apiKey,
             TimeEntryCreateRequest request,
-            CancellationToken cancellationToken = default) =>
-            PendingCreate?.Task ?? Task.FromResult(new TimeEntryOperationResult { Success = true });
+            CancellationToken cancellationToken = default)
+        {
+            CreatedRequests.Add(request);
+            return PendingCreate?.Task ?? Task.FromResult(new TimeEntryOperationResult { Success = true });
+        }
 
         public Task<TimeEntryOperationResult> UpdateTimeEntryAsync(
             string baseUrl,

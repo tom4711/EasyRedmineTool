@@ -8,9 +8,7 @@
 
   <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                 HorizontalAlignment="Stretch">
-    <Grid Margin="24"
-          Width="{Binding $parent[ScrollViewer].Viewport.Width}"
-          HorizontalAlignment="Left">
+    <Grid Margin="24">
       <Border Width="{Binding $parent[Grid].Bounds.Width}"
             MaxWidth="640"
             HorizontalAlignment="Left">

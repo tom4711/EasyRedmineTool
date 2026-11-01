@@ -53,6 +53,7 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
     public void PrepareView()
     {
         UpdateQuarterLabel();
+        OnPropertyChanged(nameof(IsCurrentQuarter));
 
         if (!HasLoadedData)
         {

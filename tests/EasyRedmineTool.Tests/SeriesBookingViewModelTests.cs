@@ -107,6 +107,10 @@ public class SeriesBookingViewModelTests
 
         await viewModel.RefreshPreviewCommand.ExecuteAsync(null);
         viewModel.RequestBookSeriesCommand.Execute(null);
+        Assert.True(viewModel.ShowBookingConfirmation);
+        Assert.Equal("1 Eintrag buchen", viewModel.BookingConfirmationActionLabel);
+        Assert.Contains("1 Einträge × 2 h = 2 h", viewModel.BookingConfirmationText, StringComparison.Ordinal);
+        Assert.Contains("Ticket #42: Task", viewModel.BookingConfirmationText, StringComparison.Ordinal);
         await viewModel.ConfirmBookSeriesCommand.ExecuteAsync(null);
 
         Assert.Single(context.TimeEntryService.CreatedRequests);

@@ -454,8 +454,8 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
         _confirmedComments = Comments;
         _confirmedCustomFields = TimeEntryCustomFieldSupport.BuildValues(CustomFields).ToList();
         OnPropertyChanged(nameof(BookingConfirmationActionLabel));
-        var hoursPerEntry = parsedHours.ToString("0.##", CultureInfo.InvariantCulture);
-        var totalHours = (selectedCount * parsedHours).ToString("0.##", CultureInfo.InvariantCulture);
+        var hoursPerEntry = parsedHours.ToString("G", CultureInfo.InvariantCulture);
+        var totalHours = (selectedCount * parsedHours).ToString("G", CultureInfo.InvariantCulture);
         var selectedConflictCount = selectedRows.Count(row => row.HasConflict);
         var conflictSummary = selectedConflictCount == 0
             ? "Keine Konflikttage ausgewählt."
@@ -698,6 +698,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             }
 
             OnPropertyChanged(nameof(HasCustomFields));
+            InvalidateBookingConfirmation();
         }
         catch (OperationCanceledException) when (loadToken.IsCancellationRequested)
         {

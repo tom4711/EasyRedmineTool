@@ -401,7 +401,7 @@
                         <TextBlock Classes="inline-field-label" Text="Stunden" />
                         <TextBox Classes="hours-input" Text="{Binding Hours}" PlaceholderText="1,5" />
                       </StackPanel>
-                      <StackPanel Width="220" Margin="0,0,8,0" Spacing="4">
+                      <StackPanel Margin="0,0,8,0" Spacing="4">
                         <TextBlock Classes="inline-field-label" Text="Aktivität" />
                         <ComboBox Classes="row-field"
                                   HorizontalAlignment="Stretch"

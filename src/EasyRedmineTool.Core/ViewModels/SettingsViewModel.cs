@@ -16,6 +16,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     private string _savedApiKey = string.Empty;
     private string? _lastTestedBaseUrl;
     private string? _lastTestedApiKey;
+    private string? _lastTestResultMessage;
     private bool _isInitializing;
 
     [ObservableProperty]
@@ -99,10 +100,11 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
             CancelConnectionTest();
             ConnectionStatusMessage = "Eingaben während der Prüfung geändert. Bitte erneut testen.";
         }
-        else if (_lastTestedBaseUrl is not null
-            && (BaseUrl != _lastTestedBaseUrl || ApiKey != _lastTestedApiKey))
+        else if (_lastTestedBaseUrl is not null)
         {
-            ConnectionStatusMessage = "Eingaben geändert. Verbindungsergebnis ist veraltet.";
+            ConnectionStatusMessage = BaseUrl != _lastTestedBaseUrl || ApiKey != _lastTestedApiKey
+                ? "Eingaben geändert. Verbindungsergebnis ist veraltet."
+                : _lastTestResultMessage ?? string.Empty;
         }
     }
 
@@ -160,6 +162,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
 
             _lastTestedBaseUrl = testedBaseUrl;
             _lastTestedApiKey = testedApiKey;
+            _lastTestResultMessage = result.Message;
             ConnectionStatusMessage = result.Message;
         }
         catch (OperationCanceledException)

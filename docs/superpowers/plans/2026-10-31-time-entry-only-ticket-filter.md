@@ -38,7 +38,7 @@
 
 **Interfaces:**
 - Consumes: the existing `ITicketService.GetTicketsForListAsync` and current user's paginated time entries.
-- Produces: when `IncludeTimeEntryTickets` is true, `TicketListLoadResult.Tickets` contains only matching time-entry tickets; `OpenTicketCount` is zero and `TimeEntryTicketCount` equals the unique accepted ticket count.
+- Produces: when `OnlyTimeEntryTickets` is true, `TicketListLoadResult.Tickets` contains only matching time-entry tickets; `OpenTicketCount` is zero and `TimeEntryTicketCount` equals the unique accepted ticket count.
 
 - [x] **Step 1: Change the service query path** so the normal `GetIssuesAsync` request is skipped when time entry mode is enabled; collect unique issue IDs from entries returned for the selected period, load those issues, and keep the existing assignee/status match out of this exclusive mode.
 - [x] **Step 2: Update the result status text** to say that only tickets with the user's time entries in the selected number of months were loaded, including when the result is empty.

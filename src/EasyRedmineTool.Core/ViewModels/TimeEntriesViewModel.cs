@@ -95,9 +95,12 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         DateTime spentOn)
     {
         UpdateCachedTicketLastTimeEntry(row.Ticket.Id, spentOn);
-        if (row.Ticket.LastTimeEntryOn is null || spentOn >= row.Ticket.LastTimeEntryOn)
+        foreach (var favoriteRow in FavoriteRows.Where(item => item.Ticket.Id == row.Ticket.Id))
         {
-            row.Ticket.LastTimeEntryOn = spentOn;
+            if (favoriteRow.Ticket.LastTimeEntryOn is null || spentOn >= favoriteRow.Ticket.LastTimeEntryOn)
+            {
+                favoriteRow.Ticket.LastTimeEntryOn = spentOn;
+            }
         }
 
         var orderedRows = FavoriteRows
