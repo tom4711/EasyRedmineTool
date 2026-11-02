@@ -30,4 +30,6 @@ Decision: API-key changes conservatively reset active per-connection data; offli
 - API/cache commit: 1593b94. UI/application/series commit: 926e34d.
 - Final Release run: 197 Core + 2 Desktop =199 passed,0failed,0skipped; all Desktop/XAML compiled.
 - Independent storage and UI reviews: all identified blockers resolved.
-- Remaining action: commit persistence/docs, push collective branch, create PR with Closes #47 through #58 and observe CI.
+- Complete: persistence/docs committed, collective branch pushed, PR #59 created with Closes #47 through #58. GitHub CI is checked at handoff.
+
+Final commits: 1593b94 (transport),926e34d (UI/application),e3e9865 (persistence),93dfef1 (documentation). PR: https://github.com/tom4711/EasyRedmineTool/pull/59

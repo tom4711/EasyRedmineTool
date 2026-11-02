@@ -51,4 +51,6 @@
 - [x] Persistence tests and implementation
 - [x] UI/application integration tests and implementation
 - [x] Full suite and desktop build pass; independent final review and findings addressed
-- [ ] Review report, implementation notes and plan committed; branch pushed; PR has `Closes #47` through `Closes #58`
+- [x] Review report, implementation notes and plan committed; branch pushed; PR has `Closes #47` through `Closes #58`
+
+PR: https://github.com/tom4711/EasyRedmineTool/pull/59
