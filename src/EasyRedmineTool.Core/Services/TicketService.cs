@@ -16,6 +16,8 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
 
     private readonly IEasyRedmineApiClient _apiClient = apiClient;
     private readonly object _timeEntryCacheLock = new();
+    private long _timeEntryCacheGeneration;
+    private readonly Dictionary<string, Lazy<Task<IReadOnlyList<TimeEntryDto>>>> _timeEntryInflight = new();
     private string? _timeEntryCacheKey;
     private DateTime _timeEntryCacheExpiresAt;
     private IReadOnlyList<TimeEntryDto> _cachedTimeEntries = [];
@@ -24,6 +26,8 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
     {
         lock (_timeEntryCacheLock)
         {
+            _timeEntryCacheGeneration++;
+            _timeEntryInflight.Clear();
             _timeEntryCacheKey = null;
             _timeEntryCacheExpiresAt = DateTime.MinValue;
             _cachedTimeEntries = [];
@@ -128,25 +132,59 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
         DateTime to,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var cacheKey = $"{baseUrl}|{apiKey}|{RedmineDates.FormatSpentOn(from)}|{RedmineDates.FormatSpentOn(to)}";
-
+        Lazy<Task<IReadOnlyList<TimeEntryDto>>> load;
         lock (_timeEntryCacheLock)
         {
             if (_timeEntryCacheKey == cacheKey && DateTime.UtcNow < _timeEntryCacheExpiresAt)
             {
                 return _cachedTimeEntries;
             }
+
+            if (!_timeEntryInflight.TryGetValue(cacheKey, out load!))
+            {
+                var generation = _timeEntryCacheGeneration;
+                load = new(() => LoadTimeEntriesAsync(cacheKey, generation, baseUrl, apiKey, from, to));
+                _timeEntryInflight.Add(cacheKey, load);
+            }
         }
 
-        var entries = await _apiClient.GetAllMyTimeEntriesAsync(baseUrl, apiKey, from, to, cancellationToken);
+        return await load.Value.WaitAsync(cancellationToken);
+    }
 
-        lock (_timeEntryCacheLock)
+    private async Task<IReadOnlyList<TimeEntryDto>> LoadTimeEntriesAsync(
+        string cacheKey,
+        long generation,
+        string baseUrl,
+        string apiKey,
+        DateTime from,
+        DateTime to)
+    {
+        try
         {
-            _timeEntryCacheKey = cacheKey;
-            _timeEntryCacheExpiresAt = DateTime.UtcNow.Add(TimeEntryCacheTtl);
-            _cachedTimeEntries = entries;
-        }
+            var entries = await _apiClient.GetAllMyTimeEntriesAsync(baseUrl, apiKey, from, to, CancellationToken.None);
+            lock (_timeEntryCacheLock)
+            {
+                if (_timeEntryCacheGeneration == generation)
+                {
+                    _timeEntryCacheKey = cacheKey;
+                    _timeEntryCacheExpiresAt = DateTime.UtcNow.Add(TimeEntryCacheTtl);
+                    _cachedTimeEntries = entries;
+                }
+            }
 
-        return entries;
+            return entries;
+        }
+        finally
+        {
+            lock (_timeEntryCacheLock)
+            {
+                if (_timeEntryCacheGeneration == generation)
+                {
+                    _timeEntryInflight.Remove(cacheKey);
+                }
+            }
+        }
     }
 }

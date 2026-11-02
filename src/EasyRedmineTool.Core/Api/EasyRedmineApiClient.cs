@@ -64,33 +64,11 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         int? statusId = null,
         CancellationToken cancellationToken = default)
     {
-        var offset = 0;
-        var all = new List<IssueDto>();
-        int? totalCount = null;
-
-        for (var pageIndex = 0; pageIndex < MaxPaginationPages; pageIndex++)
+        return await GetAllPagesAsync<IssueDto>("issues.json", issue => issue.Id, async offset =>
         {
             var page = await GetIssuesPageAsync(baseUrl, apiKey, assigneeFilter, statusKind, statusId, PageLimit, offset, cancellationToken);
-            if (page?.Issues is null || page.Issues.Count == 0)
-            {
-                break;
-            }
-
-            all.AddRange(page.Issues);
-            if (page.Total_Count > 0)
-            {
-                totalCount ??= page.Total_Count;
-            }
-
-            if (IsLastPage(page.Issues.Count, PageLimit, all.Count, totalCount))
-            {
-                break;
-            }
-
-            offset += PageLimit;
-        }
-
-        return all;
+            return (page?.Issues ?? [], page?.Total_Count ?? 0, page?.Offset ?? 0, page?.Limit ?? 0);
+        });
     }
 
     private async Task<IssueListResponse?> GetIssuesPageAsync(
@@ -167,33 +145,11 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         DateTime to,
         CancellationToken cancellationToken = default)
     {
-        var offset = 0;
-        var all = new List<TimeEntryDto>();
-        int? totalCount = null;
-
-        for (var pageIndex = 0; pageIndex < MaxPaginationPages; pageIndex++)
+        return await GetAllPagesAsync<TimeEntryDto>("time_entries.json", entry => entry.Id, async offset =>
         {
             var page = await GetMyTimeEntriesPageAsync(baseUrl, apiKey, from, to, PageLimit, offset, cancellationToken);
-            if (page?.Time_Entries is null || page.Time_Entries.Count == 0)
-            {
-                break;
-            }
-
-            all.AddRange(page.Time_Entries);
-            if (page.Total_Count > 0)
-            {
-                totalCount ??= page.Total_Count;
-            }
-
-            if (IsLastPage(page.Time_Entries.Count, PageLimit, all.Count, totalCount))
-            {
-                break;
-            }
-
-            offset += PageLimit;
-        }
-
-        return all;
+            return (page?.Time_Entries ?? [], page?.Total_Count ?? 0, page?.Offset ?? 0, page?.Limit ?? 0);
+        });
     }
 
     public async Task<IReadOnlyList<IssueDto>> GetIssuesByIdsAsync(
@@ -280,7 +236,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         int offset,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = $"time_entries.json?user_id=me&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&limit={limit}&offset={offset}&include=issue";
+        var endpoint = $"time_entries.json?user_id=me&from={RedmineDates.FormatSpentOn(from)}&to={RedmineDates.FormatSpentOn(to)}&limit={limit}&offset={offset}&include=issue";
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
 
@@ -581,7 +537,60 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
     private static bool TryGetArray(JsonElement source, string propertyName, out JsonElement value) 
         => source.TryGetProperty(propertyName, out value) && value.ValueKind == JsonValueKind.Array;
 
-    private static bool IsLastPage(int pageItemCount, int pageLimit, int totalLoaded, int? totalCount) =>
-        pageItemCount < pageLimit
-        || (totalCount is > 0 && totalLoaded >= totalCount.Value);
+    private static async Task<IReadOnlyList<T>> GetAllPagesAsync<T>(
+        string endpoint,
+        Func<T, int> getId,
+        Func<int, Task<(IReadOnlyList<T> Items, int Total, int Offset, int Limit)>> loadPage)
+    {
+        var all = new List<T>();
+        var seenIds = new HashSet<int>();
+        var offset = 0;
+        int? total = null;
+        for (var pageIndex = 0; pageIndex < MaxPaginationPages; pageIndex++)
+        {
+            var page = await loadPage(offset);
+            if (page.Total > 0)
+            {
+                total = page.Total;
+            }
+
+            // Zero also represents omitted metadata in the response models.
+            if (page.Offset > 0 && page.Offset != offset)
+            {
+                throw IncompletePagination(endpoint, "Der Server liefert einen unerwarteten Seitenoffset.");
+            }
+
+            if (page.Items.Count == 0)
+            {
+                if (total.HasValue && all.Count < total.Value)
+                {
+                    throw IncompletePagination(endpoint, "Der Server liefert keine weiteren Datensätze trotz höherer Gesamtzahl.");
+                }
+
+                return all;
+            }
+
+            foreach (var item in page.Items)
+            {
+                if (!seenIds.Add(getId(item)))
+                {
+                    throw IncompletePagination(endpoint, "Der Server liefert wiederholte Datensätze statt weiterer Seiten.");
+                }
+            }
+
+            all.AddRange(page.Items);
+            if (total.HasValue ? all.Count >= total.Value : page.Items.Count < (page.Limit > 0 ? page.Limit : PageLimit))
+            {
+                return all;
+            }
+
+            // Advance by records actually consumed, including server-reduced pages.
+            offset = checked(offset + page.Items.Count);
+        }
+
+        throw IncompletePagination(endpoint, $"Das Sicherheitslimit von {MaxPaginationPages} Seiten wurde erreicht.");
+    }
+
+    private static RedmineApiException IncompletePagination(string endpoint, string detail) =>
+        new(endpoint, (int)HttpStatusCode.OK, "Abruf unvollständig", detail);
 }
