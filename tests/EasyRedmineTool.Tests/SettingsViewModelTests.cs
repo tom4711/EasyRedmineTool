@@ -27,7 +27,7 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void SaveSettings_persists_credentials_and_raises_event()
+    public async Task SaveSettings_persists_credentials_and_raises_event()
     {
         using var context = TestContext.Create();
         var viewModel = new SettingsViewModel(context.ConnectionTestService, context.SettingsService)
@@ -39,7 +39,7 @@ public class SettingsViewModelTests
         var eventRaised = false;
         viewModel.SettingsSaved += (_, _) => eventRaised = true;
 
-        viewModel.SaveSettingsCommand.Execute(null);
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
 
         Assert.True(eventRaised);
         Assert.Equal("Einstellungen gespeichert.", viewModel.SaveStatusMessage);
@@ -135,6 +135,8 @@ public class SettingsViewModelTests
 
         public void Dispose()
         {
+            SettingsService.FlushAsync().GetAwaiter().GetResult();
+            foreach (var cache in Directory.EnumerateFiles(Path.GetDirectoryName(_settingsPath)!, Path.GetFileName(_settingsPath) + ".tickets.*.json")) File.Delete(cache);
             if (File.Exists(_settingsPath))
             {
                 File.Delete(_settingsPath);

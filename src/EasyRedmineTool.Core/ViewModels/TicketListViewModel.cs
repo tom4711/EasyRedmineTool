@@ -23,6 +23,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     private string? _pendingStatusName;
     private bool _isRestoringStatusFilter;
     private bool _isReloadingSettings;
+    private long _statusLoadVersion;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -73,7 +74,6 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         _appSettingsService = appSettingsService;
 
         ReloadSettings();
-        _ = ReloadStatusFilterOptionsAsync();
     }
 
     public bool IsTimeEntryLookback3Months => TimeEntryLookbackMonths == 3;
@@ -140,6 +140,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
 
     public void ReloadSettings()
     {
+        CancelOperation();
         var settings = _appSettingsService.Load();
 
         _favoriteTicketIds.Clear();
@@ -190,6 +191,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         }
 
         ApplyTicketFilter();
+        _ = ReloadStatusFilterOptionsAsync();
     }
 
     [RelayCommand]
@@ -210,7 +212,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             var (baseUrl, apiKey) = LoadCredentials();
             var result = await _ticketService.GetTicketsForListAsync(baseUrl, apiKey, filter, cancellationToken);
 
-            if (cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested || !IsCurrentConnection(baseUrl, apiKey))
             {
                 return;
             }
@@ -270,7 +272,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             var (baseUrl, apiKey) = LoadCredentials();
             var ticket = await _ticketService.GetIssueByIdAsync(baseUrl, apiKey, ticketId, cancellationToken);
 
-            if (cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested || !IsCurrentConnection(baseUrl, apiKey))
             {
                 return;
             }
@@ -304,7 +306,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ToggleFavoriteForTicket(TicketListItemViewModel? ticketItem)
     {
-        if (ticketItem is null)
+        if (ticketItem is null || !Tickets.Contains(ticketItem))
         {
             return;
         }
@@ -315,7 +317,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void OpenTicketInBrowser(TicketListItemViewModel? ticketItem)
     {
-        if (ticketItem is null)
+        if (ticketItem is null || !Tickets.Contains(ticketItem))
         {
             return;
         }
@@ -324,9 +326,11 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         RedmineLinks.OpenIssueInBrowser(baseUrl, ticketItem.Ticket.Id);
     }
 
-    private async Task ReloadStatusFilterOptionsAsync(CancellationToken cancellationToken = default)
+    internal async Task ReloadStatusFilterOptionsAsync(CancellationToken cancellationToken = default)
     {
+        var version = ++_statusLoadVersion;
         var (baseUrl, apiKey) = LoadCredentials();
+        bool IsCurrent() => version == _statusLoadVersion && !cancellationToken.IsCancellationRequested && IsCurrentConnection(baseUrl, apiKey);
         if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(apiKey))
         {
             ApplyDefaultStatusFilterOptions();
@@ -337,7 +341,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         try
         {
             var statuses = await _ticketService.GetIssueStatusesAsync(baseUrl, apiKey, cancellationToken);
-            if (cancellationToken.IsCancellationRequested)
+            if (!IsCurrent())
             {
                 return;
             }
@@ -347,16 +351,18 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         }
         catch (OperationCanceledException)
         {
-            throw;
+            // Superseded/canceled metadata loads must not change current filters.
         }
         catch (RedmineApiException ex)
         {
+            if (!IsCurrent()) return;
             ApplyDefaultStatusFilterOptions();
             RestoreSelectedStatusFilter();
             StatusMessage = ex.Message;
         }
         catch
         {
+            if (!IsCurrent()) return;
             ApplyDefaultStatusFilterOptions();
             RestoreSelectedStatusFilter();
         }
@@ -569,6 +575,12 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
             _ => "alle Status"
         };
 
+    private bool IsCurrentConnection(string baseUrl, string apiKey)
+    {
+        var current = LoadCredentials();
+        return ConnectionIdentity.Get(baseUrl, apiKey) == ConnectionIdentity.Get(current.BaseUrl, current.ApiKey);
+    }
+
     private (string BaseUrl, string ApiKey) LoadCredentials()
     {
         var settings = _appSettingsService.Load();
@@ -636,6 +648,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         _operationCts?.Cancel();
         _operationCts?.Dispose();
         _operationCts = null;
+        IsBusy = false;
     }
 
     public void Dispose()

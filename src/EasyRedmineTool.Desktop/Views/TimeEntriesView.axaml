@@ -129,6 +129,7 @@
 
   <Grid RowDefinitions="Auto,*">
     <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="8">
+      <TextBlock Text="{Binding WarningMessage}" IsVisible="{Binding HasWarningMessage}" TextWrapping="Wrap" />
       <TextBlock Text="Zeiteinträge" FontSize="22" FontWeight="Bold" />
       <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Opacity="0.85" />
 
@@ -177,6 +178,7 @@
                   <Border Classes="today-entry-row"
                           Margin="0,0,0,8">
                     <StackPanel Spacing="10">
+                      <TextBlock Text="{Binding WarningMessage}" IsVisible="{Binding HasWarningMessage}" TextWrapping="Wrap" />
                       <Grid ColumnDefinitions="*,Auto"
                             IsVisible="{Binding !IsDeleteConfirmationVisible}">
                         <StackPanel Grid.Column="0" Spacing="4">
@@ -333,12 +335,11 @@
       </Border>
     </StackPanel>
 
-    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-      <Border Margin="24,0,24,24"
+      <Border Grid.Row="1" Margin="24,0,24,24"
               Classes="time-entry-card"
               HorizontalAlignment="Stretch">
-        <StackPanel Spacing="16">
-          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="16">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
             <TextBlock Grid.Column="0"
                        Classes="section-title"
                        Text="{Binding BookingSectionTitle}"
@@ -365,7 +366,7 @@
             </Button>
           </Grid>
 
-          <StackPanel Spacing="4">
+          <StackPanel Grid.Row="1" Spacing="4">
             <TextBox Text="{Binding FavoriteFilterText}"
                      PlaceholderText="{Binding SearchPlaceholder}" />
             <TextBlock Text="{Binding ListScopeSummary}"
@@ -373,10 +374,15 @@
                        Opacity="0.75" />
           </StackPanel>
 
-          <ItemsControl ItemsSource="{Binding FilteredFavoriteRows}">
-            <ItemsControl.ItemTemplate>
+          <ListBox x:Name="BookingRows" Grid.Row="2" ItemsSource="{Binding FilteredFavoriteRows}"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.Styles>
+              <Style Selector="ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:FavoriteTimeEntryRowViewModel">
                 <Border Classes="favorite-booking-row"
+                        Loaded="OnBookingCardLoaded" Unloaded="OnBookingCardUnloaded" DataContextChanged="OnBookingCardDataContextChanged"
                         Classes.focused="{Binding IsFocused}"
                         Margin="0,0,0,10">
                   <StackPanel Spacing="10">
@@ -495,7 +501,7 @@
                       </StackPanel>
                     </Expander>
 
-                    <!-- Optional fields are grouped in the expandable details section above. -->
+                    <TextBlock Text="{Binding WarningMessage}" IsVisible="{Binding HasWarningMessage}" TextWrapping="Wrap" />
 
                     <TextBlock Text="{Binding ValidationMessage}"
                                Foreground="IndianRed"
@@ -509,10 +515,9 @@
                   </StackPanel>
                 </Border>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
       </Border>
-    </ScrollViewer>
   </Grid>
 </UserControl>

@@ -1,0 +1,20 @@
+# Desktop transport policy and rendered booking-list regressions (#55, #57)
+
+`ServiceCollectionExtensions` now explicitly configures the Redmine typed client's `SocketsHttpHandler.PooledConnectionLifetime` to five minutes and the factory `HandlerLifetime` to infinite. Singleton services may keep their typed client while pooled connections expire independently. The existing request timeout and cancellation contracts are unchanged.
+
+Important correction to F11: the first test inspected the actual factory-created handler on this .NET 10 application and measured a **two-minute** pooled connection lifetime before the change. The review's implication that this application necessarily had unbounded pooled connections was too broad. This change makes the lifetime contract explicit and regression-tested; no prior DNS failure or infinite connection lifetime was reproduced.
+
+The new `EasyRedmineTool.Desktop.Tests` project references Desktop and uses official `Avalonia.Headless.XUnit` **12.1.4**, matching the application. That package uses xUnit v3, so the isolated test project uses xUnit v3 3.2.2 while existing Core tests retain xUnit v2. Package dependency metadata was checked at [NuGet](https://www.nuget.org/packages/Avalonia.Headless.XUnit/12.1.4), and the test approach follows Avalonia's [headless testing documentation](https://docs.avaloniaui.net/docs/testing/setting-up-the-headless-platform). The project is included in the solution after successful restore.
+
+The headless test creates the actual `TimeEntriesView` in an 1100×900 window with 500 tickets. It checks all of the following through the real control tree, layout, templates, bindings and view-model services:
+
+- Before the view is shown, 500 backing rows cause zero activity/custom-field requests.
+- The ListBox realizes between 1 and 30 containers, rather than 500. Initial activity and field request counts are also bounded by 30; in-flight activity loads never exceed four.
+- A bound hours TextBox updates the row. Scrolling to ticket 500 removes the first row's container and loads the newly visible ticket; scrolling back restores the same row, hours, date, comments, selected activity and custom-field object/value.
+- Returning to the first row does not reload its completed form. Total requests across these scroll transitions remain bounded by 60.
+
+The test application loads FluentTheme and the production resource dictionaries but never initializes the production App, settings or services. It explicitly registers the Desktop assembly so resource loading is independent of test order. Settings are memory-only; all form data uses a gated fake service, and mutation methods throw if called. This is a real headless layout/binding regression, not a pixel screenshot comparison or a live backend test.
+
+TDD/verification: the HTTP test failed before the DI change with expected 5 minutes versus actual 2 minutes. The rendered test identified a real invalid ListBox XAML property during its first build; the root task corrected that view. An initial harness order dependency in resource loading was corrected, then the UI test passed independently. The final combined desktop run passes both tests with no failures/skips. Use the existing serialized solution runner for subsequent full-suite checks; direct project verification used the same lock through `/private/tmp/ert-desktop-test.py test`.
+
+Manual DNS/reconnect check (documented, not performed): use a disposable test instance with GET access and two identifiable backend addresses under a controllable hostname. Open the desktop app, perform a read and keep the app/client alive. Change that hostname's DNS/VPN route to the second backend, wait beyond five minutes and repeat the read. Confirm a new connection reaches the second backend without restarting the application. An already running request may finish on the old connection; the lifetime policy does not interrupt active requests. Repeat with cancellation and verify cancellation still ends the read normally. Do not use booking mutations for this check.

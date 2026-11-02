@@ -17,7 +17,16 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
     private readonly TimeEntriesViewModel _parent;
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
-    private readonly TimeEntryDto _entry;
+    private TimeEntryDto _entry;
+    private bool _isDeleted;
+    private readonly string _connectionIdentity;
+    private readonly int _connectionVersion;
+    private bool IsCurrentConnection => _connectionVersion == _parent.ConnectionVersion && _connectionIdentity == _parent.CurrentConnectionIdentity();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWarningMessage))]
+    private string warningMessage = string.Empty;
+    public bool HasWarningMessage => !string.IsNullOrWhiteSpace(WarningMessage);
 
     [ObservableProperty]
     private string hours = string.Empty;
@@ -49,16 +58,36 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
         CachedTicket = cachedTicket;
         _appSettingsService = appSettingsService;
         _timeEntryService = timeEntryService;
+        _connectionVersion = parent.ConnectionVersion;
+        var settings = appSettingsService.Load();
+        _connectionIdentity = ConnectionIdentity.Get(settings.BaseUrl, settings.ApiKey);
 
         Hours = entry.Hours.ToString("0.##", CultureInfo.InvariantCulture);
         Comments = entry.Comments;
+    }
+
+    internal double BookedHours => _entry.Hours;
+    internal void UpdateEntry(TimeEntryDto entry, IssueDto? ticket)
+    {
+        if (IsBusy || IsEditing) return;
+        _entry = entry;
+        CachedTicket = ticket;
+        NotifyCommittedValues();
+    }
+
+    private void NotifyCommittedValues()
+    {
+        OnPropertyChanged(nameof(TicketLabel));
+        OnPropertyChanged(nameof(HoursDisplay));
+        OnPropertyChanged(nameof(ActivityName));
+        OnPropertyChanged(nameof(CommentsDisplay));
     }
 
     public int EntryId => _entry.Id;
 
     public int IssueId => _entry.GetIssueId();
 
-    public IssueDto? CachedTicket { get; }
+    public IssueDto? CachedTicket { get; private set; }
 
     public ObservableCollection<TimeEntryActivityDto> Activities { get; } = [];
 
@@ -138,6 +167,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
     [RelayCommand]
     private async Task SaveEditAsync()
     {
+        if (!IsCurrentConnection || _isDeleted) return;
         if (IsBusy)
         {
             return;
@@ -169,6 +199,10 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             return;
         }
 
+        var submittedComments = Comments;
+        var submittedActivity = SelectedActivity;
+        var submittedFields = CustomFields.Select(field => new TimeEntryCustomFieldRowViewModel(
+            field.Id, field.Name, field.IsRequired, field.HasPossibleValues, field.PossibleValues.ToList(), field.Value)).ToList();
         try
         {
             IsBusy = true;
@@ -183,17 +217,36 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
                     IssueId = IssueId,
                     Hours = parsedHours,
                     SpentOn = _entry.Spent_On,
-                    ActivityId = SelectedActivity.Id,
-                    Comments = Comments,
-                    CustomFields = TimeEntryCustomFieldSupport.BuildValues(CustomFields).ToList()
+                    ActivityId = submittedActivity.Id,
+                    Comments = submittedComments,
+                    CustomFields = TimeEntryCustomFieldSupport.BuildValues(submittedFields).ToList()
                 });
 
+            if (!IsCurrentConnection || _isDeleted) return;
             _parent.SetStatusMessage(result.Message);
             if (result.Success)
             {
-                TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, CustomFields);
+                _entry.Hours = parsedHours;
+                _entry.Comments = submittedComments;
+                _entry.Activity = submittedActivity;
+                _entry.Activity_Id = submittedActivity.Id;
+                _entry.Custom_Fields = submittedFields.Select(field => new TimeEntryCustomFieldValueDto
+                {
+                    Id = field.Id, Name = field.Name, Value = field.Value.Trim()
+                }).ToList();
+                NotifyCommittedValues();
                 IsEditing = false;
-                await _parent.ReloadTodayBookedHoursAsync();
+                try
+                {
+                    TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, submittedFields);
+                    await _appSettingsService.FlushAsync();
+                }
+                catch (Exception)
+                {
+                    WarningMessage = "Die Änderung ist gespeichert; lokale Vorgaben konnten nicht gespeichert werden.";
+                    if (IsCurrentConnection) _parent.SetWarningMessage(WarningMessage);
+                }
+                if (IsCurrentConnection) await RefreshAfterCommitAsync();
             }
         }
         finally
@@ -205,6 +258,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
     [RelayCommand]
     private async Task ConfirmDeleteAsync()
     {
+        if (!IsCurrentConnection || _isDeleted) return;
         if (IsBusy)
         {
             return;
@@ -227,11 +281,14 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
                 settings.ApiKey,
                 EntryId);
 
+            if (!IsCurrentConnection || _isDeleted) return;
             _parent.SetStatusMessage(result.Message);
             if (result.Success)
             {
                 IsDeleteConfirmationVisible = false;
-                await _parent.ReloadTodayBookedHoursAsync();
+                _isDeleted = true;
+                _parent.RemoveCommittedEntry(this);
+                await RefreshAfterCommitAsync();
             }
         }
         finally
@@ -240,7 +297,29 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
         }
     }
 
+    private async Task RefreshAfterCommitAsync()
+    {
+        var commitMessage = _parent.StatusMessage;
+        try
+        {
+            if (await _parent.RefreshTodayCoreAsync()) return;
+        }
+        catch (Exception) { }
+        if (IsCurrentConnection)
+        {
+            _parent.SetStatusMessage(commitMessage);
+            WarningMessage = "Die Änderung ist gespeichert; die Tagesübersicht konnte nicht aktualisiert werden.";
+            _parent.SetWarningMessage(WarningMessage);
+        }
+    }
+
     private async Task LoadEditFormDataAsync()
+    {
+        try { await LoadEditFormCoreAsync(); }
+        catch (Exception) { if (IsCurrentConnection) WarningMessage = "Die Formulardaten konnten nicht geladen werden."; }
+    }
+
+    private async Task LoadEditFormCoreAsync()
     {
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -256,6 +335,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             IssueId,
             projectId);
 
+        if (!IsCurrentConnection || !IsEditing) return;
         Activities.Clear();
         foreach (var activity in loadedActivities.OrderBy(activity => activity.Name))
         {
@@ -272,6 +352,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             IssueId,
             projectId);
 
+        if (!IsCurrentConnection || !IsEditing) return;
         CustomFields.Clear();
         foreach (var row in TimeEntryCustomFieldSupport.CreateRows(
                      recentValues,

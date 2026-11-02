@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core;
+using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Services.Interfaces;
 
 using System.Collections.ObjectModel;
@@ -98,6 +99,7 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
             IsBusy = true;
             StatusMessage = "Auswertung wird geladen …";
 
+            var requestedIdentity = CurrentIdentity();
             var requestedQuarter = SelectedQuarterStart;
             var (from, to, label) = GetSelectedQuarterRange(requestedQuarter);
 
@@ -108,7 +110,7 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
                 to,
                 cancellationToken);
 
-            if (cancellationToken.IsCancellationRequested || requestedQuarter != SelectedQuarterStart)
+            if (cancellationToken.IsCancellationRequested || requestedQuarter != SelectedQuarterStart || requestedIdentity != CurrentIdentity())
             {
                 return;
             }
@@ -148,6 +150,19 @@ public partial class WeeklySummaryViewModel : ViewModelBase, IDisposable
         {
             CompleteReload(reloadCts);
         }
+    }
+
+    public void ResetForConnectionChange()
+    {
+        CancelReload();
+        ClearLoadedData();
+        PrepareView();
+    }
+
+    private string CurrentIdentity()
+    {
+        var settings = _appSettingsService.Load();
+        return ConnectionIdentity.Get(settings.BaseUrl, settings.ApiKey);
     }
 
     [RelayCommand]
