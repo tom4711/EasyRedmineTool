@@ -9,6 +9,7 @@ internal sealed class TimeEntryFormDataCache
     private readonly object _sync = new();
     private readonly Dictionary<string, IReadOnlyList<TimeEntryActivityDto>> _activities = new();
     private readonly Dictionary<string, Lazy<Task<IReadOnlyList<TimeEntryActivityDto>>>> _activitiesInflight = new();
+    private static readonly SemaphoreSlim LoadSlots = new(4, 4);
     private long _generation;
 
     public async Task<IReadOnlyList<TimeEntryActivityDto>> GetOrLoadActivitiesAsync(
@@ -42,6 +43,7 @@ internal sealed class TimeEntryFormDataCache
         long generation,
         Func<CancellationToken, Task<IReadOnlyList<TimeEntryActivityDto>>> loader)
     {
+        await LoadSlots.WaitAsync().ConfigureAwait(false);
         try
         {
             var loaded = await loader(CancellationToken.None);
@@ -64,6 +66,7 @@ internal sealed class TimeEntryFormDataCache
                     _activitiesInflight.Remove(cacheKey);
                 }
             }
+            LoadSlots.Release();
         }
     }
 

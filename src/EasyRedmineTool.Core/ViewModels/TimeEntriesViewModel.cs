@@ -310,7 +310,8 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
                 TodayTimeEntries.Add(row);
             }
 
-            TodayBookedHours = Math.Round(todayEntries.Sum(entry => entry.Hours), 2);
+            TodayBookedHours = Math.Round(todayEntries.Sum(entry =>
+                _todayRows.TryGetValue(entry.Id, out var row) && row.IsBusy ? row.BookedHours : entry.Hours), 2);
             OnPropertyChanged(nameof(HasTodayTimeEntries));
             OnPropertyChanged(nameof(TodayEntriesSummary));
             return true;

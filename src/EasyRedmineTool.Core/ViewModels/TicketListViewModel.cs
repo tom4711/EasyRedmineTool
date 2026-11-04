@@ -232,6 +232,7 @@ public partial class TicketListViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
+            if (cancellationToken.IsCancellationRequested) return;
             StatusMessage = $"Fehler beim Laden: {ex.Message}";
         }
         finally

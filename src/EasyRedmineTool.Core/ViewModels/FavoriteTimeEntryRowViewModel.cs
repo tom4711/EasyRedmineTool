@@ -31,6 +31,11 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
 
     public bool IsCurrentConnection => _connectionVersion == _parent.ConnectionVersion && _connectionIdentity == _parent.CurrentConnectionIdentity();
     internal void AddWarning(string message) => WarningMessage = string.IsNullOrEmpty(WarningMessage) ? message : WarningMessage + " " + message;
+    private void RemoveWarning(string message)
+    {
+        var remaining = WarningMessage.Replace(message, string.Empty, StringComparison.Ordinal).Trim();
+        WarningMessage = string.Join(" ", remaining.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    }
 
     [ObservableProperty]
     private string hours = AppConstants.DefaultHours;
@@ -104,7 +109,11 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             try
             {
                 await task.WaitAsync(cancellationToken);
-                if (IsCurrentConnection && !cancellationToken.IsCancellationRequested) _formReady = true;
+                if (IsCurrentConnection && !cancellationToken.IsCancellationRequested)
+                {
+                    _formReady = true;
+                    RemoveWarning("Formulardaten konnten nicht geladen werden. Bitte die Karte erneut öffnen.");
+                }
                 return;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && task.IsCompleted)
