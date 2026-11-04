@@ -81,16 +81,74 @@ public partial class App : Application
 
     private async Task FlushAndShutdownAsync(IClassicDesktopStyleApplicationLifetime desktop, IAppSettingsService settings)
     {
-        try { await settings.FlushAsync(); }
-        catch (Exception)
+        while (true)
         {
+            try
+            {
+                var flushTask = settings.FlushAsync();
+                var completedTask = await Task.WhenAny(flushTask, Task.Delay(TimeSpan.FromSeconds(10)));
+                if (completedTask == flushTask)
+                {
+                    await flushTask;
+                    break;
+                }
+
+                _ = flushTask.ContinueWith(
+                    task => _ = task.Exception,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+            }
+            catch (Exception)
+            {
+                // Offer a retry or an explicit choice to exit without the pending settings.
+            }
+
             Services?.GetService<ILogger<App>>()?.LogWarning("Pending settings could not be persisted at shutdown.");
+            if (!await ShowPersistenceFailureDialogAsync(desktop.MainWindow)) break;
         }
-        finally
+
+        _shutdownComplete = true;
+        desktop.Shutdown();
+    }
+
+    private static async Task<bool> ShowPersistenceFailureDialogAsync(Window? owner)
+    {
+        if (owner is null) return false;
+
+        var dialog = new Window
         {
-            _shutdownComplete = true;
-            desktop.Shutdown();
-        }
+            Title = "Einstellungen nicht gespeichert",
+            Width = 440,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        var buttons = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
+        };
+        var retry = new Button { Content = "Erneut versuchen" };
+        retry.Click += (_, _) => dialog.Close(true);
+        var exit = new Button { Content = "Trotzdem beenden" };
+        exit.Click += (_, _) => dialog.Close(false);
+        buttons.Children.Add(retry);
+        buttons.Children.Add(exit);
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(20),
+            Spacing = 16,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Die letzten Einstellungen konnten nicht gespeichert werden. Sie können es erneut versuchen oder die Anwendung jetzt beenden.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                },
+                buttons
+            }
+        };
+        return await dialog.ShowDialog<bool>(owner);
     }
 
     private static void ApplyMacOsDockIcon()

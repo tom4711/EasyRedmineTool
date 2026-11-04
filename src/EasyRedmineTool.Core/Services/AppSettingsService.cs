@@ -179,8 +179,22 @@ public sealed class AppSettingsService : IAppSettingsService
                 await using var ownership = await AcquirePersistenceLockAsync().ConfigureAwait(false);
                 await RefreshCommittedHistoryAsync().ConfigureAwait(false);
                 var identity = Identity(snapshot);
-                if (!_writtenTickets.TryGetValue(identity, out var tickets) || !TicketsEqual(tickets.Tickets, snapshot.CachedTickets) ||
-                    !File.Exists(TicketPath(identity, tickets.Revision)))
+                var canReuseRevision = _writtenTickets.TryGetValue(identity, out var tickets) &&
+                    TicketsEqual(tickets.Tickets, snapshot.CachedTickets);
+                if (canReuseRevision)
+                {
+                    try
+                    {
+                        var persistedTickets = await ReadTicketsAsync(identity, tickets!.Revision).ConfigureAwait(false);
+                        canReuseRevision = TicketsEqual(persistedTickets, snapshot.CachedTickets);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
+                    {
+                        canReuseRevision = false;
+                    }
+                }
+
+                if (!canReuseRevision)
                 {
                     var revision = Guid.NewGuid().ToString("N");
                     await WriteAtomicallyAsync(TicketPath(identity, revision), new TicketDocument
@@ -194,8 +208,9 @@ public sealed class AppSettingsService : IAppSettingsService
                 }
 
                 _committedRevisions.TryGetValue(identity, out var committed);
-                var nextHistory = committed?.Current == tickets.Revision
-                    ? committed : new TicketRevisionHistory(tickets.Revision, committed?.Current);
+                var revisionToCommit = tickets!.Revision;
+                var nextHistory = committed?.Current == revisionToCommit
+                    ? committed : new TicketRevisionHistory(revisionToCommit, committed?.Current);
                 var histories = new Dictionary<string, TicketRevisionHistory>(_committedRevisions) { [identity] = nextHistory };
                 var smallSettings = Normalize(snapshot);
                 smallSettings.CachedTickets = [];
