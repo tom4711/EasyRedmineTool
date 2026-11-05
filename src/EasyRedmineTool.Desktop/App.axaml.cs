@@ -16,6 +16,7 @@ using EasyRedmineTool.Desktop.Views;
 using Microsoft.Extensions.DependencyInjection;
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -86,9 +87,12 @@ public partial class App : Application
             try
             {
                 var flushTask = settings.FlushAsync();
-                var completedTask = await Task.WhenAny(flushTask, Task.Delay(TimeSpan.FromSeconds(10)));
+                using var timeout = new CancellationTokenSource();
+                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(10), timeout.Token);
+                var completedTask = await Task.WhenAny(flushTask, timeoutTask);
                 if (completedTask == flushTask)
                 {
+                    timeout.Cancel();
                     await flushTask;
                     break;
                 }

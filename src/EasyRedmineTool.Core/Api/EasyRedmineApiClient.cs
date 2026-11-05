@@ -402,7 +402,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         string spentOn,
         int activityId,
         string comments,
-        IReadOnlyList<TimeEntryCustomFieldValue> customFields)
+        List<TimeEntryCustomFieldValue> customFields)
     {
         if (customFields.Count == 0)
         {
