@@ -19,6 +19,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
     private readonly ITimeEntryService _timeEntryService;
     private TimeEntryDto _entry;
     private bool _isDeleted;
+    private long _editSession;
     private readonly string _connectionIdentity;
     private readonly int _connectionVersion;
     private bool IsCurrentConnection => _connectionVersion == _parent.ConnectionVersion && _connectionIdentity == _parent.CurrentConnectionIdentity();
@@ -67,6 +68,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
     }
 
     internal double BookedHours => _entry.Hours;
+    internal bool HasPendingUserState => IsEditing || IsBusy || IsDeleteConfirmationVisible;
     internal void UpdateEntry(TimeEntryDto entry, IssueDto? ticket)
     {
         if (IsBusy || IsEditing) return;
@@ -122,11 +124,12 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
 
     partial void OnIsEditingChanged(bool value)
     {
+        var editSession = ++_editSession;
         if (value)
         {
             Hours = _entry.Hours.ToString("0.##", CultureInfo.InvariantCulture);
             Comments = _entry.Comments;
-            _ = LoadEditFormDataAsync();
+            _ = LoadEditFormDataAsync(editSession);
         }
         else
         {
@@ -313,13 +316,16 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadEditFormDataAsync()
+    private async Task LoadEditFormDataAsync(long editSession)
     {
-        try { await LoadEditFormCoreAsync(); }
-        catch (Exception) { if (IsCurrentConnection) WarningMessage = "Die Formulardaten konnten nicht geladen werden."; }
+        try { await LoadEditFormCoreAsync(editSession); }
+        catch (Exception)
+        {
+            if (IsCurrentEditSession(editSession)) WarningMessage = "Die Formulardaten konnten nicht geladen werden.";
+        }
     }
 
-    private async Task LoadEditFormCoreAsync()
+    private async Task LoadEditFormCoreAsync(long editSession)
     {
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
@@ -335,7 +341,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             IssueId,
             projectId);
 
-        if (!IsCurrentConnection || !IsEditing) return;
+        if (!IsCurrentEditSession(editSession)) return;
         Activities.Clear();
         foreach (var activity in loadedActivities.OrderBy(activity => activity.Name))
         {
@@ -352,7 +358,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
             IssueId,
             projectId);
 
-        if (!IsCurrentConnection || !IsEditing) return;
+        if (!IsCurrentEditSession(editSession)) return;
         CustomFields.Clear();
         foreach (var row in TimeEntryCustomFieldSupport.CreateRows(
                      recentValues,
@@ -364,4 +370,7 @@ public partial class TodayTimeEntryRowViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(HasCustomFields));
     }
+
+    private bool IsCurrentEditSession(long editSession) =>
+        editSession == _editSession && IsCurrentConnection && IsEditing;
 }

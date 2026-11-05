@@ -296,6 +296,14 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
                 .OrderByDescending(entry => entry.Hours)
                 .ThenBy(entry => entry.GetIssueId())
                 .ToList();
+            var currentEntryIds = todayEntries.Select(entry => entry.Id).ToHashSet();
+            foreach (var staleEntryId in _todayRows
+                         .Where(pair => !currentEntryIds.Contains(pair.Key) && !pair.Value.HasPendingUserState)
+                         .Select(pair => pair.Key)
+                         .ToList())
+            {
+                _todayRows.Remove(staleEntryId);
+            }
 
             TodayTimeEntries.Clear();
             foreach (var entry in todayEntries)
@@ -308,6 +316,12 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
                 }
                 else row.UpdateEntry(entry, cachedTicket);
                 TodayTimeEntries.Add(row);
+            }
+
+            foreach (var pendingRow in _todayRows.Values.Where(row =>
+                         !currentEntryIds.Contains(row.EntryId) && row.HasPendingUserState))
+            {
+                TodayTimeEntries.Add(pendingRow);
             }
 
             TodayBookedHours = Math.Round(todayEntries.Sum(entry =>
