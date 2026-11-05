@@ -46,6 +46,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AboutViewModel>();
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<TicketListViewModel>();
+        services.AddTransient<KanbanDashboardViewModel>();
         services.AddTransient<TimeEntriesViewModel>();
         services.AddTransient<WeeklySummaryViewModel>();
         services.AddTransient<SeriesBookingViewModel>();
