@@ -86,6 +86,10 @@ public sealed class AppSettingsService : IAppSettingsService
             updated.CachedTickets = [];
             updated.FavoriteTicketIds = [];
             updated.LastLoadedTicketIds = [];
+            updated.DashboardProjectIds = [];
+            updated.DashboardTicketIds = [];
+            updated.DashboardProjectFilterField = null;
+            updated.DashboardProjectFilterValue = null;
             updated.TimeEntryCustomFieldDefaults = [];
         }
         _snapshot = updated;
@@ -389,6 +393,10 @@ public sealed class AppSettingsService : IAppSettingsService
         IsDarkMode = settings.IsDarkMode,
         CachedTickets = (settings.CachedTickets ?? []).Select(CloneTicket).ToList(),
         FavoriteTicketIds = [.. settings.FavoriteTicketIds ?? []],
+        DashboardProjectIds = [.. settings.DashboardProjectIds ?? []],
+        DashboardTicketIds = [.. settings.DashboardTicketIds ?? []],
+        DashboardProjectFilterField = settings.DashboardProjectFilterField,
+        DashboardProjectFilterValue = settings.DashboardProjectFilterValue,
         LastLoadedTicketIds = [.. settings.LastLoadedTicketIds ?? []],
         TicketLoadAssigneeFilter = settings.TicketLoadAssigneeFilter,
         TicketLoadStatusFilterKind = settings.TicketLoadStatusFilterKind,
@@ -401,10 +409,12 @@ public sealed class AppSettingsService : IAppSettingsService
 
     private static IssueDto CloneTicket(IssueDto issue) => new()
     {
-        Id = issue.Id, Subject = issue.Subject, Project = CloneEntity(issue.Project),
+        Id = issue.Id, Subject = issue.Subject, Description = issue.Description, Project = CloneEntity(issue.Project),
         Status = issue.Status is null ? null : new StatusDto { Id = issue.Status.Id, Name = issue.Status.Name, Is_Closed = issue.Status.Is_Closed },
-        Priority = CloneEntity(issue.Priority), Tracker = CloneEntity(issue.Tracker), Assigned_To = CloneEntity(issue.Assigned_To),
-        Due_Date = issue.Due_Date, LastTimeEntryOn = issue.LastTimeEntryOn
+        Priority = CloneEntity(issue.Priority), Tracker = CloneEntity(issue.Tracker), Author = CloneEntity(issue.Author),
+        Category = CloneEntity(issue.Category), Fixed_Version = CloneEntity(issue.Fixed_Version), Assigned_To = CloneEntity(issue.Assigned_To),
+        Start_Date = issue.Start_Date, Due_Date = issue.Due_Date, Created_On = issue.Created_On, Updated_On = issue.Updated_On,
+        LastTimeEntryOn = issue.LastTimeEntryOn
     };
     private static NamedEntityDto? CloneEntity(NamedEntityDto? entity) => entity is null ? null : new() { Id = entity.Id, Name = entity.Name };
     private static bool EntityEqual(NamedEntityDto? left, NamedEntityDto? right) => left?.Id == right?.Id && left?.Name == right?.Name;
@@ -412,8 +422,12 @@ public sealed class AppSettingsService : IAppSettingsService
         pair.First.Id == pair.Second.Id && pair.First.Subject == pair.Second.Subject &&
         EntityEqual(pair.First.Project, pair.Second.Project) && EntityEqual(pair.First.Status, pair.Second.Status) &&
         pair.First.Status?.Is_Closed == pair.Second.Status?.Is_Closed && EntityEqual(pair.First.Priority, pair.Second.Priority) &&
-        EntityEqual(pair.First.Tracker, pair.Second.Tracker) && EntityEqual(pair.First.Assigned_To, pair.Second.Assigned_To) &&
-        pair.First.Due_Date == pair.Second.Due_Date && pair.First.LastTimeEntryOn == pair.Second.LastTimeEntryOn);
+        EntityEqual(pair.First.Tracker, pair.Second.Tracker) && EntityEqual(pair.First.Author, pair.Second.Author) &&
+        EntityEqual(pair.First.Category, pair.Second.Category) && EntityEqual(pair.First.Fixed_Version, pair.Second.Fixed_Version) &&
+        EntityEqual(pair.First.Assigned_To, pair.Second.Assigned_To) && pair.First.Description == pair.Second.Description &&
+        pair.First.Start_Date == pair.Second.Start_Date && pair.First.Due_Date == pair.Second.Due_Date &&
+        pair.First.Created_On == pair.Second.Created_On && pair.First.Updated_On == pair.Second.Updated_On &&
+        pair.First.LastTimeEntryOn == pair.Second.LastTimeEntryOn);
 
     private static AppSettings CreateDefault() => new() { BaseUrl = AppConstants.DefaultBaseUrl };
     private sealed record TicketSnapshot(List<IssueDto> Tickets, string Revision);
