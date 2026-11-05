@@ -18,6 +18,24 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
     private readonly TimeEntriesViewModel _parent;
     private readonly IAppSettingsService _appSettingsService;
     private readonly ITimeEntryService _timeEntryService;
+    private readonly string _connectionIdentity;
+    private readonly int _connectionVersion;
+    private Task? _formLoadTask;
+    private bool _formReady;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWarningMessage))]
+    private string warningMessage = string.Empty;
+
+    public bool HasWarningMessage => !string.IsNullOrWhiteSpace(WarningMessage);
+
+    public bool IsCurrentConnection => _connectionVersion == _parent.ConnectionVersion && _connectionIdentity == _parent.CurrentConnectionIdentity();
+    internal void AddWarning(string message) => WarningMessage = string.IsNullOrEmpty(WarningMessage) ? message : WarningMessage + " " + message;
+    private void RemoveWarning(string message)
+    {
+        var remaining = WarningMessage.Replace(message, string.Empty, StringComparison.Ordinal).Trim();
+        WarningMessage = string.Join(" ", remaining.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    }
 
     [ObservableProperty]
     private string hours = AppConstants.DefaultHours;
@@ -63,15 +81,54 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         TimeEntriesViewModel parent,
         IssueDto ticket,
         IAppSettingsService appSettingsService,
-        ITimeEntryService timeEntryService)
+        ITimeEntryService timeEntryService,
+        string? connectionIdentity = null)
     {
         _parent = parent;
         Ticket = ticket;
         _appSettingsService = appSettingsService;
         _timeEntryService = timeEntryService;
+        _connectionVersion = parent.ConnectionVersion;
+        var settings = connectionIdentity is null ? appSettingsService.Load() : null;
+        _connectionIdentity = connectionIdentity ?? ConnectionIdentity.Get(settings!.BaseUrl, settings.ApiKey);
     }
 
-    public IssueDto Ticket { get; }
+    public IssueDto Ticket { get; private set; }
+
+    internal void UpdateTicket(IssueDto ticket)
+    {
+        Ticket = ticket;
+        OnPropertyChanged(nameof(Ticket));
+    }
+
+    public async Task EnsureFormLoadedAsync(CancellationToken cancellationToken = default)
+    {
+        while (!_formReady && IsCurrentConnection && !cancellationToken.IsCancellationRequested)
+        {
+            var task = _formLoadTask ??= _parent.LoadRowFormAsync(this, cancellationToken);
+            try
+            {
+                await task.WaitAsync(cancellationToken);
+                if (IsCurrentConnection && !cancellationToken.IsCancellationRequested)
+                {
+                    _formReady = true;
+                    RemoveWarning("Formulardaten konnten nicht geladen werden. Bitte die Karte erneut öffnen.");
+                }
+                return;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && task.IsCompleted)
+            {
+                // A newly visible container may have joined the previous container's canceled load.
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception)
+            {
+                AddWarning("Formulardaten konnten nicht geladen werden. Bitte die Karte erneut öffnen.");
+                return;
+            }
+            finally { if (task.IsCompleted && _formLoadTask == task) _formLoadTask = null; }
+        }
+    }
 
     public ObservableCollection<TimeEntryActivityDto> Activities { get; } = [];
 
@@ -129,7 +186,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             Ticket.Project?.Id,
             cancellationToken);
 
-        if (cancellationToken.IsCancellationRequested)
+        if (cancellationToken.IsCancellationRequested || !IsCurrentConnection)
         {
             return;
         }
@@ -153,7 +210,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
             Ticket.Project?.Id,
             cancellationToken);
 
-        if (cancellationToken.IsCancellationRequested)
+        if (cancellationToken.IsCancellationRequested || !IsCurrentConnection)
         {
             return;
         }
@@ -210,6 +267,7 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
     [RelayCommand]
     private async Task CreateTimeEntryAsync()
     {
+        if (!IsCurrentConnection) return;
         if (IsSubmitting)
         {
             return;
@@ -248,9 +306,13 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
         }
 
         var submittedDate = SpentOn.Value;
+        var submittedComments = Comments;
+        var submittedFields = CustomFields.Select(field => new TimeEntryCustomFieldRowViewModel(
+            field.Id, field.Name, field.IsRequired, field.HasPossibleValues, field.PossibleValues.ToList(), field.Value)).ToList();
         try
         {
             IsSubmitting = true;
+            WarningMessage = string.Empty;
             ValidationMessage = string.Empty;
             RowStatusMessage = "Zeiteintrag wird erstellt …";
 
@@ -263,23 +325,38 @@ public partial class FavoriteTimeEntryRowViewModel : ViewModelBase
                     Hours = parsedHours,
                     SpentOn = RedmineDates.FormatSpentOn(submittedDate),
                     ActivityId = SelectedActivity.Id,
-                    Comments = Comments,
-                    CustomFields = TimeEntryCustomFieldSupport.BuildValues(CustomFields).ToList()
+                    Comments = submittedComments,
+                    CustomFields = TimeEntryCustomFieldSupport.BuildValues(submittedFields).ToList()
                 });
 
+            if (!IsCurrentConnection) return;
             RowStatusMessage = result.Success
                 ? $"{parsedHours.ToString("0.##", CultureInfo.GetCultureInfo("de-DE"))} h für {submittedDate:dd.MM.yyyy} gebucht."
                 : result.Message;
             _parent.SetStatusMessage(result.Message);
             if (result.Success)
             {
-                TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, CustomFields);
-                Comments = string.Empty;
-                await _parent.HandleEntryCreatedAsync(this, submittedDate);
+                if (Comments == submittedComments) Comments = string.Empty;
+                try
+                {
+                    TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, submittedFields);
+                    await _appSettingsService.FlushAsync();
+                }
+                catch (Exception)
+                {
+                    AddWarning("Die Buchung ist gespeichert; lokale Vorgaben konnten nicht gespeichert werden.");
+                }
+                if (!IsCurrentConnection) return;
+                try { await _parent.HandleEntryCreatedAsync(this, submittedDate); }
+                catch (Exception)
+                {
+                    AddWarning("Die Buchung ist gespeichert; die Tagesübersicht konnte nicht aktualisiert werden.");
+                }
             }
         }
         catch (Exception ex)
         {
+            if (!IsCurrentConnection) return;
             RowStatusMessage = ex.Message;
             _parent.SetStatusMessage($"Ticket #{Ticket.Id}: {ex.Message}");
         }

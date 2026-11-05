@@ -20,7 +20,13 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     private readonly ITimeEntryService _timeEntryService;
     private CancellationTokenSource? _ticketDetailsCts;
     private CancellationTokenSource? _ticketFilterCts;
+    private CancellationTokenSource? _previewCts;
+    private string _connectionIdentity;
+    private int _connectionVersion;
+    private string _confirmedConnectionIdentity = string.Empty;
+    private int _confirmedConnectionVersion;
     private int _previewVersion;
+    private int _previewLoadVersion;
     private List<DateTime> _confirmedDates = [];
     private IssueDto? _confirmedTicket;
     private TimeEntryActivityDto? _confirmedActivity;
@@ -77,9 +83,11 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     private string comments = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanBook))]
     private bool isLoadingPreview;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanBook))]
     private bool isBooking;
 
     [ObservableProperty]
@@ -87,6 +95,10 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWarningMessage))]
+    private string warningMessage = string.Empty;
 
     [ObservableProperty]
     private bool showBookingConfirmation;
@@ -98,6 +110,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     {
         _appSettingsService = appSettingsService;
         _timeEntryService = timeEntryService;
+        _connectionIdentity = CurrentConnectionIdentity();
     }
 
     public ObservableCollection<IssueDto> Tickets { get; } = [];
@@ -109,6 +122,8 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     public ObservableCollection<SeriesBookingPreviewRowViewModel> PreviewRows { get; } = [];
 
     public bool HasCustomFields => CustomFields.Count > 0;
+
+    public bool HasWarningMessage => !string.IsNullOrWhiteSpace(WarningMessage);
 
     public string TicketSearchPlaceholder => ShowFavoritesOnly
         ? "In Favoriten suchen (Nr., Betreff, Projekt) …"
@@ -144,6 +159,11 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
     public void PrepareView()
     {
+        if (_connectionIdentity != CurrentConnectionIdentity())
+        {
+            ResetForConnectionChange();
+        }
+
         ReloadTickets();
         StatusMessage = string.Empty;
 
@@ -152,6 +172,44 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             _ = LoadTicketDetailsAsync();
         }
     }
+
+    public void ResetForConnectionChange()
+    {
+        _connectionVersion++;
+        _connectionIdentity = CurrentConnectionIdentity();
+        CancelTicketDetailsLoad();
+        CancelTicketFilterLoad();
+        ClearPreview();
+        Tickets.Clear();
+        SelectedTicket = null;
+        Activities.Clear();
+        CustomFields.Clear();
+        SelectedActivity = null;
+        _confirmedDates.Clear();
+        _confirmedTicket = null;
+        _confirmedActivity = null;
+        _confirmedCustomFields = [];
+        _confirmedComments = string.Empty;
+        _confirmedHours = 0;
+        _confirmedConnectionIdentity = string.Empty;
+        BookingConfirmationText = string.Empty;
+        Comments = string.Empty;
+        TicketFilterText = string.Empty;
+        CancelTicketFilterLoad();
+        TicketListScopeSummary = string.Empty;
+        StatusMessage = string.Empty;
+        WarningMessage = string.Empty;
+        OnPropertyChanged(nameof(HasCustomFields));
+    }
+
+    private string CurrentConnectionIdentity()
+    {
+        var settings = _appSettingsService.Load();
+        return ConnectionIdentity.Get(settings.BaseUrl, settings.ApiKey);
+    }
+
+    private bool IsCurrentConnection(string identity, int version) =>
+        version == _connectionVersion && identity == _connectionIdentity && identity == CurrentConnectionIdentity();
 
     partial void OnSelectedTicketChanged(IssueDto? value)
     {
@@ -272,60 +330,69 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task RefreshPreviewAsync()
     {
-        if (IsLoadingPreview || IsBooking)
+        await RefreshPreviewCoreAsync();
+    }
+
+    private async Task<bool> RefreshPreviewCoreAsync(
+        IReadOnlySet<DateTime>? bookedDates = null,
+        HashSet<DateTime>? selectedDates = null)
+    {
+        var connectionIdentity = _connectionIdentity;
+        var connectionVersion = _connectionVersion;
+        if (!IsCurrentConnection(connectionIdentity, connectionVersion) || IsLoadingPreview || IsBooking)
         {
-            return;
+            return false;
         }
 
         if (SelectedTicket is null)
         {
             StatusMessage = "Bitte ein Ticket auswählen.";
-            return;
+            return false;
         }
 
         if (!FromDate.HasValue || !ToDate.HasValue)
         {
             StatusMessage = "Bitte Von- und Bis-Datum auswählen.";
-            return;
+            return false;
         }
 
         if (ToDate.Value.Date < FromDate.Value.Date)
         {
             StatusMessage = "Das Enddatum muss am oder nach dem Startdatum liegen.";
-            return;
+            return false;
         }
 
         if (!TimeEntryHours.TryParsePositive(Hours, out var parsedHours))
         {
             StatusMessage = "Bitte gültige Stunden eingeben.";
-            return;
+            return false;
         }
 
         if (SelectedActivity is null)
         {
             StatusMessage = "Bitte eine Aktivität auswählen.";
-            return;
+            return false;
         }
 
         var settings = _appSettingsService.Load();
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
             StatusMessage = "API-Key fehlt. Bitte zuerst Einstellungen speichern.";
-            return;
+            return false;
         }
 
         var selectedWeekdays = GetSelectedWeekdays();
         if (selectedWeekdays.Count == 0)
         {
             StatusMessage = "Bitte mindestens einen Wochentag auswählen.";
-            return;
+            return false;
         }
 
         var customFieldError = TimeEntryCustomFieldSupport.Validate(CustomFields);
         if (customFieldError is not null)
         {
             StatusMessage = customFieldError;
-            return;
+            return false;
         }
 
         var plannedDates = SeriesBookingPlanner.GenerateDates(FromDate.Value.Date, ToDate.Value.Date, selectedWeekdays);
@@ -335,9 +402,13 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             PreviewRows.Clear();
             NotifyPreviewChanged();
             StatusMessage = "Im gewählten Zeitraum gibt es keine passenden Tage.";
-            return;
+            return false;
         }
 
+        _previewLoadVersion++;
+        var previewCts = new CancellationTokenSource();
+        _previewCts = previewCts;
+        var previewToken = previewCts.Token;
         try
         {
             IsLoadingPreview = true;
@@ -349,39 +420,65 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
                 settings.BaseUrl,
                 settings.ApiKey,
                 FromDate.Value.Date,
-                ToDate.Value.Date);
+                ToDate.Value.Date,
+                previewToken);
+
+            if (!IsCurrentConnection(connectionIdentity, connectionVersion) || previewToken.IsCancellationRequested)
+            {
+                return false;
+            }
 
             if (previewVersion != _previewVersion)
             {
                 StatusMessage = "Eingaben geändert. Bitte Vorschau erneut laden.";
-                return;
+                return false;
             }
 
             if (!loadResult.Success)
             {
                 StatusMessage = loadResult.Message;
-                return;
+                return false;
             }
 
-            var conflictDates = SeriesBookingPlanner.FindConflictDates(ticketId, loadResult.Entries);
+            var conflictDates = SeriesBookingPlanner.FindConflictDates(ticketId, loadResult.Entries).ToHashSet();
+            if (bookedDates is not null)
+            {
+                conflictDates.UnionWith(bookedDates);
+            }
 
             PreviewRows.Clear();
             foreach (var date in plannedDates)
             {
-                PreviewRows.Add(new SeriesBookingPreviewRowViewModel(
+                var row = new SeriesBookingPreviewRowViewModel(
                     date,
                     parsedHours,
                     conflictDates.Contains(date.Date),
-                    NotifyPreviewChanged));
+                    NotifyPreviewChanged);
+                if (selectedDates is not null)
+                {
+                    row.IsSelected = selectedDates.Contains(date.Date) && !row.HasConflict;
+                }
+
+                PreviewRows.Add(row);
             }
 
             HasPreview = true;
             NotifyPreviewChanged();
             StatusMessage = $"Vorschau: {PreviewRows.Count} Tage, {PreviewRows.Count(row => row.HasConflict)} Konflikt(e).";
+            return true;
+        }
+        catch (OperationCanceledException) when (previewToken.IsCancellationRequested)
+        {
+            return false;
         }
         finally
         {
-            IsLoadingPreview = false;
+            if (ReferenceEquals(_previewCts, previewCts))
+            {
+                _previewCts = null;
+                IsLoadingPreview = false;
+            }
+            previewCts.Dispose();
         }
     }
 
@@ -421,7 +518,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void RequestBookSeries()
     {
-        if (!CanBook || SelectedTicket is null || SelectedActivity is null)
+        if (!IsCurrentConnection(_connectionIdentity, _connectionVersion) || !CanBook || SelectedTicket is null || SelectedActivity is null)
         {
             return;
         }
@@ -447,6 +544,8 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        _confirmedConnectionIdentity = _connectionIdentity;
+        _confirmedConnectionVersion = _connectionVersion;
         _confirmedDates = selectedRows.Select(row => row.Date).ToList();
         _confirmedTicket = SelectedTicket;
         _confirmedActivity = SelectedActivity;
@@ -474,7 +573,8 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task ConfirmBookSeriesAsync()
     {
-        if (!ShowBookingConfirmation || IsBooking || _confirmedTicket is null || _confirmedActivity is null)
+        if (!IsCurrentConnection(_confirmedConnectionIdentity, _confirmedConnectionVersion) ||
+            !ShowBookingConfirmation || IsBooking || _confirmedTicket is null || _confirmedActivity is null)
         {
             return;
         }
@@ -509,6 +609,15 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        var bookingIdentity = _confirmedConnectionIdentity;
+        var bookingVersion = _confirmedConnectionVersion;
+        var bookingPreviewVersion = _previewVersion;
+        var bookingPreviewLoadVersion = _previewLoadVersion;
+
+        bool IsBookingPreviewCurrent() =>
+            IsCurrentConnection(bookingIdentity, bookingVersion) &&
+            bookingPreviewVersion == _previewVersion && bookingPreviewLoadVersion == _previewLoadVersion;
+
         var bookingTicket = _confirmedTicket;
         var bookingActivity = _confirmedActivity;
         var parsedHours = _confirmedHours;
@@ -516,14 +625,22 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
         var customFieldValues = _confirmedCustomFields;
         ShowBookingConfirmation = false;
 
+        var successCount = 0;
+        var failureMessages = new List<string>();
+        var bookedDates = new HashSet<DateTime>();
+        WarningMessage = string.Empty;
+
         try
         {
             IsBooking = true;
-            var successCount = 0;
-            var failureMessages = new List<string>();
 
             for (var index = 0; index < selectedRows.Count; index++)
             {
+                if (!IsCurrentConnection(bookingIdentity, bookingVersion))
+                {
+                    return;
+                }
+
                 var row = selectedRows[index];
                 StatusMessage = $"Buche {index + 1} von {selectedRows.Count} ({row.DateLabel}) …";
 
@@ -540,36 +657,100 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
                         CustomFields = customFieldValues.ToList()
                     });
 
+                if (!IsCurrentConnection(bookingIdentity, bookingVersion))
+                {
+                    return;
+                }
+
                 if (result.Success)
                 {
                     successCount++;
-                    row.IsSelected = false;
+                    bookedDates.Add(row.Date.Date);
+                    row.MarkBooked();
                 }
                 else
                 {
                     failureMessages.Add($"{row.DateLabel}: {result.Message}");
                 }
             }
-
-            if (failureMessages.Count == 0)
-            {
-                TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, CustomFields);
-                StatusMessage = $"{successCount} Zeiteinträge wurden erstellt.";
-                Comments = string.Empty;
-                await RefreshPreviewAsync();
-            }
-            else
-            {
-                StatusMessage = $"{successCount} erstellt, {failureMessages.Count} fehlgeschlagen. {failureMessages[0]}";
-            }
-
-            NotifyPreviewChanged();
         }
         finally
         {
             IsBooking = false;
         }
+
+        if (!IsBookingPreviewCurrent())
+        {
+            return;
+        }
+
+        var bookingSummary = failureMessages.Count == 0
+            ? $"{successCount} Zeiteinträge wurden erstellt."
+            : $"{successCount} erstellt, {failureMessages.Count} fehlgeschlagen. {failureMessages[0]}";
+        StatusMessage = bookingSummary;
+
+        if (successCount > 0)
+        {
+            try
+            {
+                TimeEntryCustomFieldSupport.SaveDefaults(_appSettingsService, CustomFields);
+                await _appSettingsService.FlushAsync();
+            }
+            catch (Exception ex)
+            {
+                if (!IsBookingPreviewCurrent())
+                {
+                    return;
+                }
+                AddWarning($"Buchung erfolgreich; lokale Vorgaben konnten nicht gespeichert werden: {ex.Message}");
+            }
+
+            if (!IsBookingPreviewCurrent())
+            {
+                return;
+            }
+
+            var remainingDates = PreviewRows.Where(row => row.IsSelected).Select(row => row.Date.Date).ToHashSet();
+            try
+            {
+                var refreshTask = RefreshPreviewCoreAsync(bookedDates, remainingDates);
+                bookingPreviewLoadVersion = _previewLoadVersion;
+                var refreshed = await refreshTask;
+                if (!IsBookingPreviewCurrent())
+                {
+                    return;
+                }
+                if (!refreshed)
+                {
+                    AddWarning($"Vorschau konnte nach der Buchung nicht aktualisiert werden: {StatusMessage}");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!IsBookingPreviewCurrent())
+                {
+                    return;
+                }
+                AddWarning($"Vorschau konnte nach der Buchung nicht aktualisiert werden: {ex.Message}");
+            }
+        }
+
+        if (!IsBookingPreviewCurrent())
+        {
+            return;
+        }
+
+        if (failureMessages.Count == 0)
+        {
+            Comments = string.Empty;
+        }
+
+        StatusMessage = bookingSummary;
+        NotifyPreviewChanged();
     }
+
+    private void AddWarning(string message) =>
+        WarningMessage = string.IsNullOrEmpty(WarningMessage) ? message : $"{WarningMessage} {message}";
 
     private void ReloadTickets()
     {
@@ -650,9 +831,11 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
 
         var loadToken = BeginTicketDetailsLoad();
         var ticketId = ticket.Id;
+        var connectionIdentity = _connectionIdentity;
+        var connectionVersion = _connectionVersion;
 
         var settings = _appSettingsService.Load();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        if (!IsCurrentConnection(connectionIdentity, connectionVersion) || string.IsNullOrWhiteSpace(settings.ApiKey))
         {
             return;
         }
@@ -666,7 +849,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
                 ticket.Project?.Id,
                 loadToken);
 
-            if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))
+            if (ShouldIgnoreTicketDetailsResult(ticketId, connectionIdentity, connectionVersion, loadToken))
             {
                 return;
             }
@@ -686,7 +869,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
                 ticket.Project?.Id,
                 loadToken);
 
-            if (ShouldIgnoreTicketDetailsResult(loadToken, ticketId))
+            if (ShouldIgnoreTicketDetailsResult(ticketId, connectionIdentity, connectionVersion, loadToken))
             {
                 return;
             }
@@ -705,12 +888,15 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
         }
         catch (RedmineApiException ex)
         {
-            StatusMessage = ex.Message;
+            if (IsCurrentConnection(connectionIdentity, connectionVersion))
+            {
+                StatusMessage = ex.Message;
+            }
         }
     }
 
-    private bool ShouldIgnoreTicketDetailsResult(CancellationToken loadToken, int ticketId) =>
-        loadToken.IsCancellationRequested || SelectedTicket?.Id != ticketId;
+    private bool ShouldIgnoreTicketDetailsResult(int ticketId, string connectionIdentity, int connectionVersion, CancellationToken loadToken) =>
+        loadToken.IsCancellationRequested || SelectedTicket?.Id != ticketId || !IsCurrentConnection(connectionIdentity, connectionVersion);
 
     private void CancelTicketDetailsLoad()
     {
@@ -736,6 +922,7 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
     {
         CancelTicketDetailsLoad();
         CancelTicketFilterLoad();
+        CancelPreviewLoad();
         GC.SuppressFinalize(this);
     }
 
@@ -749,8 +936,18 @@ public partial class SeriesBookingViewModel : ViewModelBase, IDisposable
             IncludeSaturday,
             IncludeSunday);
 
+    private void CancelPreviewLoad()
+    {
+        var pending = _previewCts;
+        _previewCts = null;
+        pending?.Cancel();
+        pending?.Dispose();
+        IsLoadingPreview = false;
+    }
+
     private void ClearPreview()
     {
+        CancelPreviewLoad();
         _previewVersion++;
         HasPreview = false;
         PreviewRows.Clear();

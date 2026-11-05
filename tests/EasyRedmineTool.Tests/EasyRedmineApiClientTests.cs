@@ -5,6 +5,7 @@ using EasyRedmineTool.Core.Models.Tickets;
 
 using Microsoft.Extensions.Logging;
 
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 
@@ -40,7 +41,7 @@ public class EasyRedmineApiClientTests
     }
 
     [Fact]
-    public async Task GetAllMyOpenIssuesAsync_stops_when_total_count_is_missing()
+    public async Task GetAllMyOpenIssuesAsync_reports_incomplete_fetch_at_safety_limit()
     {
         var requestCount = 0;
         var handler = new CountingHandler(_ =>
@@ -55,10 +56,11 @@ public class EasyRedmineApiClientTests
         });
 
         var client = new EasyRedmineApiClient(new HttpClient(handler));
-        var issues = await client.GetAllMyOpenIssuesAsync("https://redmine.example/", "secret");
+        var error = await Assert.ThrowsAsync<RedmineApiException>(() =>
+            client.GetAllMyOpenIssuesAsync("https://redmine.example/", "secret"));
 
         Assert.Equal(100, requestCount);
-        Assert.Equal(10_000, issues.Count);
+        Assert.Contains("unvollständig", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -172,6 +174,140 @@ public class EasyRedmineApiClientTests
             entry.Message.Contains("Issues konnten nicht geladen werden", StringComparison.Ordinal) &&
             entry.Message.Contains('7') &&
             entry.Message.Contains('8'));
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    public async Task Pagination_honors_server_page_size(bool timeEntries, bool includeTotal)
+    {
+        var offsets = new List<int>();
+        var handler = new CountingHandler(request =>
+        {
+            var query = request.RequestUri!.Query.TrimStart('?').Split('&')
+                .Select(part => part.Split('=')).ToDictionary(part => part[0], part => part[1]);
+            var offset = int.Parse(query["offset"], CultureInfo.InvariantCulture);
+            offsets.Add(offset);
+            var count = Math.Min(25, Math.Max(0, 80 - offset));
+            var items = Enumerable.Range(offset + 1, count).Select(id => new { id }).ToList();
+            var response = new Dictionary<string, object>
+            {
+                [timeEntries ? "time_entries" : "issues"] = items,
+                ["limit"] = 25,
+                ["offset"] = offset
+            };
+            if (includeTotal) response["total_count"] = 80;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(response))
+            };
+        });
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+
+        var ids = timeEntries
+            ? (await client.GetAllMyTimeEntriesAsync("https://redmine.example/", "secret", DateTime.Today, DateTime.Today)).Select(x => x.Id)
+            : (await client.GetAllMyOpenIssuesAsync("https://redmine.example/", "secret")).Select(x => x.Id);
+
+        Assert.Equal(Enumerable.Range(1, 80), ids);
+        Assert.Equal(new[] { 0, 25, 50, 75 }, offsets);
+    }
+
+    [Fact]
+    public async Task Time_entries_report_incomplete_fetch_at_safety_limit()
+    {
+        var requests = 0;
+        var handler = new CountingHandler(_ =>
+        {
+            var offset = requests++ * 100;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    time_entries = Enumerable.Range(offset + 1, 100).Select(id => new { id }),
+                    offset, limit = 100, total_count = 10_001
+                }))
+            };
+        });
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+        var error = await Assert.ThrowsAsync<RedmineApiException>(() =>
+            client.GetAllMyTimeEntriesAsync("https://redmine.example/", "secret", DateTime.Today, DateTime.Today));
+        Assert.Equal(100, requests);
+        Assert.Contains("unvollständig", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Pagination_without_total_supports_full_page_and_empty_end(bool timeEntries)
+    {
+        var requests = 0;
+        var handler = new CountingHandler(_ =>
+        {
+            var offset = requests++ * 100;
+            var response = new Dictionary<string, object>
+            {
+                [timeEntries ? "time_entries" : "issues"] = Enumerable.Range(1, offset == 0 ? 100 : 0).Select(id => new { id }),
+                ["offset"] = offset, ["limit"] = 100
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(response)) };
+        });
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+        var count = timeEntries
+            ? (await client.GetAllMyTimeEntriesAsync("https://redmine.example/", "secret", DateTime.Today, DateTime.Today)).Count
+            : (await client.GetAllMyOpenIssuesAsync("https://redmine.example/", "secret")).Count;
+        Assert.Equal(100, count);
+        Assert.Equal(2, requests);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Pagination_reports_repeated_page_instead_of_counting_duplicate_ids(bool timeEntries)
+    {
+        var requests = 0;
+        var handler = new CountingHandler(_ =>
+        {
+            requests++;
+            var response = new Dictionary<string, object>
+            {
+                [timeEntries ? "time_entries" : "issues"] = Enumerable.Range(1, 25).Select(id => new { id }),
+                ["offset"] = 0, ["limit"] = 25, ["total_count"] = 80
+            };
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(response)) };
+        });
+        var client = new EasyRedmineApiClient(new HttpClient(handler));
+        await Assert.ThrowsAsync<RedmineApiException>(async () =>
+        {
+            if (timeEntries) await client.GetAllMyTimeEntriesAsync("https://redmine.example/", "secret", DateTime.Today, DateTime.Today);
+            else await client.GetAllMyOpenIssuesAsync("https://redmine.example/", "secret");
+        });
+        Assert.Equal(2, requests);
+    }
+
+    [Theory]
+    [InlineData("de-DE")]
+    [InlineData("en-US")]
+    [InlineData("th-TH")]
+    public async Task Time_entry_query_uses_gregorian_dates(string culture)
+    {
+        var previous = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+            string? query = null;
+            var client = new EasyRedmineApiClient(new HttpClient(new CountingHandler(request =>
+            {
+                query = request.RequestUri!.Query;
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"time_entries\":[]}") };
+            })));
+            await client.GetAllMyTimeEntriesAsync("https://redmine.example/", "secret", new DateTime(2026, 11, 1), new DateTime(2026, 11, 1));
+
+            Assert.Contains("from=2026-11-01", query, StringComparison.Ordinal);
+            Assert.Contains("to=2026-11-01", query, StringComparison.Ordinal);
+        }
+        finally { CultureInfo.CurrentCulture = previous; }
     }
 
     private static IssueListResponse CreateIssuesPage(int offset, int count, int? total, int startId)

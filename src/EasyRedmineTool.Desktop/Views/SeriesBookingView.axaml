@@ -68,7 +68,8 @@
       <TextBlock Text="Rückwirkende Zeiteinträge für ein Ticket über einen Zeitraum erstellen."
                  TextWrapping="Wrap"
                  Opacity="0.85" />
-      <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Opacity="0.85" />
+      <TextBlock Text="{Binding WarningMessage}" IsVisible="{Binding HasWarningMessage}" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Opacity="0.85" />
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">

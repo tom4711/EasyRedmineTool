@@ -91,6 +91,12 @@ Gespeichert werden u. a.:
 - Zwischengespeicherte Ticketliste
 - Favoriten und Vorlage für den letzten Zeiteintrag
 
+Die Ticketliste liegt in separaten, verbindungsbezogenen Dateien neben `settings.json`. Bestehende kombinierte Einstellungen werden beim Start automatisch migriert. Einstellungen verweisen auf einen vollständig geschriebenen Ticket-Snapshot; kleine Änderungen wie der Themewechsel schreiben die Ticketdatei nicht erneut.
+
+Ein Wechsel von Server oder API-Schlüssel setzt die aktive Ticketliste, Favoriten und Zusatzfeldvorgaben zurück. Das gilt vorsichtshalber auch bei Schlüsselrotation, weil die App offline nicht feststellen kann, ob der neue Schlüssel zum selben Konto gehört. Nach dem Wechsel die Tickets erneut laden.
+
+Bei beschädigten oder unlesbaren Einstellungen bleiben die Originaldateien erhalten und automatisches Speichern wird gesperrt. Die App zeigt einen Hinweis; die Datei muss wiederhergestellt und die Anwendung neu gestartet werden. Für eine Sicherung den gesamten Konfigurationsordner kopieren, damit Einstellungen und referenzierte Ticketdateien zusammenbleiben.
+
 ---
 
 ## Sicherheit
@@ -133,6 +139,7 @@ graph TB
 | `EasyRedmineTool.Desktop` | Avalonia-UI, Styles, Einstiegspunkt |
 | `EasyRedmineTool.Core` | ViewModels, Services, API-Client, Modelle |
 | `EasyRedmineTool.Tests` | Unit-Tests für Kernlogik |
+| `EasyRedmineTool.Desktop.Tests` | Avalonia-Headless-Tests für Layout, Binding und Virtualisierung |
 
 **Tech-Stack:** Avalonia 12 · CommunityToolkit.Mvvm · Microsoft.Extensions.DependencyInjection / Http / Logging · Material Icons
 
@@ -144,7 +151,7 @@ graph TB
 dotnet test EasyRedmineTool.slnx
 ```
 
-Abgedeckt u. a.: Einstellungen (`AppSettingsService`), Datums-Helfer (`RedmineDates`), Ticket-Lookup und API-Pagination.
+Abgedeckt u. a.: asynchrone Einstellungen und Migration, Datums-Helfer (`RedmineDates`), vollständige API-Pagination, Cache-Invalidierung, Verbindungswechsel sowie Buchungs- und Bearbeitungszustände. Der Avalonia-Headless-Test prüft 500 Tickets, begrenztes Laden und den Erhalt von Eingaben beim Scrollen. Die Tests verwenden Fake-Dienste und führen keine echten Redmine-Buchungen aus.
 
 ---
 

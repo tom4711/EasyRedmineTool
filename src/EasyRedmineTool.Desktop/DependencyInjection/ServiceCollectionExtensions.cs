@@ -10,6 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using System;
+using System.Net.Http;
+using System.Threading;
 
 public static class ServiceCollectionExtensions
 {
@@ -21,7 +23,14 @@ public static class ServiceCollectionExtensions
             builder.SetMinimumLevel(LogLevel.Information);
         });
 
-        services.AddHttpClient<IEasyRedmineApiClient, EasyRedmineApiClient>();
+        // Singleton services retain this typed client for the desktop session.
+        // Rotate pooled connections for DNS/VPN changes; keep the owning handler stable.
+        services.AddHttpClient<IEasyRedmineApiClient, EasyRedmineApiClient>()
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            })
+            .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
 
         services.AddHttpClient<IUpdateCheckService, UpdateCheckService>(client =>
         {

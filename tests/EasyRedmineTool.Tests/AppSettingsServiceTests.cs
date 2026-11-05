@@ -9,6 +9,42 @@ using Microsoft.Extensions.Logging.Abstractions;
 public class AppSettingsServiceTests
 {
     [Fact]
+    public async Task Load_returns_snapshot_without_rereading_disk()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".json");
+        var service = new AppSettingsService(path, NullLogger<AppSettingsService>.Instance);
+        try
+        {
+            await service.InitializeAsync();
+            service.Save(new AppSettings { ApiKey = "initial" });
+            await service.FlushAsync();
+            File.WriteAllText(path, "broken");
+            Assert.Equal("initial", service.Load().ApiKey);
+        }
+        finally { foreach (var file in Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + "*")) File.Delete(file); }
+    }
+
+    [Fact]
+    public async Task Connection_change_clears_context_bound_data()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".json");
+        var service = new AppSettingsService(path, NullLogger<AppSettingsService>.Instance);
+        try
+        {
+            await service.InitializeAsync();
+            service.Save(new AppSettings { BaseUrl = "https://a.example", ApiKey = "key", CachedTickets = [new IssueDto { Id = 42 }], FavoriteTicketIds = [42], LastLoadedTicketIds = [42], TimeEntryCustomFieldDefaults = [new() { Id = 1, Value = "A" }] });
+            service.Update(s => s.ApiKey = "rotated");
+            await service.FlushAsync();
+            var current = service.Load();
+            Assert.Empty(current.CachedTickets);
+            Assert.Empty(current.FavoriteTicketIds);
+            Assert.Empty(current.LastLoadedTicketIds);
+            Assert.Empty(current.TimeEntryCustomFieldDefaults);
+        }
+        finally { foreach (var file in Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + "*")) File.Delete(file); }
+    }
+
+    [Fact]
     public void Normalize_applies_defaults_for_missing_values()
     {
         var settings = new AppSettings
@@ -58,13 +94,14 @@ public class AppSettingsServiceTests
     }
 
     [Fact]
-    public void Update_mutates_settings_without_dropping_other_fields()
+    public async Task Update_connection_change_preserves_credentials_and_clears_favorites()
     {
         var settingsPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".json");
         var service = new AppSettingsService(settingsPath, NullLogger<AppSettingsService>.Instance);
 
         try
         {
+            await service.InitializeAsync();
             service.Save(new AppSettings
             {
                 BaseUrl = "https://old.example/",
@@ -74,28 +111,27 @@ public class AppSettingsServiceTests
 
             service.Update(settings => settings.BaseUrl = "https://new.example/");
 
+            await service.FlushAsync();
             var loaded = service.Load();
             Assert.Equal("https://new.example/", loaded.BaseUrl);
             Assert.Equal("secret", loaded.ApiKey);
-            Assert.Equal([42], loaded.FavoriteTicketIds);
+            Assert.Empty(loaded.FavoriteTicketIds);
         }
         finally
         {
-            if (File.Exists(settingsPath))
-            {
-                File.Delete(settingsPath);
-            }
+            foreach (var file in Directory.GetFiles(Path.GetDirectoryName(settingsPath)!, Path.GetFileName(settingsPath) + "*")) File.Delete(file);
         }
     }
 
     [Fact]
-    public void Save_and_load_round_trip_preserves_ticket_filters_and_custom_field_defaults()
+    public async Task Save_and_load_round_trip_preserves_ticket_filters_and_custom_field_defaults()
     {
         var settingsPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".json");
         var service = new AppSettingsService(settingsPath, NullLogger<AppSettingsService>.Instance);
 
         try
         {
+            await service.InitializeAsync();
             service.Save(new AppSettings
             {
                 BaseUrl = "https://redmine.example/",
@@ -112,6 +148,7 @@ public class AppSettingsServiceTests
 
             service.Update(settings => settings.IsDarkMode = true);
 
+            await service.FlushAsync();
             var loaded = service.Load();
             Assert.True(loaded.IsDarkMode);
             Assert.Equal(TicketAssigneeFilter.All, loaded.TicketLoadAssigneeFilter);
@@ -123,21 +160,19 @@ public class AppSettingsServiceTests
         }
         finally
         {
-            if (File.Exists(settingsPath))
-            {
-                File.Delete(settingsPath);
-            }
+            foreach (var file in Directory.GetFiles(Path.GetDirectoryName(settingsPath)!, Path.GetFileName(settingsPath) + "*")) File.Delete(file);
         }
     }
 
     [Fact]
-    public void Save_writes_settings_without_leaving_temp_file()
+    public async Task Save_writes_settings_without_leaving_temp_file()
     {
         var settingsPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".json");
         var service = new AppSettingsService(settingsPath, NullLogger<AppSettingsService>.Instance);
 
         try
         {
+            await service.InitializeAsync();
             service.Save(new AppSettings
             {
                 BaseUrl = "https://redmine.example/",
@@ -145,19 +180,16 @@ public class AppSettingsServiceTests
                 IsDarkMode = true
             });
 
+            await service.FlushAsync();
             Assert.True(File.Exists(settingsPath));
-            Assert.False(File.Exists(settingsPath + ".tmp"));
-
+            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(settingsPath)!, Path.GetFileName(settingsPath) + "*.tmp"));
             var loaded = service.Load();
             Assert.Equal("https://redmine.example/", loaded.BaseUrl);
             Assert.True(loaded.IsDarkMode);
         }
         finally
         {
-            if (File.Exists(settingsPath))
-            {
-                File.Delete(settingsPath);
-            }
+            foreach (var file in Directory.GetFiles(Path.GetDirectoryName(settingsPath)!, Path.GetFileName(settingsPath) + "*")) File.Delete(file);
         }
     }
 }

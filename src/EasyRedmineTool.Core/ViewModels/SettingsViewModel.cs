@@ -76,7 +76,11 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(ApiKeyVisibilityActionLabel));
     }
 
-    public void PrepareView() => IsApiKeyVisible = false;
+    public void PrepareView()
+    {
+        IsApiKeyVisible = false;
+        if (_appSettingsService.LastPersistenceError is { } error) SaveStatusMessage = error;
+    }
 
     private void OnConnectionInputsChanged()
     {
@@ -109,19 +113,30 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
-    private void SaveSettings()
+    private async Task SaveSettingsAsync()
     {
-        _appSettingsService.Update(settings =>
+        var savedUrl = BaseUrl;
+        var savedKey = ApiKey;
+        try
         {
-            settings.BaseUrl = BaseUrl;
-            settings.ApiKey = ApiKey;
-        });
-
-        _savedBaseUrl = BaseUrl;
-        _savedApiKey = ApiKey;
-        HasUnsavedChanges = false;
-        SaveStatusMessage = "Einstellungen gespeichert.";
-        SettingsSaved?.Invoke(this, EventArgs.Empty);
+            _appSettingsService.Update(settings =>
+            {
+                settings.BaseUrl = savedUrl;
+                settings.ApiKey = savedKey;
+            });
+            // The active in-memory identity changes immediately, even if disk persistence later fails.
+            SettingsSaved?.Invoke(this, EventArgs.Empty);
+            await _appSettingsService.FlushAsync();
+            _savedBaseUrl = savedUrl;
+            _savedApiKey = savedKey;
+            HasUnsavedChanges = BaseUrl != savedUrl || ApiKey != savedKey;
+            SaveStatusMessage = HasUnsavedChanges ? "Ungespeicherte Änderungen." : "Einstellungen gespeichert.";
+        }
+        catch (Exception)
+        {
+            SaveStatusMessage = "Einstellungen konnten nicht gespeichert werden. Die Änderungen gelten nur für diese Sitzung.";
+            HasUnsavedChanges = true;
+        }
     }
 
     [RelayCommand]

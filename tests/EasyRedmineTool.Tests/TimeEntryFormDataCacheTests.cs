@@ -19,18 +19,40 @@ public class TimeEntryFormDataCacheTests
         }
 
         using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
-
         var firstLoad = cache.GetOrLoadActivitiesAsync("activities", Loader, cancelled.Token);
         var secondLoad = cache.GetOrLoadActivitiesAsync("activities", Loader, CancellationToken.None);
 
+        cancelled.Cancel();
         gate.SetResult();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => firstLoad);
         var activities = await secondLoad;
-        await firstLoad;
 
         Assert.Equal(1, loadCount);
         Assert.Single(activities);
         Assert.Equal("Dev", activities[0].Name);
+    }
+
+    [Fact]
+    public async Task Invalidate_detaches_old_load_and_prevents_stale_publication()
+    {
+        var cache = new TimeEntryFormDataCache();
+        var oldGate = new TaskCompletionSource<IReadOnlyList<TimeEntryActivityDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var freshGate = new TaskCompletionSource<IReadOnlyList<TimeEntryActivityDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var count = 0;
+        Task<IReadOnlyList<TimeEntryActivityDto>> Loader(CancellationToken _) => ++count == 1 ? oldGate.Task : freshGate.Task;
+        var oldLoad = cache.GetOrLoadActivitiesAsync("key", Loader, default);
+        cache.Invalidate();
+        var newLoad = cache.GetOrLoadActivitiesAsync("key", Loader, default);
+        var loadsAfterInvalidate = count;
+        oldGate.SetResult([new() { Id = 1 }]);
+        await oldLoad;
+        var otherNewReader = cache.GetOrLoadActivitiesAsync("key", Loader, default);
+        freshGate.SetResult([new() { Id = 2 }]);
+        Assert.Equal(2, loadsAfterInvalidate);
+        Assert.Equal(2, (await newLoad)[0].Id);
+        Assert.Equal(2, (await otherNewReader)[0].Id);
+        Assert.Equal(2, (await cache.GetOrLoadActivitiesAsync("key", Loader, default))[0].Id);
+        Assert.Equal(2, count);
     }
 
     private static async Task<IReadOnlyList<TimeEntryActivityDto>> WaitForGateAsync(

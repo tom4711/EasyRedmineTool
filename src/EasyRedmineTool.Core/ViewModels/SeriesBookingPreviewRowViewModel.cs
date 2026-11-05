@@ -24,7 +24,15 @@ public partial class SeriesBookingPreviewRowViewModel : ViewModelBase
     [ObservableProperty]
     private bool isSelected;
 
-    public bool HasConflict { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusLabel))]
+    private bool hasConflict;
+
+    public void MarkBooked()
+    {
+        HasConflict = true;
+        IsSelected = false;
+    }
 
     public string DateLabel => Date.ToString("dd.MM.yyyy", CultureInfo.GetCultureInfo("de-DE"));
 

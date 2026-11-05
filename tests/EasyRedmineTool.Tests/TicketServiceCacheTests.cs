@@ -36,9 +36,48 @@ public class TicketServiceCacheTests
         Assert.Equal(0, apiClient.TimeEntryRequestCount);
     }
 
+    [Fact]
+    public async Task Invalidation_during_load_prevents_old_cache_publication_and_sharing()
+    {
+        var oldGate = new TaskCompletionSource<IReadOnlyList<TimeEntryDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var freshGate = new TaskCompletionSource<IReadOnlyList<TimeEntryDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var api = new CountingTimeEntryApiClient { Load = count => count == 1 ? oldGate.Task : freshGate.Task };
+        var service = new TicketService(api);
+        var filter = new TicketLoadFilter { OnlyTimeEntryTickets = true };
+        var oldLoad = service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
+        service.InvalidateTimeEntryCache();
+        var newLoad = service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
+        oldGate.SetResult([new() { Issue_Id = 1 }]);
+        await oldLoad;
+        var otherNewReader = service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
+        freshGate.SetResult([new() { Issue_Id = 2 }]);
+        Assert.Equal(2, (await newLoad).Tickets[0].Id);
+        Assert.Equal(2, (await otherNewReader).Tickets[0].Id);
+        Assert.Equal(2, (await service.GetTicketsForListAsync("https://redmine.example/", "secret", filter)).Tickets[0].Id);
+        Assert.Equal(2, api.TimeEntryRequestCount);
+    }
+
+    [Fact]
+    public async Task Concurrent_readers_share_load_and_waiter_cancellation_is_independent()
+    {
+        var gate = new TaskCompletionSource<IReadOnlyList<TimeEntryDto>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var api = new CountingTimeEntryApiClient { Load = _ => gate.Task };
+        var service = new TicketService(api);
+        var filter = new TicketLoadFilter { OnlyTimeEntryTickets = true };
+        using var cancellation = new CancellationTokenSource();
+        var first = service.GetTicketsForListAsync("https://redmine.example/", "secret", filter, cancellation.Token);
+        var second = service.GetTicketsForListAsync("https://redmine.example/", "secret", filter);
+        cancellation.Cancel();
+        gate.SetResult([]);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+        await second;
+        Assert.Equal(1, api.TimeEntryRequestCount);
+    }
+
     private sealed class CountingTimeEntryApiClient : IEasyRedmineApiClient
     {
         public int TimeEntryRequestCount { get; private set; }
+        public Func<int, Task<IReadOnlyList<TimeEntryDto>>>? Load { get; init; }
 
         public Task<HttpResponseMessage> GetCurrentUserAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
@@ -75,7 +114,7 @@ public class TicketServiceCacheTests
             CancellationToken cancellationToken = default)
         {
             TimeEntryRequestCount++;
-            return Task.FromResult<IReadOnlyList<TimeEntryDto>>([]);
+            return Load?.Invoke(TimeEntryRequestCount) ?? Task.FromResult<IReadOnlyList<TimeEntryDto>>([]);
         }
 
         public Task<IReadOnlyList<IssueDto>> GetIssuesByIdsAsync(
@@ -83,7 +122,7 @@ public class TicketServiceCacheTests
             string apiKey,
             IReadOnlyList<int> issueIds,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<IssueDto>>([]);
+            Task.FromResult<IReadOnlyList<IssueDto>>(issueIds.Select(id => new IssueDto { Id = id }).ToList());
 
         public Task<IReadOnlyList<TimeEntryActivityDto>> GetTimeEntryActivitiesAsync(
             string baseUrl,

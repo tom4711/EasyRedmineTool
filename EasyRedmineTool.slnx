@@ -5,5 +5,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/EasyRedmineTool.Tests/EasyRedmineTool.Tests.csproj" />
+    <Project Path="tests/EasyRedmineTool.Desktop.Tests/EasyRedmineTool.Desktop.Tests.csproj" />
   </Folder>
 </Solution>

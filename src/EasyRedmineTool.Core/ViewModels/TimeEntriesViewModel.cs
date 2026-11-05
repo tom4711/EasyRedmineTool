@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using EasyRedmineTool.Core;
-using EasyRedmineTool.Core.Api;
 using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.TimeEntries;
 using EasyRedmineTool.Core.Models.Tickets;
@@ -19,9 +18,21 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
     private readonly ITimeEntryService _timeEntryService;
     private CancellationTokenSource? _todayHoursCts;
     private CancellationTokenSource? _rowLoadCts;
+    private readonly Dictionary<int, FavoriteTimeEntryRowViewModel> _rows = [];
+    private readonly Dictionary<int, TodayTimeEntryRowViewModel> _todayRows = [];
+    private readonly HashSet<int> _deletedEntryIds = [];
+    private readonly SemaphoreSlim _formLoadSlots = new(4);
+    private string? _connectionIdentity;
+    internal int ConnectionVersion { get; private set; }
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWarningMessage))]
+    private string warningMessage = string.Empty;
+    public bool HasWarningMessage => !string.IsNullOrWhiteSpace(WarningMessage);
+    internal void SetWarningMessage(string message) => WarningMessage = message;
 
     [ObservableProperty]
     private string favoriteFilterText = string.Empty;
@@ -49,6 +60,8 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
     {
         _appSettingsService = appSettingsService;
         _timeEntryService = timeEntryService;
+        var settings = _appSettingsService.Load();
+        _connectionIdentity = ConnectionIdentity.Get(settings.BaseUrl, settings.ApiKey);
     }
 
     public string TodayBookedHoursDisplay =>
@@ -94,7 +107,17 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         FavoriteTimeEntryRowViewModel row,
         DateTime spentOn)
     {
-        UpdateCachedTicketLastTimeEntry(row.Ticket.Id, spentOn);
+        if (!row.IsCurrentConnection) return;
+        try
+        {
+            UpdateCachedTicketLastTimeEntry(row.Ticket.Id, spentOn);
+            await _appSettingsService.FlushAsync();
+        }
+        catch (Exception)
+        {
+            row.AddWarning("Die Buchung ist gespeichert; der lokale Ticket-Cache konnte nicht aktualisiert werden.");
+        }
+        if (!row.IsCurrentConnection) return;
         foreach (var favoriteRow in FavoriteRows.Where(item => item.Ticket.Id == row.Ticket.Id))
         {
             if (favoriteRow.Ticket.LastTimeEntryOn is null || spentOn >= favoriteRow.Ticket.LastTimeEntryOn)
@@ -114,43 +137,37 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         }
 
         ApplyFavoriteFilter();
-        await ReloadTodayBookedHoursAsync();
+        var commitMessage = StatusMessage;
+        if (!await RefreshTodayCoreAsync() && row.IsCurrentConnection)
+        {
+            StatusMessage = commitMessage;
+            row.AddWarning("Die Buchung ist gespeichert; die Tagesübersicht konnte nicht aktualisiert werden.");
+        }
     }
 
     [RelayCommand]
     public void ReloadFavorites()
     {
-        CancelRowLoads();
-        var rowLoadToken = BeginRowLoads();
-
         var settings = _appSettingsService.Load();
-        var previousState = FavoriteRows.ToDictionary(
-            row => row.Ticket.Id,
-            row => (row.Hours, row.Comments, row.SpentOn, SelectedActivityId: row.SelectedActivity?.Id));
-
+        var identity = SynchronizeConnection(settings);
+        _rowLoadCts ??= new CancellationTokenSource();
+        var favorites = settings.FavoriteTicketIds.ToHashSet();
         var tickets = (ShowFavoritesOnly
-                ? settings.CachedTickets.Where(t => settings.FavoriteTicketIds.Contains(t.Id))
+                ? settings.CachedTickets.Where(t => favorites.Contains(t.Id))
                 : settings.CachedTickets)
             .OrderByDescending(t => t.LastTimeEntryOn.HasValue)
             .ThenByDescending(t => t.LastTimeEntryOn)
-            .ThenBy(t => t.Id)
-            .ToList();
-
+            .ThenBy(t => t.Id).ToList();
         FavoriteRows.Clear();
         foreach (var ticket in tickets)
         {
-            var row = new FavoriteTimeEntryRowViewModel(this, ticket, _appSettingsService, _timeEntryService);
-            int? selectedActivityId = null;
-            if (previousState.TryGetValue(ticket.Id, out var state))
+            if (!_rows.TryGetValue(ticket.Id, out var row))
             {
-                row.Hours = state.Hours;
-                row.Comments = state.Comments;
-                row.SpentOn = state.SpentOn ?? DateTime.Today;
-                selectedActivityId = state.SelectedActivityId;
+                row = new FavoriteTimeEntryRowViewModel(this, ticket, _appSettingsService, _timeEntryService, identity);
+                _rows.Add(ticket.Id, row);
             }
-
+            else row.UpdateTicket(ticket);
             FavoriteRows.Add(row);
-            _ = RestoreAndLoadRowAsync(row, selectedActivityId, rowLoadToken);
         }
 
         ApplyFavoriteFilter();
@@ -189,60 +206,68 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         ReloadFavorites();
     }
 
+    private string SynchronizeConnection(AppSettings settings)
+    {
+        var identity = ConnectionIdentity.Get(settings.BaseUrl, settings.ApiKey);
+        if (_connectionIdentity != identity)
+        {
+            CancelRowLoads();
+            CancelTodayHoursLoad();
+            _connectionIdentity = identity;
+            ConnectionVersion++;
+            _rows.Clear();
+            FavoriteRows.Clear();
+            FilteredFavoriteRows.Clear();
+            _todayRows.Clear();
+            _deletedEntryIds.Clear();
+            WarningMessage = string.Empty;
+            TodayTimeEntries.Clear();
+            TodayBookedHours = 0;
+            FocusedIssueId = null;
+            OnPropertyChanged(nameof(HasTodayTimeEntries));
+            OnPropertyChanged(nameof(TodayEntriesSummary));
+        }
+        return identity;
+    }
+
     private string GetEmptyListMessage() =>
         ShowFavoritesOnly
             ? "Keine Favoriten vorhanden. Auf „Alle“ umschalten oder in der Ticketliste Favoriten markieren."
             : "Keine Tickets in der lokalen Liste. Bitte zuerst in der Ticketliste laden.";
 
-    private async Task RestoreAndLoadRowAsync(
-        FavoriteTimeEntryRowViewModel row,
-        int? selectedActivityId,
-        CancellationToken cancellationToken)
+    internal async Task LoadRowFormAsync(FavoriteTimeEntryRowViewModel row, CancellationToken cancellationToken)
     {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, _rowLoadCts?.Token ?? CancellationToken.None);
+        await _formLoadSlots.WaitAsync(linked.Token);
         try
         {
-            await row.LoadActivitiesAsync(cancellationToken);
-
-            if (cancellationToken.IsCancellationRequested)
-            {
-                return;
-            }
-
-            if (selectedActivityId.HasValue)
-            {
-                row.SelectedActivity = row.Activities.FirstOrDefault(a => a.Id == selectedActivityId.Value)
-                    ?? row.SelectedActivity;
-            }
+            linked.Token.ThrowIfCancellationRequested();
+            if (row.IsCurrentConnection) await row.LoadActivitiesAsync(linked.Token);
+            linked.Token.ThrowIfCancellationRequested();
         }
-        catch (OperationCanceledException)
-        {
-            // A newer ReloadFavorites call superseded this load.
-        }
-        catch (RedmineApiException ex)
-        {
-            if (string.IsNullOrWhiteSpace(StatusMessage))
-            {
-                StatusMessage = ex.Message;
-            }
-        }
+        finally { _formLoadSlots.Release(); }
     }
 
     [RelayCommand]
-    public async Task ReloadTodayBookedHoursAsync()
+    public async Task ReloadTodayBookedHoursAsync() => await RefreshTodayCoreAsync();
+
+    internal async Task<bool> RefreshTodayCoreAsync()
     {
+        var settings = _appSettingsService.Load();
+        var requestIdentity = SynchronizeConnection(settings);
         CancelTodayHoursLoad();
         var cancellationToken = BeginTodayHoursLoad();
 
         try
         {
-            var settings = _appSettingsService.Load();
             if (string.IsNullOrWhiteSpace(settings.ApiKey))
             {
                 TodayBookedHours = 0;
                 TodayTimeEntries.Clear();
                 OnPropertyChanged(nameof(HasTodayTimeEntries));
                 OnPropertyChanged(nameof(TodayEntriesSummary));
-                return;
+                return false;
             }
 
             var today = DateTime.Today;
@@ -253,47 +278,72 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
                 today,
                 cancellationToken);
 
-            if (cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested ||
+                requestIdentity != CurrentConnectionIdentity())
             {
-                return;
+                return false;
             }
 
             if (!result.Success)
             {
                 StatusMessage = result.Message;
-                TodayTimeEntries.Clear();
-                OnPropertyChanged(nameof(HasTodayTimeEntries));
-                OnPropertyChanged(nameof(TodayEntriesSummary));
-                return;
+                return false;
             }
 
             var todayKey = RedmineDates.TodayKey();
             var todayEntries = result.Entries
-                .Where(entry => string.Equals(entry.Spent_On, todayKey, StringComparison.Ordinal))
+                .Where(entry => !_deletedEntryIds.Contains(entry.Id) && string.Equals(entry.Spent_On, todayKey, StringComparison.Ordinal))
                 .OrderByDescending(entry => entry.Hours)
                 .ThenBy(entry => entry.GetIssueId())
                 .ToList();
+            var currentEntryIds = todayEntries.Select(entry => entry.Id).ToHashSet();
+            foreach (var staleEntryId in _todayRows
+                         .Where(pair => !currentEntryIds.Contains(pair.Key) && !pair.Value.HasPendingUserState)
+                         .Select(pair => pair.Key)
+                         .ToList())
+            {
+                _todayRows.Remove(staleEntryId);
+            }
 
             TodayTimeEntries.Clear();
             foreach (var entry in todayEntries)
             {
                 var cachedTicket = settings.CachedTickets.FirstOrDefault(ticket => ticket.Id == entry.GetIssueId());
-                TodayTimeEntries.Add(new TodayTimeEntryRowViewModel(
-                    this,
-                    entry,
-                    cachedTicket,
-                    _appSettingsService,
-                    _timeEntryService));
+                if (!_todayRows.TryGetValue(entry.Id, out var row))
+                {
+                    row = new TodayTimeEntryRowViewModel(this, entry, cachedTicket, _appSettingsService, _timeEntryService);
+                    _todayRows.Add(entry.Id, row);
+                }
+                else row.UpdateEntry(entry, cachedTicket);
+                TodayTimeEntries.Add(row);
             }
 
-            TodayBookedHours = Math.Round(todayEntries.Sum(entry => entry.Hours), 2);
+            foreach (var pendingRow in _todayRows.Values.Where(row =>
+                         !currentEntryIds.Contains(row.EntryId) && row.HasPendingUserState))
+            {
+                TodayTimeEntries.Add(pendingRow);
+            }
+
+            TodayBookedHours = Math.Round(todayEntries.Sum(entry =>
+                _todayRows.TryGetValue(entry.Id, out var row) && row.IsBusy ? row.BookedHours : entry.Hours), 2);
             OnPropertyChanged(nameof(HasTodayTimeEntries));
             OnPropertyChanged(nameof(TodayEntriesSummary));
+            return true;
         }
         catch (OperationCanceledException)
         {
-            // A newer reload superseded this request.
+            return false;
         }
+    }
+
+    internal void RemoveCommittedEntry(TodayTimeEntryRowViewModel row)
+    {
+        _deletedEntryIds.Add(row.EntryId);
+        _todayRows.Remove(row.EntryId);
+        TodayTimeEntries.Remove(row);
+        TodayBookedHours = Math.Max(0, TodayBookedHours - row.BookedHours);
+        OnPropertyChanged(nameof(HasTodayTimeEntries));
+        OnPropertyChanged(nameof(TodayEntriesSummary));
     }
 
     partial void OnFavoriteFilterTextChanged(string value)
@@ -415,6 +465,12 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         });
     }
 
+    internal string CurrentConnectionIdentity()
+    {
+        var settings = _appSettingsService.Load();
+        return ConnectionIdentity.Get(settings.BaseUrl, settings.ApiKey);
+    }
+
     private void CancelTodayHoursLoad()
     {
         _todayHoursCts?.Cancel();
@@ -433,12 +489,6 @@ public partial class TimeEntriesViewModel : ViewModelBase, IDisposable
         _rowLoadCts?.Cancel();
         _rowLoadCts?.Dispose();
         _rowLoadCts = null;
-    }
-
-    private CancellationToken BeginRowLoads()
-    {
-        _rowLoadCts = new CancellationTokenSource();
-        return _rowLoadCts.Token;
     }
 
     public void Dispose()

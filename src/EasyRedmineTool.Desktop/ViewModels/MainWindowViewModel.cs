@@ -2,6 +2,7 @@
 
 using Avalonia;
 using Avalonia.Styling;
+using Avalonia.Threading;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -24,6 +25,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private CancellationTokenSource? _updateCheckCts;
     private bool _isApplyingThemeFromSettings;
     private bool _disposed;
+    private string _connectionIdentity = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPersistenceWarning))]
+    private string persistenceWarning = string.Empty;
+    public bool HasPersistenceWarning => !string.IsNullOrWhiteSpace(PersistenceWarning);
 
     [ObservableProperty]
     private bool isSettingsVisible;
@@ -83,6 +90,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         AboutViewModel = aboutViewModel;
         _appSettingsService = appSettingsService;
         _updateCheckService = updateCheckService;
+        var settings = _appSettingsService.Load();
+        _connectionIdentity = ConnectionIdentity.Get(settings.BaseUrl, settings.ApiKey);
+        PersistenceWarning = _appSettingsService.LastPersistenceError ?? string.Empty;
+        _appSettingsService.PersistenceFailed += OnPersistenceFailed;
+        _appSettingsService.PersistenceSucceeded += OnPersistenceSucceeded;
 
         SettingsViewModel.SettingsSaved += OnSettingsSaved;
         WeeklySummaryViewModel.OpenTimeEntryRequested += OnOpenTimeEntryFromSummary;
@@ -239,8 +251,39 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _updateCheckCts = null;
     }
 
+    private void OnPersistenceFailed(object? sender, PersistenceFailedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_disposed && _appSettingsService.LastPersistenceError == e.Message)
+            {
+                PersistenceWarning = e.Message;
+            }
+        });
+    }
+
+    private void OnPersistenceSucceeded(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_disposed && _appSettingsService.LastPersistenceError is null)
+            {
+                PersistenceWarning = string.Empty;
+            }
+        });
+    }
+
     private void OnSettingsSaved(object? sender, EventArgs e)
     {
+        var settings = _appSettingsService.Load();
+        var identity = ConnectionIdentity.Get(settings.BaseUrl, settings.ApiKey);
+        if (identity != _connectionIdentity)
+        {
+            _connectionIdentity = identity;
+            WeeklySummaryViewModel.ResetForConnectionChange();
+            SeriesBookingViewModel.ResetForConnectionChange();
+        }
+        PersistenceWarning = _appSettingsService.LastPersistenceError ?? string.Empty;
         TicketListViewModel.ReloadSettings();
         TimeEntriesViewModel.ClearFocusedIssue();
         TimeEntriesViewModel.ReloadFavorites();
@@ -343,6 +386,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         _disposed = true;
+        _appSettingsService.PersistenceFailed -= OnPersistenceFailed;
+        _appSettingsService.PersistenceSucceeded -= OnPersistenceSucceeded;
         CancelUpdateCheck();
         SettingsViewModel.SettingsSaved -= OnSettingsSaved;
         WeeklySummaryViewModel.OpenTimeEntryRequested -= OnOpenTimeEntryFromSummary;
@@ -352,5 +397,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         TimeEntriesViewModel.Dispose();
         WeeklySummaryViewModel.Dispose();
         SeriesBookingViewModel.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

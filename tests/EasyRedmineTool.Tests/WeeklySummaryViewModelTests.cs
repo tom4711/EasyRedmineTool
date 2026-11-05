@@ -138,6 +138,8 @@ public class WeeklySummaryViewModelTests
 
         public void Dispose()
         {
+            SettingsService.FlushAsync().GetAwaiter().GetResult();
+            foreach (var cache in Directory.EnumerateFiles(Path.GetDirectoryName(_settingsPath)!, Path.GetFileName(_settingsPath) + ".tickets.*.json")) File.Delete(cache);
             if (File.Exists(_settingsPath))
             {
                 File.Delete(_settingsPath);
