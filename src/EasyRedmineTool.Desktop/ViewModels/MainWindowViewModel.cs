@@ -94,6 +94,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _connectionIdentity = ConnectionIdentity.Get(settings.BaseUrl, settings.ApiKey);
         PersistenceWarning = _appSettingsService.LastPersistenceError ?? string.Empty;
         _appSettingsService.PersistenceFailed += OnPersistenceFailed;
+        _appSettingsService.PersistenceSucceeded += OnPersistenceSucceeded;
 
         SettingsViewModel.SettingsSaved += OnSettingsSaved;
         WeeklySummaryViewModel.OpenTimeEntryRequested += OnOpenTimeEntryFromSummary;
@@ -252,7 +253,24 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void OnPersistenceFailed(object? sender, PersistenceFailedEventArgs e)
     {
-        Dispatcher.UIThread.Post(() => { if (!_disposed) PersistenceWarning = e.Message; });
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_disposed && _appSettingsService.LastPersistenceError == e.Message)
+            {
+                PersistenceWarning = e.Message;
+            }
+        });
+    }
+
+    private void OnPersistenceSucceeded(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_disposed && _appSettingsService.LastPersistenceError is null)
+            {
+                PersistenceWarning = string.Empty;
+            }
+        });
     }
 
     private void OnSettingsSaved(object? sender, EventArgs e)
@@ -369,6 +387,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         _disposed = true;
         _appSettingsService.PersistenceFailed -= OnPersistenceFailed;
+        _appSettingsService.PersistenceSucceeded -= OnPersistenceSucceeded;
         CancelUpdateCheck();
         SettingsViewModel.SettingsSaved -= OnSettingsSaved;
         WeeklySummaryViewModel.OpenTimeEntryRequested -= OnOpenTimeEntryFromSummary;

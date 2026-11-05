@@ -37,6 +37,7 @@ public sealed class AppSettingsService : IAppSettingsService
     public string SettingsFilePath => _settingsFilePath;
     public string? LastPersistenceError { get { lock (_sync) return _lastPersistenceError; } }
     public event EventHandler<PersistenceFailedEventArgs>? PersistenceFailed;
+    public event EventHandler? PersistenceSucceeded;
 
     public Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -221,7 +222,13 @@ public sealed class AppSettingsService : IAppSettingsService
                 }).ConfigureAwait(false);
                 // Only a successful settings replacement advances committed history or allows pruning.
                 _committedRevisions[identity] = nextHistory;
-                lock (_sync) _lastPersistenceError = null;
+                bool recovered;
+                lock (_sync)
+                {
+                    recovered = _lastPersistenceError is not null;
+                    _lastPersistenceError = null;
+                }
+                if (recovered) ReportSuccess();
                 await CleanupRevisionsAsync(identity, nextHistory).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
@@ -357,6 +364,17 @@ public sealed class AppSettingsService : IAppSettingsService
         {
             try { subscriber(this, new PersistenceFailedEventArgs(message)); }
             catch (Exception) { _logger.LogWarning("Settings persistence error notification failed."); }
+        }
+    }
+
+    private void ReportSuccess()
+    {
+        var subscribers = PersistenceSucceeded;
+        if (subscribers is null) return;
+        foreach (EventHandler subscriber in subscribers.GetInvocationList())
+        {
+            try { subscriber(this, EventArgs.Empty); }
+            catch (Exception) { _logger.LogWarning("Settings persistence recovery notification failed."); }
         }
     }
 

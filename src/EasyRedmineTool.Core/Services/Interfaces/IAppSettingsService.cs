@@ -7,6 +7,7 @@ public interface IAppSettingsService
     string SettingsFilePath { get; }
     string? LastPersistenceError => null;
     event EventHandler<PersistenceFailedEventArgs>? PersistenceFailed { add { } remove { } }
+    event EventHandler? PersistenceSucceeded { add { } remove { } }
 
     Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
