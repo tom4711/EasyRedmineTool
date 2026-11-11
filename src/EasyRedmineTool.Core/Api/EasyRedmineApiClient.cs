@@ -56,6 +56,38 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         return result?.Issue_Statuses ?? [];
     }
 
+    public async Task<IReadOnlyList<ProjectDto>> GetProjectsAsync(
+        string baseUrl,
+        string apiKey,
+        CancellationToken cancellationToken = default)
+    {
+        return await GetAllPagesAsync<ProjectDto>("projects.json", project => project.Id, async offset =>
+        {
+            const int limit = PageLimit;
+            // Clear the default project query and request active or Redmine-closed projects.
+            var endpoint = $"projects.json?set_filter=1&status=1|5&limit={limit}&offset={offset}";
+            using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, endpoint);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            await EnsureSuccessAsync(response, endpoint, cancellationToken);
+            var page = await response.Content.ReadFromJsonAsync<ProjectListResponse>(RedmineJson.Options, cancellationToken);
+            return (page?.Projects ?? [], page?.Total_Count ?? 0, page?.Offset ?? 0, page?.Limit ?? 0);
+        });
+    }
+
+    public async Task<IReadOnlyList<IssueDto>> GetProjectIssuesAsync(
+        string baseUrl,
+        string apiKey,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        return await GetAllPagesAsync<IssueDto>($"projects/{projectId}/issues.json", issue => issue.Id, async offset =>
+        {
+            var page = await GetIssuesPageAsync(baseUrl, apiKey, TicketAssigneeFilter.All, TicketStatusFilterKind.All,
+                statusId: null, PageLimit, offset, projectId, cancellationToken);
+            return (page?.Issues ?? [], page?.Total_Count ?? 0, page?.Offset ?? 0, page?.Limit ?? 0);
+        });
+    }
+
     public async Task<IReadOnlyList<IssueDto>> GetIssuesAsync(
         string baseUrl,
         string apiKey,
@@ -66,7 +98,7 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
     {
         return await GetAllPagesAsync<IssueDto>("issues.json", issue => issue.Id, async offset =>
         {
-            var page = await GetIssuesPageAsync(baseUrl, apiKey, assigneeFilter, statusKind, statusId, PageLimit, offset, cancellationToken);
+            var page = await GetIssuesPageAsync(baseUrl, apiKey, assigneeFilter, statusKind, statusId, PageLimit, offset, cancellationToken: cancellationToken);
             return (page?.Issues ?? [], page?.Total_Count ?? 0, page?.Offset ?? 0, page?.Limit ?? 0);
         });
     }
@@ -79,9 +111,10 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         int? statusId,
         int limit,
         int offset,
+        int? projectId = null,
         CancellationToken cancellationToken = default)
     {
-        var query = BuildIssuesQuery(assigneeFilter, statusKind, statusId, limit, offset);
+        var query = BuildIssuesQuery(assigneeFilter, statusKind, statusId, limit, offset, projectId);
         using var request = CreateRequest(HttpMethod.Get, baseUrl, apiKey, query);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
 
@@ -94,7 +127,8 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
         TicketStatusFilterKind statusKind,
         int? statusId,
         int limit,
-        int offset)
+        int offset,
+        int? projectId = null)
     {
         var parameters = new List<string>
         {
@@ -119,6 +153,11 @@ public class EasyRedmineApiClient(HttpClient httpClient, ILogger<EasyRedmineApiC
             TicketStatusFilterKind.Specific when statusId.HasValue => $"status_id={statusId.Value}",
             _ => "status_id=*"
         });
+
+        if (projectId.HasValue)
+        {
+            parameters.Add($"project_id={projectId.Value}");
+        }
 
         return $"issues.json?{string.Join('&', parameters)}";
     }

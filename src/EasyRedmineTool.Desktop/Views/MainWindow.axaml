@@ -25,6 +25,10 @@
                   Command="{Binding OpenTicketListCommand}"
                   Content="{materialIcons:MaterialIconTextExt Kind=ClipboardListOutline, Text=Tickets}" />
           <Button Classes="nav"
+                  Classes.active="{Binding IsDashboardVisible}"
+                  Command="{Binding OpenDashboardCommand}"
+                  Content="{materialIcons:MaterialIconTextExt Kind=ViewDashboardOutline, Text=Teamboard}" />
+          <Button Classes="nav"
                   Classes.active="{Binding IsTimeEntriesVisible}"
                   AutomationProperties.ItemStatus="{Binding IsTimeEntriesVisible}"
                   Command="{Binding OpenTimeEntriesCommand}"
@@ -110,6 +114,10 @@
 
       <Grid IsVisible="{Binding IsTicketListVisible}">
         <views:TicketListView DataContext="{Binding TicketListViewModel}" />
+      </Grid>
+
+      <Grid IsVisible="{Binding IsDashboardVisible}">
+        <views:KanbanDashboardView DataContext="{Binding KanbanDashboardViewModel}" />
       </Grid>
 
       <Grid IsVisible="{Binding IsTimeEntriesVisible}">

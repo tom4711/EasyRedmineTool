@@ -8,6 +8,18 @@ using TicketStatusFilterKind = EasyRedmineTool.Core.Models.Tickets.TicketStatusF
 
 public interface IEasyRedmineApiClient
 {
+    Task<IReadOnlyList<ProjectDto>> GetProjectsAsync(
+        string baseUrl,
+        string apiKey,
+        CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ProjectDto>>([]);
+
+    Task<IReadOnlyList<IssueDto>> GetProjectIssuesAsync(
+        string baseUrl,
+        string apiKey,
+        int projectId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<IReadOnlyList<IssueDto>>(new NotSupportedException("Projektbezogener Ticketabruf wird nicht unterstützt."));
+
     Task<HttpResponseMessage> GetCurrentUserAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default);
 
     Task<int?> GetCurrentUserIdAsync(string baseUrl, string apiKey, CancellationToken cancellationToken = default);

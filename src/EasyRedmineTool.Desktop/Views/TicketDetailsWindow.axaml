@@ -1,0 +1,56 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:tickets="using:EasyRedmineTool.Core.Models.Tickets"
+        x:Class="EasyRedmineTool.Desktop.Views.TicketDetailsWindow"
+        x:DataType="tickets:IssueDto"
+        Title="Ticketdetails"
+        Width="720"
+        Height="640"
+        MinWidth="520"
+        MinHeight="420"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <StackPanel Grid.Row="0" Margin="24,20,24,12" Spacing="4">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBlock Text="#" FontSize="20" FontWeight="Bold" />
+        <TextBlock Text="{Binding Id}" FontSize="20" FontWeight="Bold" />
+      </StackPanel>
+      <TextBlock Text="{Binding Subject}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="24,8,24,20" Spacing="14">
+        <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+          <TextBlock Grid.Row="0" Text="Projekt" FontWeight="SemiBold" /><TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Project.Name}" TextWrapping="Wrap" />
+          <TextBlock Grid.Row="1" Text="Status" FontWeight="SemiBold" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Status.Name}" />
+          <TextBlock Grid.Row="2" Text="Tracker" FontWeight="SemiBold" /><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Tracker.Name}" />
+          <TextBlock Grid.Row="3" Text="Priorität" FontWeight="SemiBold" /><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Priority.Name}" />
+          <TextBlock Grid.Row="4" Text="Bearbeiter" FontWeight="SemiBold" /><TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Assigned_To.Name}" />
+          <TextBlock Grid.Row="5" Text="Autor" FontWeight="SemiBold" /><TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Author.Name}" />
+          <TextBlock Grid.Row="6" Text="Kategorie" FontWeight="SemiBold" /><TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Category.Name}" />
+          <TextBlock Grid.Row="7" Text="Zielversion" FontWeight="SemiBold" /><TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding Fixed_Version.Name}" />
+          <TextBlock Grid.Row="8" Text="Beginn" FontWeight="SemiBold" /><TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding Start_Date}" />
+          <TextBlock Grid.Row="9" Text="Fällig" FontWeight="SemiBold" /><TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding Due_Date}" />
+          <TextBlock Grid.Row="10" Text="Erstellt" FontWeight="SemiBold" /><TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding Created_On}" />
+          <TextBlock Grid.Row="11" Text="Zuletzt geändert" FontWeight="SemiBold" /><TextBlock Grid.Row="11" Grid.Column="1" Text="{Binding Updated_On}" />
+        </Grid>
+
+        <StackPanel Spacing="6">
+          <TextBlock Text="Beschreibung" FontSize="16" FontWeight="SemiBold" />
+          <Border Background="{DynamicResource CardBackgroundBrush}"
+                  BorderBrush="{DynamicResource CardBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="6"
+                  Padding="12">
+            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" />
+          </Border>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="24,8,24,20">
+      <Button Classes="secondary" Content="Schließen" IsDefault="True" Click="OnCloseClick" />
+    </StackPanel>
+  </Grid>
+</Window>

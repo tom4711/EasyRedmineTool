@@ -39,6 +39,19 @@ public class TicketService(IEasyRedmineApiClient apiClient) : ITicketService
         return await _apiClient.GetAllMyOpenIssuesAsync(baseUrl, apiKey, cancellationToken);
     }
 
+    public Task<IReadOnlyList<ProjectDto>> GetProjectsAsync(
+        string baseUrl,
+        string apiKey,
+        CancellationToken cancellationToken = default) =>
+        _apiClient.GetProjectsAsync(baseUrl, apiKey, cancellationToken);
+
+    public Task<IReadOnlyList<IssueDto>> GetProjectTicketsAsync(
+        string baseUrl,
+        string apiKey,
+        int projectId,
+        CancellationToken cancellationToken = default) =>
+        _apiClient.GetProjectIssuesAsync(baseUrl, apiKey, projectId, cancellationToken);
+
     public async Task<TicketListLoadResult> GetTicketsForListAsync(
         string baseUrl,
         string apiKey,
