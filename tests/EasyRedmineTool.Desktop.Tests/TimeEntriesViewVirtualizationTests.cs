@@ -39,12 +39,13 @@ public sealed class TimeEntriesViewVirtualizationTests
             Assert.InRange(list.GetRealizedContainers().Count(), 1, 30);
             Assert.InRange(service.ActivityCalls, 1, 30);
             Assert.InRange(service.MaxConcurrentActivities, 1, 4);
+            var row = vm.FilteredFavoriteRows[0];
             service.ReleaseActivities();
+            await row.EnsureFormLoadedAsync();
             await SettleAsync(window);
             Assert.InRange(service.FieldCalls, 1, 30);
             Assert.DoesNotContain(500, service.LoadedIssueIds);
 
-            var row = vm.FilteredFavoriteRows[0];
             var firstContainer = list.ContainerFromItem(row)!;
             Assert.NotNull(firstContainer);
             var hoursInput = firstContainer.GetVisualDescendants().OfType<TextBox>().Single(box => box.Classes.Contains("hours-input"));
