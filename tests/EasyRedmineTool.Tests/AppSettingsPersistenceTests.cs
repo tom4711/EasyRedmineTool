@@ -6,7 +6,6 @@ using EasyRedmineTool.Core.Configuration;
 using EasyRedmineTool.Core.Models.Tickets;
 using EasyRedmineTool.Core.Services;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit.Abstractions;
 
 public sealed class AppSettingsPersistenceTests : IDisposable
 {

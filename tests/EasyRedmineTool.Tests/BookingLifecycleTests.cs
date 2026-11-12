@@ -321,20 +321,22 @@ public class BookingLifecycleTests
         public TaskCompletionSource<TimeEntryLoadResult>? PendingEntries { get; set; }
         public List<TimeEntryCreateRequest> Created { get; } = [];
         public TaskCompletionSource<IReadOnlyList<TimeEntryActivityDto>>? PendingActivities { get; set; }
-        public int ActivityCalls { get; private set; }
-        public int FieldCalls { get; private set; }
+        private int _activityCalls;
+        public int ActivityCalls => Volatile.Read(ref _activityCalls);
+        private int _fieldCalls;
+        public int FieldCalls => Volatile.Read(ref _fieldCalls);
         public IReadOnlyList<TimeEntryDto> Entries { get; set; } = [];
         public bool FailEntries { get; set; }
         public int EntryCalls { get; private set; }
         public int DeleteCalls { get; private set; }
         public Task<IReadOnlyList<TimeEntryActivityDto>> GetActivitiesAsync(string baseUrl, string apiKey, int? issueId = null, int? projectId = null, CancellationToken cancellationToken = default)
         {
-            ActivityCalls++;
+            Interlocked.Increment(ref _activityCalls);
             return PendingActivities?.Task ?? Task.FromResult<IReadOnlyList<TimeEntryActivityDto>>([new() { Id = 1, Name = "Dev" }]);
         }
         public Task<IReadOnlyList<TimeEntryCustomFieldValueDto>> GetRecentCustomFieldValuesAsync(string baseUrl, string apiKey, int? issueId = null, int? projectId = null, CancellationToken cancellationToken = default)
         {
-            FieldCalls++;
+            Interlocked.Increment(ref _fieldCalls);
             return Task.FromResult<IReadOnlyList<TimeEntryCustomFieldValueDto>>([]);
         }
         public Task<TimeEntryLoadResult> GetMyTimeEntriesAsync(string baseUrl, string apiKey, DateTime from, DateTime to, CancellationToken cancellationToken = default)

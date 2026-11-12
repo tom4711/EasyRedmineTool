@@ -338,7 +338,15 @@ public sealed class AppSettingsService : IAppSettingsService
         {
             await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous))
                 await JsonSerializer.SerializeAsync(stream, value, JsonOptions).ConfigureAwait(false);
-            File.Move(temporary, path, overwrite);
+            // On Windows, scanners/indexers can briefly lock the freshly written or target file.
+            for (var attempt = 1; ; attempt++)
+            {
+                try { File.Move(temporary, path, overwrite); break; }
+                catch (Exception ex) when (attempt < 5 && ex is IOException or UnauthorizedAccessException)
+                {
+                    await Task.Delay(20 * attempt).ConfigureAwait(false);
+                }
+            }
         }
         finally
         {
