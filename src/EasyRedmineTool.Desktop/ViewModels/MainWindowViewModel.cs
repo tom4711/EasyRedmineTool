@@ -39,6 +39,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool isTicketListVisible;
 
     [ObservableProperty]
+    private bool isDashboardVisible;
+
+    [ObservableProperty]
     private bool isTimeEntriesVisible;
 
     [ObservableProperty]
@@ -75,6 +78,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public MainWindowViewModel(
         SettingsViewModel settingsViewModel,
         TicketListViewModel ticketListViewModel,
+        KanbanDashboardViewModel kanbanDashboardViewModel,
         TimeEntriesViewModel timeEntriesViewModel,
         WeeklySummaryViewModel weeklySummaryViewModel,
         SeriesBookingViewModel seriesBookingViewModel,
@@ -84,6 +88,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         SettingsViewModel = settingsViewModel;
         TicketListViewModel = ticketListViewModel;
+        KanbanDashboardViewModel = kanbanDashboardViewModel;
         TimeEntriesViewModel = timeEntriesViewModel;
         WeeklySummaryViewModel = weeklySummaryViewModel;
         SeriesBookingViewModel = seriesBookingViewModel;
@@ -105,6 +110,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public SettingsViewModel SettingsViewModel { get; }
     public TicketListViewModel TicketListViewModel { get; }
+    public KanbanDashboardViewModel KanbanDashboardViewModel { get; }
     public TimeEntriesViewModel TimeEntriesViewModel { get; }
     public WeeklySummaryViewModel WeeklySummaryViewModel { get; }
     public SeriesBookingViewModel SeriesBookingViewModel { get; }
@@ -175,6 +181,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         TicketListViewModel.ReloadSettings();
         ShowTicketList();
+    }
+
+    [RelayCommand]
+    private void OpenDashboard()
+    {
+        _ = KanbanDashboardViewModel.LoadAsync();
+        ShowDashboard();
     }
 
     [RelayCommand]
@@ -317,6 +330,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         IsSettingsVisible = false;
         IsTicketListVisible = false;
+        IsDashboardVisible = false;
         IsTimeEntriesVisible = false;
         IsWeeklySummaryVisible = false;
         IsSeriesBookingVisible = false;
@@ -334,6 +348,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         HideAllViews();
         IsTicketListVisible = true;
+    }
+
+    private void ShowDashboard()
+    {
+        HideAllViews();
+        IsDashboardVisible = true;
     }
 
     private void ShowTimeEntries()
@@ -375,6 +395,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         SettingsViewModel.Dispose();
         TicketListViewModel.Dispose();
+        KanbanDashboardViewModel.Dispose();
         TimeEntriesViewModel.Dispose();
         WeeklySummaryViewModel.Dispose();
         SeriesBookingViewModel.Dispose();

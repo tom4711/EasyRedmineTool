@@ -430,3 +430,4 @@ FodyWeavers.xsd
 
 # Git worktrees (local isolation)
 .worktrees/
+.aider*

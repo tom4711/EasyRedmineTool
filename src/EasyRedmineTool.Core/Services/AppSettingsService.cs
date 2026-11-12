@@ -85,6 +85,8 @@ public sealed class AppSettingsService : IAppSettingsService
             updated.CachedTickets = [];
             updated.FavoriteTicketIds = [];
             updated.LastLoadedTicketIds = [];
+            updated.DashboardProjectIds = [];
+            updated.DashboardTicketIds = [];
             updated.TimeEntryCustomFieldDefaults = [];
         }
         _snapshot = updated;
@@ -371,6 +373,8 @@ public sealed class AppSettingsService : IAppSettingsService
         IsDarkMode = settings.IsDarkMode,
         CachedTickets = (settings.CachedTickets ?? []).Select(CloneTicket).ToList(),
         FavoriteTicketIds = [.. settings.FavoriteTicketIds ?? []],
+        DashboardProjectIds = [.. settings.DashboardProjectIds ?? []],
+        DashboardTicketIds = [.. settings.DashboardTicketIds ?? []],
         LastLoadedTicketIds = [.. settings.LastLoadedTicketIds ?? []],
         TicketLoadAssigneeFilter = settings.TicketLoadAssigneeFilter,
         TicketLoadStatusFilterKind = settings.TicketLoadStatusFilterKind,

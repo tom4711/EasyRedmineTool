@@ -12,6 +12,8 @@ public class AppSettings
     public bool IsDarkMode { get; set; }
     public List<IssueDto> CachedTickets { get; set; } = [];
     public List<int> FavoriteTicketIds { get; set; } = [];
+    public List<int> DashboardProjectIds { get; set; } = [];
+    public List<int> DashboardTicketIds { get; set; } = [];
     public List<int> LastLoadedTicketIds { get; set; } = [];
     public TicketAssigneeFilter TicketLoadAssigneeFilter { get; set; } = TicketAssigneeFilter.Me;
     public TicketStatusFilterKind TicketLoadStatusFilterKind { get; set; } = TicketStatusFilterKind.Open;
